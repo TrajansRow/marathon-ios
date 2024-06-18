@@ -2381,8 +2381,6 @@ send_text_fake(w_text_entry* te) {
 // Here's the main entry point for thgametypee postgame carnage report.
 void display_net_game_stats(void)
 {
-//printf("display_net_game_stats\n");
-  //return;//dcw shit test
   switchToSDLMenu(); //DCW
   
 	if (gMetaserverClient) 
