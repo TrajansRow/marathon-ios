@@ -30,6 +30,7 @@ Aug 31, 2000 (Loren Petrich):
 #include "cseries.h"
 #include <string.h>
 
+#include "crc.h"
 #include "tags.h"
 #include "map.h"
 #include "interface.h"
@@ -94,7 +95,6 @@ bool physics_file_is_m1(void)
     
     // check for M1 physics
     OpenedFile PhysicsFile;
-    short SavedType, SavedError = get_game_error(&SavedType);
     if (PhysicsFileSpec.Open(PhysicsFile))
     {
         uint32 tag = SDL_ReadBE32(PhysicsFile.GetRWops());
@@ -113,7 +113,6 @@ bool physics_file_is_m1(void)
         
         PhysicsFile.Close();
     }
-    set_game_error(SavedType, SavedError);
     return m1_physics;
 }
 
@@ -155,14 +154,15 @@ void *get_network_physics_buffer(
 		if (PhysicsFileSpec.Open(PhysicsFile) &&
 		    PhysicsFile.GetLength(*physics_length))
 		{
-			data = (uint8 *)malloc(*physics_length + 4);
-            SDL_RWops *ops = SDL_RWFromMem(data, *physics_length + 4);
+			*physics_length += 8;
+			data = (uint8 *)malloc(*physics_length);
+            SDL_RWops *ops = SDL_RWFromMem(data, *physics_length);
             success = SDL_WriteBE32(ops, uint32(M1_PHYSICS_MAGIC_COOKIE));
             if (success)
-                success = SDL_WriteBE32(ops, uint32(*physics_length));
+                success = SDL_WriteBE32(ops, uint32(*physics_length - 8));
             SDL_RWclose(ops);
             if (success)
-                success = PhysicsFile.Read(*physics_length, &data[8]);
+                success = PhysicsFile.Read(*physics_length - 8, &data[8]);
 			if (!success)
 				free(data);
 		}
@@ -221,6 +221,11 @@ void process_network_physics_model(
 			free_wad(wad); /* Note that the flat data points into the wad. */
 		}
 	}
+}
+
+uint32_t get_physics_file_checksum()
+{
+	return calculate_crc_for_file(PhysicsFileSpec);
 }
 
 /* --------- local code */

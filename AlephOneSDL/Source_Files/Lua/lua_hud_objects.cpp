@@ -20,6 +20,11 @@ LUA_HUD_OBJECTS.CPP
     Implements Lua HUD objects and globals
 */
 
+
+#if defined (_MSC_VER) && !defined (M_PI)
+#define _USE_MATH_DEFINES
+#endif 
+
 #include "lua_hud_objects.h"
 #include "lua_objects.h"
 #include "lua_map.h"
@@ -45,12 +50,9 @@ LUA_HUD_OBJECTS.CPP
 #include "FileHandler.h"
 #include "Crosshairs.h"
 
-#include <boost/bind.hpp>
-#include <boost/shared_ptr.hpp>
 #include <algorithm>
 #include <cmath>
-
-#ifdef HAVE_LUA
+#include <unordered_map>
 
 extern struct view_data *world_view;
 
@@ -789,7 +791,7 @@ public:
 
 Lua_Font *Lua_Font::Push(lua_State *L, FontSpecifier *fs)
 {
-	Lua_Font *t = static_cast<Lua_Font *>(L_ObjectClass<Lua_Font_Name, FontSpecifier *>::Push(L, fs));
+	Lua_Font *t = L_ObjectClass::Push<Lua_Font>(L, fs);
 	if (t)
 	{
 		t->m_font_scale = 1.0;
@@ -800,14 +802,14 @@ Lua_Font *Lua_Font::Push(lua_State *L, FontSpecifier *fs)
 
 float Lua_Font::Scale(lua_State *L, int index)
 {
-	Lua_Font *t = static_cast<Lua_Font *>(lua_touserdata(L, index));
+	Lua_Font *t = static_cast<Lua_Font *>(Instance(L, index));
 	if (!t) luaL_typerror(L, index, Lua_Font_Name);
 	return t->m_font_scale;
 }
 
 void Lua_Font::SetScale(lua_State *L, int index, float new_scale)
 {
-	Lua_Font *t = static_cast<Lua_Font *>(lua_touserdata(L, index));
+	Lua_Font *t = static_cast<Lua_Font *>(Instance(L, index));
 	if (!t) luaL_typerror(L, index, Lua_Font_Name);
 	t->m_font_scale = new_scale;
 }
@@ -952,10 +954,10 @@ int Lua_Fonts_New(lua_State *L)
 	lua_pop(L, 1);
 	
 	std::string search_path = L_Get_Search_Path(L);
-	std::auto_ptr<ScopedSearchPath> ssp;
+	std::unique_ptr<ScopedSearchPath> ssp;
 	if (search_path.size())
 	{
-		ssp.reset(new ScopedSearchPath(DirectorySpecifier(search_path)));
+		ssp = std::make_unique<ScopedSearchPath>(DirectorySpecifier(search_path));
 	}
 
 	FontSpecifier *ff = new FontSpecifier(f);
@@ -1081,7 +1083,7 @@ public:
 
 Lua_HUDPlayer_Weapon_Trigger_Bullet *Lua_HUDPlayer_Weapon_Trigger_Bullet::Push(lua_State *L, int16 weapon_index, int16 index)
 {
-	Lua_HUDPlayer_Weapon_Trigger_Bullet *t = static_cast<Lua_HUDPlayer_Weapon_Trigger_Bullet *>(L_Class<Lua_HUDPlayer_Weapon_Trigger_Bullet_Name>::Push(L, index));
+	Lua_HUDPlayer_Weapon_Trigger_Bullet *t = L_Class::Push<Lua_HUDPlayer_Weapon_Trigger_Bullet>(L, index);
 	if (t)
 	{
 		t->m_weapon_index = weapon_index;
@@ -1092,7 +1094,7 @@ Lua_HUDPlayer_Weapon_Trigger_Bullet *Lua_HUDPlayer_Weapon_Trigger_Bullet::Push(l
 
 int16 Lua_HUDPlayer_Weapon_Trigger_Bullet::WeaponIndex(lua_State *L, int index)
 {
-	Lua_HUDPlayer_Weapon_Trigger_Bullet *t = static_cast<Lua_HUDPlayer_Weapon_Trigger_Bullet*>(lua_touserdata(L, index));
+	Lua_HUDPlayer_Weapon_Trigger_Bullet *t = static_cast<Lua_HUDPlayer_Weapon_Trigger_Bullet*>(Instance(L, index));
 	if (!t) luaL_typerror(L, index, Lua_HUDPlayer_Weapon_Trigger_Bullet_Name);
 	return t->m_weapon_index;
 }
@@ -1199,7 +1201,7 @@ public:
 
 Lua_HUDPlayer_Weapon_Trigger_Energy *Lua_HUDPlayer_Weapon_Trigger_Energy::Push(lua_State *L, int16 weapon_index, int16 index)
 {
-	Lua_HUDPlayer_Weapon_Trigger_Energy *t = static_cast<Lua_HUDPlayer_Weapon_Trigger_Energy *>(L_Class<Lua_HUDPlayer_Weapon_Trigger_Energy_Name>::Push(L, index));
+	Lua_HUDPlayer_Weapon_Trigger_Energy *t = L_Class::Push<Lua_HUDPlayer_Weapon_Trigger_Energy>(L, index);
 	if (t)
 	{
 		t->m_weapon_index = weapon_index;
@@ -1210,7 +1212,7 @@ Lua_HUDPlayer_Weapon_Trigger_Energy *Lua_HUDPlayer_Weapon_Trigger_Energy::Push(l
 
 int16 Lua_HUDPlayer_Weapon_Trigger_Energy::WeaponIndex(lua_State *L, int index)
 {
-	Lua_HUDPlayer_Weapon_Trigger_Energy *t = static_cast<Lua_HUDPlayer_Weapon_Trigger_Energy*>(lua_touserdata(L, index));
+	Lua_HUDPlayer_Weapon_Trigger_Energy *t = static_cast<Lua_HUDPlayer_Weapon_Trigger_Energy*>(Instance(L, index));
 	if (!t) luaL_typerror(L, index, Lua_HUDPlayer_Weapon_Trigger_Energy_Name);
 	return t->m_weapon_index;
 }
@@ -1296,7 +1298,7 @@ public:
 
 Lua_HUDPlayer_Weapon_Trigger *Lua_HUDPlayer_Weapon_Trigger::Push(lua_State *L, int16 weapon_index, int16 index)
 {
-	Lua_HUDPlayer_Weapon_Trigger *t = static_cast<Lua_HUDPlayer_Weapon_Trigger *>(L_Class<Lua_HUDPlayer_Weapon_Trigger_Name>::Push(L, index));
+	Lua_HUDPlayer_Weapon_Trigger *t = L_Class::Push<Lua_HUDPlayer_Weapon_Trigger>(L, index);
 	if (t)
 	{
 		t->m_weapon_index = weapon_index;
@@ -1307,7 +1309,7 @@ Lua_HUDPlayer_Weapon_Trigger *Lua_HUDPlayer_Weapon_Trigger::Push(lua_State *L, i
 
 int16 Lua_HUDPlayer_Weapon_Trigger::WeaponIndex(lua_State *L, int index)
 {
-	Lua_HUDPlayer_Weapon_Trigger *t = static_cast<Lua_HUDPlayer_Weapon_Trigger*>(lua_touserdata(L, index));
+	Lua_HUDPlayer_Weapon_Trigger *t = static_cast<Lua_HUDPlayer_Weapon_Trigger*>(Instance(L, index));
 	if (!t) luaL_typerror(L, index, Lua_HUDPlayer_Weapon_Trigger_Name);
 	return t->m_weapon_index;
 }
@@ -2075,8 +2077,7 @@ static int Lua_HUDPlayer_Get_Velocity(lua_State *L)
 
 static int Lua_HUDPlayer_Get_Microphone(lua_State *L)
 {    
-    lua_pushboolean(L, current_netgame_allows_microphone() &&
-                    (dynamic_world->speaking_player_index == local_player_index));
+    lua_pushboolean(L, false);
 	return 1;
 }
 
@@ -2140,6 +2141,12 @@ static int Lua_HUDPlayer_Get_Texture_Palette(lua_State *L)
     return 1;
 }
 
+static int Lua_HUDPlayer_Get_Run_Key(lua_State* L)
+{
+	lua_pushboolean(L, current_player->run_key);
+	return 1;
+}
+
 const luaL_Reg Lua_HUDPlayer_Get[] = {
 {"color", Lua_HUDPlayer_Get_Color},
 {"dead", Lua_HUDPlayer_Get_Dead},
@@ -2162,6 +2169,7 @@ const luaL_Reg Lua_HUDPlayer_Get[] = {
 {"zoom_active", Lua_HUDPlayer_Get_Zoom},
 {"texture_palette", Lua_HUDPlayer_Get_Texture_Palette},
 {"respawn_duration", Lua_HUDPlayer_Get_Respawn_Duration},
+{"run_key", Lua_HUDPlayer_Get_Run_Key},
 {0, 0}
 };
 
@@ -2434,24 +2442,92 @@ const luaL_Reg Lua_Screen_Term_Rect_Set[] = {
 {0, 0}
 };
 
+char Lua_Screen_Text_Margins_Name[] = "text_margins";
+typedef L_Class<Lua_Screen_Text_Margins_Name> Lua_Screen_Text_Margins;
+
+static int Lua_Screen_Text_Margins_Get_Bottom(lua_State *L)
+{
+	lua_pushnumber(L, alephone::Screen::instance()->lua_text_margins.bottom);
+	return 1;
+}
+
+static int Lua_Screen_Text_Margins_Get_Left(lua_State *L)
+{
+	lua_pushnumber(L, alephone::Screen::instance()->lua_text_margins.left);
+	return 1;
+}
+
+static int Lua_Screen_Text_Margins_Get_Right(lua_State *L)
+{
+	lua_pushnumber(L, alephone::Screen::instance()->lua_text_margins.right);
+	return 1;
+}
+
+static int Lua_Screen_Text_Margins_Get_Top(lua_State *L)
+{
+	lua_pushnumber(L, alephone::Screen::instance()->lua_text_margins.top);
+	return 1;
+}
+
+static int Lua_Screen_Text_Margins_Set_Bottom(lua_State *L)
+{
+	alephone::Screen::instance()->lua_text_margins.bottom = lua_tointeger(L, 2);
+	return 0;
+}
+
+static int Lua_Screen_Text_Margins_Set_Left(lua_State *L)
+{
+	alephone::Screen::instance()->lua_text_margins.left = lua_tointeger(L, 2);
+	return 0;
+}
+
+static int Lua_Screen_Text_Margins_Set_Right(lua_State *L)
+{
+	alephone::Screen::instance()->lua_text_margins.right = lua_tointeger(L, 2);
+	return 0;
+}
+
+static int Lua_Screen_Text_Margins_Set_Top(lua_State *L)
+{
+	alephone::Screen::instance()->lua_text_margins.top = lua_tointeger(L, 2);
+	return 0;
+}
+
+const luaL_Reg Lua_Screen_Text_Margins_Get[] = {
+{"bottom", Lua_Screen_Text_Margins_Get_Bottom},
+{"left", Lua_Screen_Text_Margins_Get_Left},
+{"right", Lua_Screen_Text_Margins_Get_Right},
+{"top", Lua_Screen_Text_Margins_Get_Top},
+{0, 0}
+};
+
+const luaL_Reg Lua_Screen_Text_Margins_Set[] = {
+{"bottom", Lua_Screen_Text_Margins_Set_Bottom},
+{"left", Lua_Screen_Text_Margins_Set_Left},
+{"right", Lua_Screen_Text_Margins_Set_Right},
+{"top", Lua_Screen_Text_Margins_Set_Top},
+{0, 0}
+};
+
+
 char Lua_Screen_FOV_Name[] = "field_of_view";
 typedef L_Class<Lua_Screen_FOV_Name> Lua_Screen_FOV;
 
 static int Lua_Screen_FOV_Get_Horizontal(lua_State *L)
 {
 	float factor = 1.0f;
-	if (get_screen_mode()->acceleration == _shader_acceleration)
+	if (get_screen_mode()->acceleration == _opengl_acceleration)
 		factor = 1.3f;
-    lua_pushnumber(L, world_view->half_cone * 2.0f / factor);
+    lua_pushnumber(L, world_view->half_cone * 360.f / NUMBER_OF_ANGLES * 2.0f / factor);
     return 1;
 }
 
 static int Lua_Screen_FOV_Get_Vertical(lua_State *L)
 {
 	float factor = 1.0f;
-	if (get_screen_mode()->acceleration == _shader_acceleration)
+	if (get_screen_mode()->acceleration == _opengl_acceleration)
 		factor = 1.3f;
-    lua_pushnumber(L, world_view->half_vertical_cone * 2.0f / factor);
+    lua_pushnumber(L, world_view->half_vertical_cone * 360.f / NUMBER_OF_ANGLES * 2.0f / factor);
     return 1;
 }
 
@@ -2561,6 +2637,12 @@ static int Lua_Screen_Get_Term_Rect(lua_State *L)
 	return 1;
 }
 
+static int Lua_Screen_Get_Text_Margins(lua_State* L)
+{
+	Lua_Screen_Text_Margins::Push(L, Lua_Screen::Index(L, 1));
+	return 1;
+}
+
 static int Lua_Screen_Get_Map_Active(lua_State *L)
 {
 	lua_pushboolean(L, world_view->overhead_map_active);
@@ -2648,6 +2730,7 @@ const luaL_Reg Lua_Screen_Get[] = {
 {"world_rect", Lua_Screen_Get_World_Rect},
 {"map_rect", Lua_Screen_Get_Map_Rect},
 {"term_rect", Lua_Screen_Get_Term_Rect},
+{"text_margins", Lua_Screen_Get_Text_Margins},
 {"map_active", Lua_Screen_Get_Map_Active},
 {"map_overlay_active", Lua_Screen_Get_Map_Overlay},
 {"term_active", Lua_Screen_Get_Term_Active},
@@ -2822,7 +2905,10 @@ static int Lua_HUDGame_Get_Version(lua_State *L)
 	return 1;
 }
 
+extern int Lua_Game_Deserialize(lua_State* L);
+
 const luaL_Reg Lua_HUDGame_Get[] = {
+{"deserialize", L_TableFunction<Lua_Game_Deserialize>},
 {"difficulty", Lua_HUDGame_Get_Difficulty},
 {"kill_limit", Lua_HUDGame_Get_Kill_Limit},
 {"time_remaining", Lua_HUDGame_Get_Time_Remaining},
@@ -2833,6 +2919,35 @@ const luaL_Reg Lua_HUDGame_Get[] = {
 {"players", Lua_HUDGame_Get_Players},
 {0, 0}
 };
+
+char Lua_HUDLevel_Stash_Name[] = "LevelStash";
+typedef L_Class<Lua_HUDLevel_Stash_Name> Lua_HUDLevel_Stash;
+
+extern std::unordered_map<std::string, std::string> lua_stash;
+
+static int Lua_HUDLevel_Stash_Get(lua_State* L)
+{
+        if (!lua_isstring(L, 2))
+                return luaL_error(L, "stash: incorrect argument type");
+        
+        auto it = lua_stash.find(lua_tostring(L, 2));
+        if (it != lua_stash.end())
+        {
+                lua_pushlstring(L, it->second.data(), it->second.size());
+        }
+        else
+        {
+                lua_pushnil(L);
+        }
+
+        return 1;
+}
+
+const luaL_Reg Lua_HUDLevel_Stash_Metatable[] = {
+        {"__index", Lua_HUDLevel_Stash_Get},
+        {0, 0}
+};
+
 
 
 char Lua_HUDLevel_Name[] = "Level";
@@ -2861,10 +2976,17 @@ static int Lua_HUDLevel_Get_Map_Checksum(lua_State *L)
     return 1;
 }
 
+static int Lua_HUDLevel_Get_Stash(lua_State* L)
+{
+    Lua_HUDLevel_Stash::Push(L, 0);
+    return 1;
+}
+
 const luaL_Reg Lua_HUDLevel_Get[] = {
     {"name", Lua_HUDLevel_Get_Name},
     {"index", Lua_HUDLevel_Get_Index},
     {"map_checksum", Lua_HUDLevel_Get_Map_Checksum},
+    {"stash", Lua_HUDLevel_Get_Stash},
     {0, 0}
 };
 
@@ -3223,6 +3345,7 @@ int Lua_HUDObjects_register(lua_State *L)
 	Lua_Screen_World_Rect::Register(L, Lua_Screen_World_Rect_Get, Lua_Screen_World_Rect_Set);
 	Lua_Screen_Map_Rect::Register(L, Lua_Screen_Map_Rect_Get, Lua_Screen_Map_Rect_Set);
 	Lua_Screen_Term_Rect::Register(L, Lua_Screen_Term_Rect_Get, Lua_Screen_Term_Rect_Set);
+	Lua_Screen_Text_Margins::Register(L, Lua_Screen_Text_Margins_Get, Lua_Screen_Text_Margins_Set);
 	Lua_Screen_FOV::Register(L, Lua_Screen_FOV_Get, Lua_Screen_FOV_Set);
 	Lua_Screen_Crosshairs::Register(L, Lua_Screen_Crosshairs_Get, Lua_Screen_Crosshairs_Set);
 	
@@ -3238,6 +3361,8 @@ int Lua_HUDObjects_register(lua_State *L)
 	Lua_HUDGame::Register(L, Lua_HUDGame_Get);
 	Lua_HUDGame::Push(L, 0);
 	lua_setglobal(L, Lua_HUDGame_Name);
+
+        Lua_HUDLevel_Stash::Register(L, 0, 0, Lua_HUDLevel_Stash_Metatable);
 
 	Lua_HUDLevel::Register(L, Lua_HUDLevel_Get);
 	Lua_HUDLevel::Push(L, 0);
@@ -3276,5 +3401,3 @@ int Lua_HUDObjects_register(lua_State *L)
 	
 	return 0;
 }
-
-#endif

@@ -1,0 +1,152 @@
+A list of hacks and modifications needed to port Aleph One source files to iOS.
+
+These are the steps followed to rebase the entire engine from Aleph One into a form that will run as the iOS port.
+
+Resync vcpkg.json, and build dependencies with the iOS arm community triplet.
+
+Remove folder references to Source_Files from the Xcode project
+Replace AlephOneSDL/Source_Files with the latest from the Aleph One project using the opengl-es-renderer branch!
+
+Drop the new Source_Files into the Xcode project sidebar. DO NOT create an external build system!
+
+Use "Create Groups", and check all targets.
+
+From the new source tree, remove references to these files from everywhere: Makefile.am, COPYING, README, COPYRIGHT, buildprogram, thread_priority_sdl_win32,  thread_priority_sdl_posix, thread_priority_sdl_dummy, network_dummy.cpp, csalerts.mm, main.cpp (Make sure nothing new and important is in here)
+
+Remove references to the Shaders directory in code, and drop the real Shaders directly in as a folder. Do not add to any targets.
+
+Code changes:
+
+If not using ANGLE, swap in the needed OpenGL and GLES headers in OGL_Headers.h
+
+In lauxlib.c, set this in "int luai_system(const char* command) {":
+#ifdef __APPLE__
+		#include "TargetConditionals.h"
+		#ifdef TARGET_OS_IOS
+			return 0;
+		#else
+			return system(command);
+		#endif
+#endif
+
+In cspaths, csalerts or anywhere that includes cocoa.h:
+#ifdef __APPLE__
+		#include "TargetConditionals.h"
+		#ifdef TARGET_OS_IOS
+			#import <UIKit/UIKit.h>
+		#else
+			#import <Cocoa/Cocoa.h>
+		#endif
+#endif
+
+Replace alerts with stuff like (returning 0 or void as needed:
+#ifdef TARGET_OS_IOS
+	//NOT IMPLEMENTED!
+	return 0;
+#else
+	...
+#endif
+
+Before any checks for useSGISMipmaps, add:
+#ifdef TARGET_OS_IOS
+				bool useSGISMipmaps=0;
+#endif
+
+Deleted the iOS image loader! 
+
+Changed ofstream thumbFile; to boost_swap_impl::ofstream thumbFile; for save game thumbnails
+
+In QuickSave.h, add these:
+std::string build_save_metadata(QuickSave& save);
+bool build_map_preview(std::ostringstream& ostream);
+
+In QuickSaver.cpp, change this to non-static:
+bool build_map_preview(std::ostringstream& ostream)
+
+Make this non-static in shell.cpp:
+void process_event(const SDL_Event &event);
+
+In devices.cpp, change line_is_within_range to non-static
+
+In, return a static name for now:std::string get_application_name()
+Also need to add #include "alephversion.h" To the top of shell.cpp
+
+In shell.cpp, right before const string data_env = a1_getenv("ALEPHONE_DATA");, change default_data_dir using (also include the healer header file): 
+#if TARGET_OS_IPHONE
+  default_data_dir = getDataDir();
+  local_data_dir = getLocalDataDir();
+  //log_dir = getLocalTmpDir(); //DCW ok, this is not great because the log file grows forever. Commenting out.
+#endif
+
+Add these in screen.cpp:
+		// DCW force OpenGL ES 3.x. The default would otherwise be ES 2.
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+
+In void start_game() in interface.cpp, add helperBringUpHUD(); to the end of the function. Also add #import "AlephOneHelper.h" to the top of the file.
+
+Apply this in teterface.cpp:
+case mInterface:
+			switch(menu_item)
+			{
+				case iNewGame:
+					// DJB Start a new game with a dialog!
+					if ( helperNewGame() ) {
+						begin_game(_single_player, cheat);
+					}
+
+In screen.cpp, change initialization resolution to:  if (desktop.w >= 640/2 && desktop.h >= 480/2) //DCW divided original values by two, since retina displays have a smaller dimension in points than the native resolution.
+
+Also do: 
+int Screen::window_height()
+{
+	return std::max(static_cast<short>(480/2), screen_mode.height); //DCW added /2 due to this probably being a retina display on iOS
+}
+
+int Screen::window_width()
+{
+	return std::max(static_cast<short>(640/2), screen_mode.width);  //DCW added /2 due to this probably being a retina display on iOS
+}
+
+
+//YAY! The magic thing that makes rendering work!
+***Does the GL ES branch need this too?
+In OGL_FBO.cpp in deactive():
+		//DCW binding to framebuffer 0 doesn't switch to the on-screen buffer on mobile.
+		//Instead, call this convneience function to do something more likely to work.
+		if ( prev_fbo == 0 ) {
+			glBindFramebuffer(GL_FRAMEBUFFER, 1);
+			glBindRenderbuffer(GL_RENDERBUFFER, 1);
+		} else {
+			glBindFramebuffer(_fboTarget, prev_fbo);
+		}
+
+
+*****NEXT UP!*****
+Fix weapons reticle refresh check
+Add in switchToSDLMenu(); and display_net_game_stats_helper() stuff!
+
+TODO:
+
+Try removing ffmpeg from vcpkg build.
+
+Determine if changing 1 to _fbo here is correct:
+  glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
+  glBindRenderbuffer(GL_RENDERBUFFER, _fbo);
+
+
+In + (void)setAlephOnePreferences:, set the volume a new way
+
+Remove anything with a comment like: //Still needed for iOS 6-19-24?
+
+Did we need SDL_MouseInit(); for anything?
+
+Remove AlephOneAcceleration files?
+
+Verify the SDL mouse event works in - (void)handleTapFrom:(UITapGestureRecognizer *)recognizer.
+
+Re-implement cheats using AddItemsToPlayer and AddOneItemToPlayer
+
+Do we need esutils files?
+
+Done?: Check out and see if we need #include "game_window.h"for this line: //Still needed for iOS 6-19-24? mark_shield_display_as_dirty();

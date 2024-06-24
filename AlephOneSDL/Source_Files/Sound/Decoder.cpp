@@ -22,86 +22,34 @@
 */
 
 #include "Decoder.h"
-#include "BasicIFFDecoder.h"
-#include "game_errors.h"
-#include "MADDecoder.h"
 #include "SndfileDecoder.h"
-#include "VorbisDecoder.h"
 #include "FFmpegDecoder.h"
 #include <memory>
 
-using std::auto_ptr;
+using std::unique_ptr;
 
-StreamDecoder *StreamDecoder::Get(FileSpecifier& File)
+unique_ptr<StreamDecoder> StreamDecoder::Get(FileSpecifier& File)
 {
-	ScopedGameError gameErrorRestorer;
+	unique_ptr<SndfileDecoder> sndfileDecoder(std::make_unique<SndfileDecoder>());
+	if (sndfileDecoder->Open(File))
+		return sndfileDecoder;
 
 #ifdef HAVE_FFMPEG
 	{
-		auto_ptr<FFmpegDecoder> ffmpegDecoder(new FFmpegDecoder);
+		unique_ptr<FFmpegDecoder> ffmpegDecoder(std::make_unique<FFmpegDecoder>());
 		if (ffmpegDecoder->Open(File))
-			return ffmpegDecoder.release();
-	}
-#endif
-
-#ifdef HAVE_SNDFILE
-	{ 
-		auto_ptr<SndfileDecoder> sndfileDecoder(new SndfileDecoder);
-		if (sndfileDecoder->Open(File))
-			return sndfileDecoder.release();
-	}
-#else
-	{
-		auto_ptr<BasicIFFDecoder> iffDecoder(new BasicIFFDecoder);
-		if (iffDecoder->Open(File))
-			return iffDecoder.release();
-	}
-#endif
-
-#ifdef HAVE_VORBISFILE
-	{
-		auto_ptr<VorbisDecoder> vorbisDecoder(new VorbisDecoder);
-		if (vorbisDecoder->Open(File))
-			return vorbisDecoder.release();
-	}
-#endif
-
-#ifdef HAVE_MAD
-	{
-		auto_ptr<MADDecoder> madDecoder(new MADDecoder);
-		if (madDecoder->Open(File))
-			return madDecoder.release();
+			return ffmpegDecoder;
 	}
 #endif
 
 	return 0;
 }
 
-Decoder *Decoder::Get(FileSpecifier &File)
+Decoder* Decoder::Get(FileSpecifier& File)
 {
-	ScopedGameError gameErrorRestorer;
+	unique_ptr<SndfileDecoder> sndfileDecoder(std::make_unique<SndfileDecoder>());
+	if (sndfileDecoder->Open(File))
+		return sndfileDecoder.release();
 
-#ifdef HAVE_FFMPEG
-	{
-		auto_ptr<FFmpegDecoder> ffmpegDecoder(new FFmpegDecoder);
-		if (ffmpegDecoder->Open(File))
-			return ffmpegDecoder.release();
-	}
-#endif
-
-#ifdef HAVE_SNDFILE
-	{
-		auto_ptr<SndfileDecoder> sndfileDecoder(new SndfileDecoder);
-		if (sndfileDecoder->Open(File))
-			return sndfileDecoder.release();
-	}
-#else
-	{
-		auto_ptr<BasicIFFDecoder> iffDecoder(new BasicIFFDecoder);
-		if (iffDecoder->Open(File))
-			return iffDecoder.release();
-	}
-#endif
-    
-    return 0;
+	return 0;
 }

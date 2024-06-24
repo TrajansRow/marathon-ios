@@ -25,7 +25,6 @@ LUA_TEMPLATES.H
 
 #include "cseries.h"
 
-#ifdef HAVE_LUA
 extern "C"
 {
 #include "lua.h"
@@ -33,11 +32,12 @@ extern "C"
 #include "lualib.h"
 }
 
-#include <boost/function.hpp>
 #include "lua_script.h"
 #include "lua_mnemonics.h" // for lang_def and mnemonics
 #include <sstream>
 #include <map>
+#include <new>
+#include <functional>
 
 static inline int luaL_typerror(lua_State* L, int narg, const char* tname)
 {
@@ -75,11 +75,15 @@ public:
 	typedef index_t index_type;
 
 	static void Register(lua_State *L, const luaL_Reg get[] = 0, const luaL_Reg set[] = 0, const luaL_Reg metatable[] = 0);
-	static L_Class *Push(lua_State *L, index_t index);
+
+	template<typename instance_t = L_Class /*or a derived class*/>
+	static instance_t *Push(lua_State *L, index_t index);
+
+	static L_Class *Instance(lua_State *L, int index);
 	static index_t Index(lua_State *L, int index);
 	static bool Is(lua_State *L, int index);
 	static void Invalidate(lua_State *L, index_t index);
-	static boost::function<bool (index_t)> Valid;
+	static std::function<bool (index_t)> Valid;
 	struct ValidRange
 	{
 		ValidRange(int32 max_index) : m_max(max_index) {}
@@ -102,6 +106,9 @@ private:
 	static int _tostring(lua_State *L);
 
 protected:
+	template<typename instance_t /*L_Class or a derived class*/>
+	static instance_t *NewInstance(lua_State *L, index_t index);
+
 	static int _get(lua_State *L);
 	
 	// registry keys
@@ -127,7 +134,7 @@ struct always_valid
 };
 
 template<char *name, typename index_t>
-boost::function<bool (index_t)> L_Class<name, index_t>::Valid = always_valid();
+std::function<bool (index_t)> L_Class<name, index_t>::Valid = always_valid();
 
 template<char *name, typename index_t>
 void L_Class<name, index_t>::Register(lua_State *L, const luaL_Reg get[], const luaL_Reg set[], const luaL_Reg metatable[])
@@ -193,9 +200,42 @@ void L_Class<name, index_t>::Register(lua_State *L, const luaL_Reg get[], const 
 }
 
 template<char *name, typename index_t>
-L_Class<name, index_t> *L_Class<name, index_t>::Push(lua_State *L, index_t index)
+template<typename instance_t>
+instance_t *L_Class<name, index_t>::NewInstance(lua_State *L, index_t index)
 {
-	L_Class<name, index_t>* t = 0;
+	// Storing an L_Class ptr at offset 0 in the userdata block lets
+	// L_Class::Instance() avoid having to be type-dependent on instance_t
+	
+	struct UserdataBlock // standard-layout
+	{
+		L_Class *basePtr; // offset 0
+		alignas(instance_t) unsigned char instanceBuffer[sizeof(instance_t)];
+	};
+	
+	auto blockPtr = new (lua_newuserdata(L, sizeof(UserdataBlock))) UserdataBlock;
+	auto instancePtr = new (blockPtr->instanceBuffer) instance_t();
+	
+	blockPtr->basePtr = instancePtr;
+	blockPtr->basePtr->m_index = index;
+	luaL_getmetatable(L, name);
+	lua_setmetatable(L, -2);
+	
+	return instancePtr;
+}
+
+template<char *name, typename index_t>
+L_Class<name, index_t> *L_Class<name, index_t>::Instance(lua_State *L, int index)
+{
+	// The userdata block is assumed to start with an L_Class ptr; see L_Class::NewInstance()
+	void * blockPtr = lua_touserdata(L, index);
+	return blockPtr ? *static_cast<L_Class **>(blockPtr) : nullptr;
+}
+
+template<char *name, typename index_t>
+template<typename instance_t>
+instance_t *L_Class<name, index_t>::Push(lua_State *L, index_t index)
+{
+	instance_t* t = 0;
 
 	if (!Valid(index))
 	{
@@ -215,10 +255,7 @@ L_Class<name, index_t> *L_Class<name, index_t>::Push(lua_State *L, index_t index
 		lua_pop(L, 1);
 
 		// create an instance
-		t = static_cast<L_Class<name, index_t> *>(lua_newuserdata(L, sizeof(L_Class<name, index_t>)));
-		luaL_getmetatable(L, name);
-		lua_setmetatable(L, -2);
-		t->m_index = index;
+		t = NewInstance<instance_t>(L, index);
 
 		// insert it into the instance table
 		lua_pushnumber(L, index);
@@ -228,7 +265,7 @@ L_Class<name, index_t> *L_Class<name, index_t>::Push(lua_State *L, index_t index
 	}
 	else
 	{
-		t = static_cast<L_Class<name, index_t> *>(lua_touserdata(L, -1));
+		t = static_cast<instance_t *>(Instance(L, -1));
 	}
 
 	// remove the instance table
@@ -240,7 +277,7 @@ L_Class<name, index_t> *L_Class<name, index_t>::Push(lua_State *L, index_t index
 template<char *name, typename index_t>
 index_t L_Class<name, index_t>::Index(lua_State *L, int index)
 {
-	L_Class<name, index_t> *t = static_cast<L_Class<name, index_t> *>(lua_touserdata(L, index));
+	L_Class<name, index_t> *t = Instance(L, index);
 	if (!t) luaL_typerror(L, index, name);
 	return t->m_index;
 }
@@ -248,7 +285,7 @@ index_t L_Class<name, index_t>::Index(lua_State *L, int index)
 template<char *name, typename index_t>
 bool L_Class<name, index_t>::Is(lua_State *L, int index)
 {
-	L_Class<name, index_t>* t = static_cast<L_Class<name, index_t>*>(lua_touserdata(L, index));
+	L_Class<name, index_t>* t = Instance(L, index);
 	if (!t) return false;
 
 	if (lua_getmetatable(L, index))
@@ -557,8 +594,11 @@ void L_Enum<name, index_t>::Register(lua_State *L, const luaL_Reg get[], const l
 	lua_pushcfunction(L, _equals);
 	lua_setfield(L, -2, "__eq");
 
-	lua_pushcfunction(L, _get_mnemonic);
-	lua_setfield(L, -2, "__tostring");
+	if (mnemonics)
+	{
+		lua_pushcfunction(L, _get_mnemonic);
+		lua_setfield(L, -2, "__tostring");
+	}
 
 	if (metatable)
 		luaL_setfuncs(L, metatable, 0);
@@ -735,7 +775,7 @@ template<char *name, class T>
 class L_Container : public L_Class<name> {
 public:
 	static void Register(lua_State *L, const luaL_Reg get[] = 0, const luaL_Reg set[] = 0, const luaL_Reg metatable[] = 0);
-	static boost::function<typename T::index_type (void)> Length;
+	static std::function<typename T::index_type (void)> Length;
 	struct ConstantLength
 	{
 		ConstantLength(int32 length) : m_length(length) {}
@@ -751,7 +791,7 @@ protected:
 };
 
 template<char *name, class T>
-boost::function<typename T::index_type (void)> L_Container<name, T>::Length = ConstantLength(1);
+std::function<typename T::index_type (void)> L_Container<name, T>::Length = ConstantLength(1);
 
 template<char *name, class T>
 void L_Container<name, T>::Register(lua_State *L, const luaL_Reg get[], const luaL_Reg set[], const luaL_Reg metatable[])
@@ -908,9 +948,11 @@ int L_EnumContainer<name, T>::_get_enumcontainer(lua_State *L)
 
 // object classes hold an object_t as well as numeric index_t
 template<char *name, typename object_t, typename index_t = int16>
-class L_ObjectClass : L_Class<name, index_t> {
+class L_ObjectClass : public L_Class<name, index_t> {
 public:
-	static L_ObjectClass<name, object_t, index_t> *Push(lua_State *L, object_t object);
+	template<typename instance_t = L_ObjectClass /*or a derived class*/>
+	static instance_t *Push(lua_State *L, object_t object);
+
 	static object_t ObjectAtIndex(lua_State *L, index_t index);
 	static object_t Object(lua_State *L, int index);
 	static void Invalidate(lua_State *L, index_t index);
@@ -924,7 +966,7 @@ public:
 	static bool Is(lua_State *L, int index) {
 		return L_Class<name, index_t>::Is(L, index);
 	}
-	static boost::function<bool (index_t)> Valid;
+	static std::function<bool (index_t)> Valid;
 	
 	static std::map<index_t, object_t> _objects;
 };
@@ -942,11 +984,12 @@ struct object_valid
 };
 
 template<char *name, typename object_t, typename index_t>
-boost::function<bool (index_t)> L_ObjectClass<name, object_t, index_t>::Valid = object_valid<name, object_t, index_t>();
+std::function<bool (index_t)> L_ObjectClass<name, object_t, index_t>::Valid = object_valid<name, object_t, index_t>();
 
 
 template<char *name, typename object_t, typename index_t>
-L_ObjectClass<name, object_t, index_t> *L_ObjectClass<name, object_t, index_t>::Push(lua_State *L, object_t object)
+template<typename instance_t>
+instance_t *L_ObjectClass<name, object_t, index_t>::Push(lua_State *L, object_t object)
 {
 	// find unused index in our map
 	index_t idx = 0;
@@ -955,10 +998,7 @@ L_ObjectClass<name, object_t, index_t> *L_ObjectClass<name, object_t, index_t>::
 	_objects[idx] = object;
 	
 	// create an instance
-	L_ObjectClass<name, object_t, index_t> *t = static_cast<L_ObjectClass<name, object_t, index_t> *>(lua_newuserdata(L, sizeof(L_ObjectClass<name, object_t, index_t>)));
-	luaL_getmetatable(L, name);
-	lua_setmetatable(L, -2);
-	t->m_index = idx;
+	instance_t *t = L_Class<name, index_t>::template NewInstance<instance_t>(L, idx);
 	
 	return t;
 }
@@ -985,7 +1025,5 @@ void L_ObjectClass<name, object_t, index_t>::Invalidate(lua_State *L, index_t in
 	_objects.erase(index);
 }
 
-
-#endif
 
 #endif

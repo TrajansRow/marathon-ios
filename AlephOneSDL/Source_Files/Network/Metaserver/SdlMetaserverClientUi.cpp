@@ -39,16 +39,13 @@
 #include "metaserver_dialogs.h"
 
 #include <algorithm>
-#include <boost/function.hpp>
-#include <boost/bind.hpp>
 
 #include "TextStrings.h"
 
 #include <sstream>
+#include <functional>
 
 using namespace std;
-using boost::bind;
-using boost::ref;
 
 extern MetaserverClient* gMetaserverClient;
 
@@ -70,7 +67,7 @@ public:
 		players_games_placer->dual_add(players_in_room_w, d);
 
 		games_in_room_w = new w_games_in_room(
-			bind(&SdlMetaserverClientUi::GameSelected, this, _1),
+			std::bind(&SdlMetaserverClientUi::GameSelected, this, std::placeholders::_1),
 			320,
 			get_theme_space(METASERVER_GAMES, w_games_in_room::GAME_ENTRIES)
 		);
@@ -105,8 +102,8 @@ public:
 		placer->add(players_games_placer, true);
 		placer->add_flags();
 
-    w_colorful_chat* chat_history_w = new w_colorful_chat(600, 10);
-    placer->dual_add(chat_history_w, d);
+		w_colorful_chat* chat_history_w = new w_colorful_chat(600, 10);
+		placer->dual_add(chat_history_w, d);
 
 		horizontal_placer *entry_cancel_placer = new horizontal_placer(get_theme_space(ITEM_WIDGET));
 
@@ -119,7 +116,6 @@ public:
 		entry_cancel_placer->dual_add(chatentry_w, d);
 		entry_cancel_placer->add_flags();
 		
-    
 		w_tiny_button* cancel_w = new w_tiny_button("CANCEL", NULL, &d);
 		entry_cancel_placer->dual_add(cancel_w, d);
 
@@ -128,7 +124,7 @@ public:
 		placer->add_flags();
 		
 		d.set_widget_placer(placer);
-
+		
 		m_playersInRoomWidget = new PlayerListWidget (players_in_room_w);
 		m_gamesInRoomWidget = new GameListWidget (games_in_room_w);
 		m_chatEntryWidget = new EditTextWidget (chatentry_w);
@@ -146,7 +142,7 @@ public:
 
 	int Run()
 	{
-		d.set_processing_function(bind(&SdlMetaserverClientUi::pump, this, _1));
+		d.set_processing_function(std::bind(&SdlMetaserverClientUi::pump, this, std::placeholders::_1));
 		int result = d.run();
 
 		if(result == -1)
@@ -323,7 +319,7 @@ public:
 			placer->add(button_placer, true);
 			
 			info_dialog.set_widget_placer(placer);
-			info_dialog.set_processing_function(bind(&SdlMetaserverClientUi::pump, this, _1));
+			info_dialog.set_processing_function(std::bind(&SdlMetaserverClientUi::pump, this, std::placeholders::_1));
 			if (info_dialog.run() == 0 && gMetaserverClient->find_game(gMetaserverClient->game_target()))
 			{
 				JoinGame(*game);
@@ -345,7 +341,7 @@ private:
 	pump(dialog* d)
 	{
 		static uint32 last_update = 0;
-		uint32 ticks = SDL_GetTicks();
+		uint32 ticks = machine_tick_count();
 		if (ticks > last_update + 5000)
 		{
 			last_update = ticks;
@@ -364,16 +360,16 @@ private:
 
 private:
 	dialog d;
-	std::auto_ptr<dialog> m_info_dialog;
+	std::unique_ptr<dialog> m_info_dialog;
 	bool m_disconnected;
 };
 
 
 
-auto_ptr<MetaserverClientUi>
+std::unique_ptr<MetaserverClientUi>
 MetaserverClientUi::Create()
 {
-	return auto_ptr<MetaserverClientUi>(new SdlMetaserverClientUi);
+	return std::make_unique<SdlMetaserverClientUi>();
 }
 
 #endif // !defined(DISABLE_NETWORKING)

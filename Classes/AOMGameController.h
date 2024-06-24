@@ -9,7 +9,7 @@
 #import <Foundation/Foundation.h>
 #import <GameController/GCController.h>
 
-#include "SDL_keyboard.h"
+#include "SDL2/SDL_keyboard.h"
 
 @interface AOMGameController : NSObject {
   SDL_Keycode nextWeapon;

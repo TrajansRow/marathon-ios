@@ -25,8 +25,6 @@
 */
 
 #include "Decoder.h"
-
-#ifdef HAVE_SNDFILE
 #include "sndfile.h"
 
 class SndfileDecoder : public Decoder
@@ -37,16 +35,11 @@ public:
 	void Rewind();
 	void Close();
 
-	bool IsSixteenBit() { return true; }
+	AudioFormat GetAudioFormat() { return AudioFormat::_32_float; }
 	bool IsStereo() { return (sfinfo.channels == 2); }
-	bool IsSigned() { return true; }
-	int BytesPerFrame() { return 2 * (IsStereo() ? 2 : 1); }
+	int BytesPerFrame() { return 4 * (IsStereo() ? 2 : 1); }
 	float Rate() { return (float) sfinfo.samplerate; }
-#ifdef ALEPHONE_LITTLE_ENDIAN
-	bool IsLittleEndian() { return true; }
-#else
-	bool IsLittleEndian() { return false; }
-#endif
+	bool IsLittleEndian() { return PlatformIsLittleEndian(); }
 
 	int32 Frames() { return sfinfo.frames; }
 
@@ -57,7 +50,5 @@ private:
 	SF_INFO sfinfo;
 	SDL_RWops* rwops;
 };
-
-#endif
 
 #endif

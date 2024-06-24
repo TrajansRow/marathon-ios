@@ -35,34 +35,10 @@
 #include "sdl_network.h"
 #include "network_private.h"
 
-#include <SDL_thread.h>
-
-#include <sched.h> //DCW needed for setting self QOS
-#include <pthread.h> //DCW needed for setting self QOS
+#include <SDL2/SDL_thread.h>
 
 #include "thread_priority_sdl.h"
 #include "mytm.h" // mytm_mutex stuff
-
-//DCW
-//DCW
-#include <sys/socket.h>
-#include "SDLnetsys.h"
-struct UDP_channel {
-  int numbound;
-  IPaddress address[SDLNET_MAX_UDPADDRESSES];
-};
-struct _UDPsocket {
-  int ready;
-  SOCKET channel;
-  IPaddress address;
-  
-  struct UDP_channel binding[SDLNET_MAX_UDPCHANNELS];
-  
-  /* For debugging purposes */
-  int packetloss;
-};
-
-
 
 // Global variables (most comments and "sSomething" variables are ZZZ)
 // Storage for incoming packet data
@@ -91,10 +67,6 @@ static volatile bool		sKeepListening		= false;
 // packet handler when it gets something.
 static int
 receive_thread_function(void*) {
-  
-    //DCW Set iOS interactive QOS
-    pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
-  
     while(true) {
         // We listen with a timeout so we can shut ourselves down when needed.
         int theResult = SDLNet_CheckSockets(sSocketSet, 1000);
@@ -167,17 +139,12 @@ OSErr NetDDPOpenSocket(short *ioPortNumber, PacketHandlerProcPtr packetHandler)
 	// Open socket (SDLNet_Open seems to like port in host byte order)
         // NOTE: only SDLNet_UDP_Open wants port in host byte order.  All other uses of port in SDL_net
         // are in network byte order.
-	sSocket = SDLNet_UDP_Open(SDL_SwapBE16(*ioPortNumber)); 
+	sSocket = SDLNet_UDP_Open(SDL_SwapBE16(*ioPortNumber));
 	if (sSocket == NULL) {
 		SDLNet_FreePacket(sUDPPacketBuffer);
 		sUDPPacketBuffer = NULL;
 		return -1;
 	}
-  
-  //DCW Set an appropriate network socket service type. First connection listening when hosting
-  int st = NET_SERVICE_TYPE_VO;
-  setsockopt((int)(sSocket->channel), SOL_SOCKET, SO_NET_SERVICE_TYPE, (void *)&st, sizeof(st));
-
 
         // Set up socket set
         sSocketSet = SDLNet_AllocSocketSet(1);
@@ -189,10 +156,9 @@ OSErr NetDDPOpenSocket(short *ioPortNumber, PacketHandlerProcPtr packetHandler)
         sReceivingThread	= SDL_CreateThread(receive_thread_function, "NetDDPOpenSocket_ReceivingThread", NULL);
 
         // Set receiving thread priority very high
-  //DCW Prevent setting scheduler parameters to permit QOS on iOS
-  //bool	theResult = BoostThreadPriority(sReceivingThread);
-  //      if(theResult == false)
-  //          fdprintf("warning: BoostThreadPriority() failed; network performance may suffer\n");
+        bool	theResult = BoostThreadPriority(sReceivingThread);
+        if(theResult == false)
+            fdprintf("warning: BoostThreadPriority() failed; network performance may suffer\n");
         
         //PORTGUESS but we should generally keep port in network order, I think?
 	// We really ought to return the "real" port we bound to in *ioPortNumber...

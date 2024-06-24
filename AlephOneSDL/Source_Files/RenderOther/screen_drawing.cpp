@@ -55,7 +55,7 @@ Dec 17, 2000 (Loren Petrich):
 #include "sdl_fonts.h"
 #include <string.h>
 
-#include "SDL_ttf.h"
+#include <SDL2/SDL_ttf.h>
 #include "preferences.h"
 
 #define clutSCREEN_COLORS 130
@@ -181,9 +181,6 @@ static rgb_color InterfaceColors[NumInterfaceColors] =
 static void load_interface_rectangles(void);
 static void	load_screen_interface_colors(void);
 
-// DJB Helper include
-#include "AlephOneHelper.h"
-
 /* -------- Code */
 void initialize_screen_drawing(
 	void)
@@ -196,27 +193,11 @@ void initialize_screen_drawing(
 	/* Load the colors */
 	load_screen_interface_colors();
 	
-  // DJB Change terminal font!
-  // Check in the application bundle root for the font instead of the scenario.
-  //InterfaceFonts[4].Size = 14;
-  #if SCENARIO == 2
-  InterfaceFonts[4].Size = 14;
-  InterfaceFonts[4].File.assign("../Monaco.dfont");
-  //InterfaceFonts[4].File.assign("../bankgthd.ttf");
-  #endif
-  #if SCENARIO == 3
-  InterfaceFonts[4].Size = 14;
-  InterfaceFonts[4].File.assign("../Monaco.dfont");
-  #endif
-
-
 	/* load the font stuff. */
 	for(loop=0; loop<NUMBER_OF_INTERFACE_FONTS; ++loop)
 	{
-    InterfaceFonts[loop].Init();
+		InterfaceFonts[loop].Init();
 	}
-  
-  //InterfaceFonts[4].fontImmutable = 1; //DCW font layout hack: Prevent this from ever updating again.
 }
 
 screen_rectangle *get_interface_rectangle(short index)
@@ -642,14 +623,15 @@ void _draw_screen_text(const char *text, screen_rectangle *destination, short fl
 	if (flags & _wrap_text) {
 		int last_non_printing_character = 0, text_width = 0;
 		unsigned count = 0;
-		while (count < strlen(text_to_draw) && text_width < RECTANGLE_WIDTH(destination)) {
+		auto len = strlen(text_to_draw);
+		while (count < len && text_width < RECTANGLE_WIDTH(destination)) {
 			text_width += char_width(text_to_draw[count], font, style);
 			if (text_to_draw[count] == ' ')
 				last_non_printing_character = count;
 			count++;
 		}
 		
-		if( count != strlen(text_to_draw)) {
+		if( count != len) {
 			char remaining_text_to_draw[256];
 			screen_rectangle new_destination;
 			
@@ -718,7 +700,7 @@ TextSpec *_get_font_spec(short font_index)
 font_info *GetInterfaceFont(short font_index)
 {
 	assert(font_index>=0 && font_index<NUMBER_OF_INTERFACE_FONTS);
-	  
+	
 	return static_cast<font_info*>(InterfaceFonts[font_index].Info);
 }
 
@@ -1212,7 +1194,7 @@ void draw_polygon(SDL_Surface *s, const world_point2d *vertex_array, int vertex_
 
 void _get_interface_color(size_t color_index, SDL_Color *color)
 {	
-	assert(color_index>=0 && color_index<NumInterfaceColors);
+	assert(color_index<NumInterfaceColors);
 	
 	rgb_color &c = InterfaceColors[color_index];
 	color->r = c.red >> 8;
@@ -1225,7 +1207,7 @@ void _get_interface_color(size_t color_index, SDL_Color *color)
 
 void _get_player_color(size_t color_index, RGBColor *color)
 {
-	assert(color_index>=0 && color_index<NUMBER_OF_PLAYER_COLORS);
+	assert(color_index<NUMBER_OF_PLAYER_COLORS);
 
 	rgb_color &c = InterfaceColors[color_index + PLAYER_COLOR_BASE_INDEX];
 	color->red = c.red;
@@ -1235,7 +1217,7 @@ void _get_player_color(size_t color_index, RGBColor *color)
 
 void _get_player_color(size_t color_index, SDL_Color *color)
 {
-    assert(color_index>=0 && color_index<NUMBER_OF_PLAYER_COLORS);
+    assert(color_index<NUMBER_OF_PLAYER_COLORS);
 
     rgb_color &c = InterfaceColors[color_index + PLAYER_COLOR_BASE_INDEX];
     color->r = static_cast<Uint8>(c.red);

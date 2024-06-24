@@ -28,7 +28,7 @@
 #include "Message.h"
 
 #include "AStream.h"
-#include "SDL_net.h"
+#include <SDL2/SDL_net.h>
 #include "Scenario.h" // for scenario name and ID
 #include "network.h" // for network protocol ID
 
@@ -200,7 +200,10 @@ protected:
 		}
 
 	bool reallyInflateFrom(AIStream& inStream)
-		{ assert(false); }
+	{ 
+		assert(false);
+		return false;
+	}
 
 private:
 	uint16 m_mode;
@@ -493,11 +496,11 @@ protected:
 	bool reallyInflateFrom(AIStream& inStream);
 
 private:
-	uint16 m_color[3];
-	uint32 m_senderID;
-	uint32 m_selectedID;
-	uint16 m_internalType;
-	uint16 m_flags;
+	uint16 m_color[3] = {};
+	uint32 m_senderID = 0;
+	uint32 m_selectedID = 0;
+	uint16 m_internalType = 0;
+	uint16 m_flags = 0;
 	std::string m_senderName;
 	std::string m_message;
 };
@@ -530,10 +533,10 @@ protected:
 	bool reallyInflateFrom(AIStream& inStream);
 
 private:
-	uint16		m_color[3];
-	uint32		m_senderID;
-	uint16          m_internalType;
-	uint16          m_flags;
+	uint16 m_color[3] = {};
+	uint32 m_senderID = 0;
+	uint16 m_internalType = 0;
+	uint16 m_flags = 0;
 	std::string	m_senderName;
 	std::string	m_message;
 };
@@ -765,7 +768,7 @@ public:
 
 		int minutes_remaining() const {
 			if (m_timeRemaining == -1) return -1;
-			int remaining = m_timeRemaining / 60 - (SDL_GetTicks() - m_ticks) / 1000 / 60;
+			int remaining = m_timeRemaining / 60 - (machine_tick_count() - m_ticks) / 1000 / 60;
 			if (remaining < 0) remaining = 0;
 			return remaining;
 		}

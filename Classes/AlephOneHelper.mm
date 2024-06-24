@@ -17,13 +17,13 @@
 #include <ifaddrs.h>
 #include <arpa/inet.h>
 #include "computer_interface.h" //Used for player in terminal check
-#include "SDL_syswm.h"
+#include "SDL2/SDL_syswm.h"
 
 #import "PreferencesViewController.h"
 
 
 extern "C" {
-  #include "SDL_mouse_c.h"
+//Still needed for iOS 6-19-24?  #include "SDL_mouse_c.h"
 }
 
 //raw movement deltas for gyro and misc. input
@@ -288,7 +288,7 @@ void getSomeTextFromIOS(char *label, const char *currentText)  {
                                                           int length = [inputText length];
                                                           int chunksize = 10; //Arbitrary string chunk size
                                                           for(int i = 0; i < length; i+=chunksize) {
-                                                            NSRange range = NSMakeRange(i, min(chunksize, length-i));
+                                                            NSRange range = NSMakeRange(i, fmin(chunksize, length-i));
                                                             NSString *chunk=[inputText substringWithRange:range];
                                                             NSLog(@"Sending chunk as input: %@" , chunk);
                                                             //Convert the first text field to a c string and copy it's data into a new text input event that gets fed into the dialog event loop.

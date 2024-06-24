@@ -48,19 +48,7 @@ Aug 27, 2000 (Loren Petrich):
 #define PIN(value,floor,ceiling) \
 	((film_profile.inexplicable_pin_change) ? (A1_PIN(value,floor,ceiling)) : (M2_PIN(value,floor,ceiling)))
 
-// DJB Remove warning
-#ifndef ABS
-#define ABS(x) ((x)<0 ? -(x) : (x))
-#endif
 #define SGN(x) ((x)<0 ? -1 : (x)>0 ? 1 : 0)
-
-template <typename T> void
-SWAP(T& a, T& b)
-{
-	T t = a;
-	a = b;
-	b = t;
-}
 
 #define FLAG(bit) (1L<<(bit))
 #define TEST_FLAG32(flags,bit) (((flags)&FLAG(bit))!=0)
@@ -95,11 +83,7 @@ static inline int NextPowerOfTwo(int n)
 
 template<class T> T* GetMemberWithBounds(T* Array, const size_t Index, const size_t Number)
 {
-	// Bounds checking
-	if (!(Index>=0 && Index<Number)) return NULL;
-	
-	// The appropriate pointer
-	return (Array + Index);
+	return (Index < Number) ? (Array + Index) : NULL;
 }
 
 /*
@@ -115,13 +99,13 @@ template<class T> void obj_copy(T& destination, const T& source)
 	{memcpy(&destination, &source, sizeof(T));}
 
 template<class T> void objlist_copy(T* destination, const T* source, size_t num_objects)
-	{memcpy(destination, source, num_objects*sizeof(T));}
+	{if (num_objects > 0) memcpy(destination, source, num_objects*sizeof(T));}
 
 template<class T> void obj_set(T& object, int value)
 	{memset(&object, value, sizeof(T));}
 
 template<class T> void objlist_set(T* object_list, int value, size_t num_objects)
-	{memset(object_list, value, num_objects*sizeof(T));}
+	{if (num_objects > 0) memset(object_list, value, num_objects*sizeof(T));}
 
 template<class T> void obj_clear(T& object)
 	{obj_set(object, 0);}

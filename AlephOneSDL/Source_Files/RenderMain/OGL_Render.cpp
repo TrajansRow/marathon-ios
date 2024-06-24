@@ -140,17 +140,10 @@ May 3, 2003 (Br'fin (Jeremy Parsons))
 #include "shell.h"
 #include "preferences.h"
 
-//DCW Used for mouse smoothing
-#include "mouse.h"
-
-#include <OpenGLES/ES1/gl.h> //DCW
-#include "MatrixStack.hpp"
-#include "OGL_Shader.h"
-#include "AlephOneAcceleration.hpp"
-
 #ifdef HAVE_OPENGL
 
 #include "OGL_Headers.h"
+#include "MatrixStack.hpp"
 
 #include "interface.h"
 #include "render.h"
@@ -172,10 +165,6 @@ May 3, 2003 (Br'fin (Jeremy Parsons))
 
 #include <cmath>
 
-#import "AlephOneHelper.h"
-//DCW
-#include "esUtil.h"
-
 extern bool use_lua_hud_crosshairs;
 
 // Whether or not OpenGL is active for rendering
@@ -184,7 +173,7 @@ static bool _OGL_IsActive = false;
 
 // Reads off of the current map;
 // call it to avoid lazy loading of textures
-typedef pair<shape_descriptor,int16> TextureWithTransferMode;
+typedef std::pair<shape_descriptor,int16> TextureWithTransferMode;
 static void PreloadTextures();
 static void PreloadWallTexture(const TextureWithTransferMode& inTexture);
 
@@ -237,7 +226,6 @@ inline short Adjust_Y(short y) {return PIN(y,1,ViewHeight-1);}
 	Everything is clipped to a cube that is -1 to +1 in all the coordinates.
 */
 
-  //DCW changing to glfloat for ES1
 // Marathon centered world -> Marathon eye
 static GLfloat CenteredWorld_2_MaraEye[16];
 // Marathon world -> Marathon eye
@@ -251,14 +239,12 @@ static const GLfloat MaraEye_2_OGLEye[16] =
 	0,	0,	0,	1
 };
 
-  //DCW changing to glfloat for ES1
 // World -> OpenGL eye (good modelview matrix for 3D-model inhabitants)
 static GLfloat World_2_OGLEye[16];
 // Centered world -> OpenGL eye (good modelview matrix for 3D-model skyboxes)
 // (also good for handling horizontal-surface data)
 static GLfloat CenteredWorld_2_OGLEye[16];
 
-  //DCW: converting these double matrices to float for ES1
 // Screen -> clip (good starter matrix; assumes distance is already projected)
 GLfloat Screen_2_Clip[16];
 // OpenGL eye -> clip (good projection matrix for 3D models)
@@ -278,22 +264,18 @@ static int ProjectionType = Projection_NONE;
 static void SetProjectionType(int NewProjectionType)
 {
 	if (NewProjectionType == ProjectionType) return;
-  
+
 	switch(NewProjectionType)
 	{
 	case Projection_OpenGL_Eye:
-		if (!useShaderRenderer()) glMatrixMode(GL_PROJECTION);
-    MatrixStack::Instance()->matrixMode(MS_PROJECTION);
-		if (!useShaderRenderer()) glLoadMatrixf(OGLEye_2_Clip);
-    MatrixStack::Instance()->loadMatrixf(OGLEye_2_Clip);
+		MSI()->matrixMode(MS_PROJECTION);
+		MSI()->loadMatrixf(OGLEye_2_Clip);
 		ProjectionType = NewProjectionType;
 		break;
 	
 	case Projection_Screen:
-		if (!useShaderRenderer()) glMatrixMode(GL_PROJECTION);
-    MatrixStack::Instance()->matrixMode(MS_PROJECTION);
-		if (!useShaderRenderer()) glLoadMatrixf(Screen_2_Clip);
-    MatrixStack::Instance()->loadMatrixf(Screen_2_Clip);
+		MSI()->matrixMode(MS_PROJECTION);
+		MSI()->loadMatrixf(Screen_2_Clip);
 		ProjectionType = NewProjectionType;
 		break;
 	}
@@ -307,9 +289,6 @@ const GLfloat Z_Far = 1.5*64*WORLD_ONE;
 // Projection coefficients for depth
 const GLfloat Z_Proj0 = (Z_Far + Z_Near)/(Z_Far - Z_Near);
 const GLfloat Z_Proj1 = 2*Z_Far*Z_Near/(Z_Far - Z_Near);
-
-// Whether Z-buffering is being used
-bool Z_Buffering = false;
 
 // Screen <-> world conversion factors and functions
 GLfloat XScale, YScale, XScaleRecip, YScaleRecip, XOffset, YOffset;
@@ -330,14 +309,9 @@ inline void Screen2Ray(point2d& Pt, GLfloat* Ray)
 	Ray[0] = XScaleRecip*(Pt.x - XOffset);
 	Ray[1] = YScaleRecip*(Pt.y - YOffset);
 	Ray[2] = -1;
-  
-  //DCW mouselook smoothing test
-  /*Ray[0] = XScaleRecip*(Pt.x -(lostMousePrecisionX()*5)- XOffset);
-  Ray[1] = YScaleRecip*(Pt.y +(lostMousePrecisionY()*5)- YOffset);*/
 }
 
 
-  //DCW Converting to GLfloat for ES1
 // Surface-coordinate management;
 // does all necessary setup tasks for finding where a ray hits a surface
 struct SurfaceCoords
@@ -396,11 +370,21 @@ static _fixed SelfLuminosity;
 // Pointer to current fog data:
 OGL_FogData *CurrFog = NULL;
 
-inline bool FogActive()
+bool FogActive()
 {
 	if (!CurrFog) return false;
 	bool FogAllowed = TEST_FLAG(Get_OGL_ConfigureData().Flags,OGL_Flag_Fog);
 	return CurrFog->IsPresent && FogAllowed;
+}
+
+OGL_FogData* OGL_GetCurrFogData()
+{
+	if (FogActive())
+	{
+		return CurrFog;
+	}
+
+	return nullptr;
 }
 
 // Current fog color; may be different from the fog color above because of infravision being on
@@ -521,8 +505,8 @@ bool OGL_ClearScreen()
 {
 	if (OGL_IsActive())
 	{
-		glClearColor(0,0,0,1); //DCW make alpha 1 for fully opaque. Set to red or something to debug view placement.
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+		glClearColor(0,0,0,0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		return true;
 	}
 	else return false;
@@ -539,11 +523,7 @@ bool OGL_StartRun()
 
 	// Will stop previous run if it had been active
 	if (OGL_IsActive()) OGL_StopRun();
-
-	bool ShaderRender = (graphics_preferences->screen_mode.acceleration == _shader_acceleration);
-	OGL_ConfigureData& ConfigureData = Get_OGL_ConfigureData();
-	Z_Buffering = ShaderRender || TEST_FLAG(ConfigureData.Flags,OGL_Flag_ZBuffer);
-
+	
 #ifdef __WIN32__
 	glewInit();
 #endif
@@ -570,28 +550,21 @@ bool OGL_StartRun()
 	  else
 	    npotTextures = true;
 	}
-   
-	FBO_Allowed = false;
-  //DCW in ES 2.0, we can assume FBOs are available
-	//if (!OGL_CheckExtension("GL_EXT_framebuffer_object"))
-  if( !useShaderRenderer() )
+
+	FBO_Allowed = true; //We pretty much need to assume FBOs are going to work.
+	/*FBO_Allowed = false;
+    if (!OGL_CheckExtension("GL_EXT_framebuffer_object"))
 	{
 		logWarning("Framebuffer Objects not available");
-		if (ShaderRender)
-		{
-			logWarning("Disabling shader renderer");
-			graphics_preferences->screen_mode.acceleration = _opengl_acceleration;
-			ShaderRender = false;
-			Z_Buffering = TEST_FLAG(ConfigureData.Flags,OGL_Flag_ZBuffer);
-		}
+		return false;
 	}
 	else
 	{
 		FBO_Allowed = true;
-	}
+	}*/
 
 	Bloom_sRGB = false;
-	if (ShaderRender && TEST_FLAG(graphics_preferences->OGL_Configure.Flags, OGL_Flag_Blur))
+	if (TEST_FLAG(graphics_preferences->OGL_Configure.Flags, OGL_Flag_Blur))
 	{
 	  if (!FBO_Allowed)
 	  {
@@ -606,25 +579,17 @@ bool OGL_StartRun()
 	    Bloom_sRGB = true;
 	}
 
+    Shader::loadAll();
+
 	_OGL_IsActive = true;
 	OGL_StartProgress(count_replacement_collections() + 2);
 
 	// Set up some OpenGL stuff: these will be the defaults for this rendering context
 	
 	// Set up for Z-buffering
-	if (Z_Buffering)
-	{
-		glEnable(GL_DEPTH_TEST);
-		// This Z-buffering setup does seem to work correctly;
-		// one may want to make the world geometry write-only (glDepthFunc(GL_ALWAYS))
-		// if coincident textures are not rendered very well.
-		// [DEFAULT] -- anything marked out as this ought to be reverted to if changed
-    glDepthFunc(GL_LEQUAL);
-		if (ShaderRender)
-			glDepthRangef(0,1); //DCW: changing toglDepthRangef
-		else
-			glDepthRangef(1,0); //DCW: changing toglDepthRangef
-	}
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+	glDepthRangef(0,1);
 	
 	// Prevent wrong-side polygons from being rendered;
 	// this works because the engine's visibility routines make all world-geometry
@@ -639,15 +604,15 @@ bool OGL_StartRun()
 	
 	// [DEFAULT]
 	// Set standard alpha-test function; cut off at halfway point (for sharp edges)
-	glAlphaFunc(GL_GREATER,0.5);
+	//glAlphaFunc(GL_GREATER,0.5); //NOT SUPPORTED ANGLE FUNCTION
 	
 	// [DEFAULT]
 	// Set standard crossfade blending function (for smooth transitions)
 	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 	
 	// Switch on use of vertex and texture-coordinate arrays
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	//glEnableClientState(GL_VERTEX_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
+	//glEnableClientState(GL_TEXTURE_COORD_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
 
 	OGL_Rasterizer_Init();
 	
@@ -667,13 +632,7 @@ bool OGL_StartRun()
 	ModelRenderObject.Clear();
 	SetupShaders();
 	OGL_ProgressCallback(1);
-  
-  //DCW debugging
-  //GLfloat m[16];
-  //glGetFloatv (GL_MODELVIEW_MATRIX, m);
-  //printf ( "Modelviewr: %f %f %f %f, %f %f %f %f, %f %f %f %f, %f %f %f %f\n",
-  //        m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8],m[9],m[10],m[11],m[12],m[13],m[14],m[15]);
-  
+
 	// Avoid lazy initial texture loading
 	PreloadTextures();
 	OGL_ProgressCallback(1);
@@ -704,7 +663,7 @@ bool OGL_StopRun()
 // ZZZ: changes to try to do less redundant work (using a set of pairs etc.)
 void PreloadTextures()
 {
-	typedef set<TextureWithTransferMode> TextureWithTransferModeSet;
+	typedef std::set<TextureWithTransferMode> TextureWithTransferModeSet;
 
 	TextureWithTransferModeSet theSetOfTexturesUsed;
 
@@ -809,8 +768,7 @@ void PreloadWallTexture(const TextureWithTransferMode& inTexture)
 	if (TMgr.Setup()) {
 		TMgr.RenderNormal();
 		if (TMgr.IsGlowMapped()) TMgr.RenderGlowing();
-		if (graphics_preferences->screen_mode.acceleration == _shader_acceleration &&
-			TEST_FLAG(Get_OGL_ConfigureData().Flags, OGL_Flag_BumpMap))
+		if (TEST_FLAG(Get_OGL_ConfigureData().Flags, OGL_Flag_BumpMap))
 			TMgr.RenderBump();
 	}
 }
@@ -842,7 +800,7 @@ bool OGL_SetWindow(Rect &ScreenBounds, Rect &ViewBounds, bool UseBackBuffer)
 	if (JustInited) {JustInited = false; DoUpdate = true;}
 	else if (!RectsEqual(ScreenBounds,SavedScreenBounds)) DoUpdate = true;
 	else if (!RectsEqual(ViewBounds,SavedViewBounds)) DoUpdate = true;
-	else if (graphics_preferences->screen_mode.acceleration == _shader_acceleration) DoUpdate = true;
+	else DoUpdate = true;
 	
 	if (!DoUpdate) return true;
 	
@@ -855,17 +813,8 @@ bool OGL_SetWindow(Rect &ScreenBounds, Rect &ViewBounds, bool UseBackBuffer)
 	
 	// Create the screen -> clip (fundamental) matrix; this will be needed
 	// for all the other projections
-	if (!useShaderRenderer()) glMatrixMode(GL_PROJECTION);
-  MatrixStack::Instance()->matrixMode(MS_PROJECTION);
-  
-  //DCW Commenting out DJB's hud ortho changes for now... The hud goes wacky with them in.
-  // DJB OpenGL Landscape
-  //glLoadIdentity();
-  //glOrthof(0, ViewWidth, ViewHeight, 0, 1, -1);          // OpenGL-style z
- 
-  
-	if (!useShaderRenderer()) glGetFloatv(GL_PROJECTION_MATRIX,Screen_2_Clip);
-  MatrixStack::Instance()->getFloatv(MS_PROJECTION_MATRIX, Screen_2_Clip);
+	MSI()->matrixMode(MS_PROJECTION);
+	MSI()->getFloatv(MS_PROJECTION_MATRIX,Screen_2_Clip);
 	
 	// Set projection type to initially none (force load of first one)
 	ProjectionType = Projection_NONE;
@@ -884,10 +833,7 @@ bool OGL_StartMain()
 	glFrontFace(GL_CW);
 	
 	// Set the Z-buffering for this go-around
-	if (Z_Buffering)
-		glEnable(GL_DEPTH_TEST);
-	else
-		glDisable(GL_DEPTH_TEST);
+	glEnable(GL_DEPTH_TEST);
 	
 	// Moved this test down here for convenience; the overhead map won't have fog,
 	// so be sure to turn it on when leaving the overhead map
@@ -898,7 +844,7 @@ bool OGL_StartMain()
 	CurrFog = OGL_GetFogData(FogType);
 	if (FogActive())
 	{
-		glEnable(GL_FOG);
+		//glEnable(GL_FOG); //NOT SUPPORTED ANGLE ENUM
 		Using_sRGB = Wanting_sRGB;
 		CurrFogColor[0] = sRGB_frob(CurrFog->Color.red/65535.0F);
 		CurrFogColor[1] = sRGB_frob(CurrFog->Color.green/65535.0F);
@@ -912,16 +858,33 @@ bool OGL_StartMain()
 			else
 				FindInfravisionVersionRGBA(LoadedWallTexture,CurrFogColor);
 		}
-		glFogfv(GL_FOG_COLOR,CurrFogColor);
-		glFogf(GL_FOG_DENSITY,1.0F/MAX(1,WORLD_ONE*CurrFog->Depth));
-    MatrixStack::Instance()->fogColor3f(CurrFogColor[0], CurrFogColor[1], CurrFogColor[2]);
-    MatrixStack::Instance()->fogDensity(1.0F/MAX(1,WORLD_ONE*CurrFog->Depth));
+        MSI()->fogColor3f(CurrFogColor[0], CurrFogColor[1], CurrFogColor[2]);
+		
+		if (CurrFog->Mode == OGL_Fog_Linear)
+		{
+			MSI()->fogDensity(0.0);
+			MSI()->fogStartEnd(WORLD_ONE*CurrFog->Start, WORLD_ONE*(CurrFog->Start + CurrFog->Depth));
+		}
+		else if (CurrFog->Mode == OGL_Fog_Exp2)
+		{
+			//glFogf(GL_FOG_DENSITY,1.0F/MAX(1,WORLD_ONE*CurrFog->Depth));
+			MSI()->fogDensity(1.0F/MAX(1,WORLD_ONE*CurrFog->Depth));
+			MSI()->fogStartEnd(0,0);
+		}
+		else
+		{
+			//glFogf(GL_FOG_DENSITY,1.0F/MAX(1,WORLD_ONE*CurrFog->Depth));
+			MSI()->fogDensity(1.0F/MAX(1,WORLD_ONE*CurrFog->Depth));
+			MSI()->fogStartEnd(0,0);
+		}
+		
+		MSI()->fogDensity(1.0F/MAX(1,WORLD_ONE*CurrFog->Depth));
 	}
 	else
 	{
-		glFogf(GL_FOG_DENSITY,0.0F);
-    MatrixStack::Instance()->fogDensity(0.0F);
-		glDisable(GL_FOG);
+		MSI()->fogDensity(0.0F);
+		MSI()->fogStartEnd(0,0);
+		//glDisable(GL_FOG); //NOT SUPPORTED ANGLE ENUM
 	}
 	
 	// Set the color of the void
@@ -941,7 +904,7 @@ bool OGL_StartMain()
 			Blue = CurrFogColor[2];
 		}
 		
-		glClearColor(Red,Green,Blue,1); //DCW make alpha 1
+		glClearColor(Red,Green,Blue,0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 	// Have to clear the Z-buffer before rendering, no matter what
@@ -977,13 +940,11 @@ bool OGL_EndMain()
 	SetProjectionType(Projection_Screen);
 	
 	// Reset modelview matrix
-	if (!useShaderRenderer()) glMatrixMode(GL_MODELVIEW);
-  MatrixStack::Instance()->matrixMode(MS_MODELVIEW);
-	if (!useShaderRenderer()) glLoadIdentity();
-  MatrixStack::Instance()->loadIdentity();
+	MSI()->matrixMode(MS_MODELVIEW);
+	MSI()->loadIdentity();
 	
 	// No texture mapping now
-	glDisable(GL_TEXTURE_2D);
+	//glDisable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
 	
 	// And no Z buffer
 	glDisable(GL_DEPTH_TEST);
@@ -998,9 +959,7 @@ bool OGL_EndMain()
 bool OGL_SwapBuffers()
 {
 	if (!OGL_IsActive()) return false;
-  //glPushGroupMarkerEXT(0, "Main screen swap");
 	MainScreenSwap();
-  //glPopGroupMarkerEXT();
 	return true;
 }
 
@@ -1042,7 +1001,6 @@ bool SurfaceCoords::FindComplements()
 }
 
 
-  //DCW Converting to GLfloat for ES1
 // Multiply a vector by an OpenGL matrix
 inline void GL_MatrixTimesVector(const GLfloat *Matrix, const GLfloat *Vector, GLfloat *ResVec)
 {
@@ -1054,67 +1012,48 @@ inline void GL_MatrixTimesVector(const GLfloat *Matrix, const GLfloat *Vector, G
 			Matrix[4*3+k]*Vector[3];
 }
 
+
 // Set view parameters; this is for proper perspective rendering
 bool OGL_SetView(view_data &View)
 {
 	if (!OGL_IsActive()) return false;
 	
 	// Use the modelview matrix as storage; set the matrix back when done
-	if (!useShaderRenderer()) glMatrixMode(GL_MODELVIEW);
-  MatrixStack::Instance()->matrixMode(GL_MODELVIEW);
+	MSI()->matrixMode(MS_MODELVIEW);
 
 	// World coordinates to Marathon eye coordinates
-	if (!useShaderRenderer()) glLoadIdentity();
-  MatrixStack::Instance()->loadIdentity();
-	//glGetFloatv(GL_MODELVIEW_MATRIX,CenteredWorld_2_MaraEye);
-  MatrixStack::Instance()->getFloatv(MS_MODELVIEW_MATRIX,CenteredWorld_2_MaraEye);
- 
+	MSI()->loadIdentity();
+	MSI()->getFloatv(MS_MODELVIEW_MATRIX,CenteredWorld_2_MaraEye);
+	
 	// Do rotation first:
 	const double TrigMagReciprocal = 1/double(TRIG_MAGNITUDE);
 	double Cosine = TrigMagReciprocal*double(cosine_table[View.yaw]);
 	double Sine = TrigMagReciprocal*double(sine_table[View.yaw]);
-  
-  //DCW mouselook smoothing test. Smooths ceiling texture placement.
-  if (shouldSmoothMouselook()) {
-    Cosine = TrigMagReciprocal*cosine_table_calculated(View.yaw + lostMousePrecisionX());
-    Sine = TrigMagReciprocal*sine_table_calculated(View.yaw + lostMousePrecisionX());
-  }
-  
 	CenteredWorld_2_MaraEye[0] = Cosine;
 	CenteredWorld_2_MaraEye[1] = - Sine;
 	CenteredWorld_2_MaraEye[4] = Sine;
 	CenteredWorld_2_MaraEye[4+1] = Cosine;
-	if (!useShaderRenderer()) glLoadMatrixf(CenteredWorld_2_MaraEye);
-  MatrixStack::Instance()->loadMatrixf(CenteredWorld_2_MaraEye);
-  
+	MSI()->loadMatrixf(CenteredWorld_2_MaraEye);
+	
 	// Set the view direction
 	ViewDir[0] = (float)Cosine;
 	ViewDir[1] = (float)Sine;
 	ModelRenderObject.ViewDirection[2] = 0;	// Always stays the same
-  
+
 	// Do a translation and then save;
-	if (!useShaderRenderer()) glTranslatef(-View.origin.x,-View.origin.y,-View.origin.z);
-  MatrixStack::Instance()->translatef(-View.origin.x,-View.origin.y,-View.origin.z);
-	//glGetFloatv(GL_MODELVIEW_MATRIX,World_2_MaraEye);
-  MatrixStack::Instance()->getFloatv(MS_MODELVIEW,World_2_MaraEye);
-
-  // Find the appropriate modelview matrix for 3D-model inhabitant rendering
-	if (!useShaderRenderer()) glLoadMatrixf(MaraEye_2_OGLEye);
-  MatrixStack::Instance()->loadMatrixf(MaraEye_2_OGLEye);
-	if (!useShaderRenderer()) glMultMatrixf(World_2_MaraEye);
-  MatrixStack::Instance()->multMatrixf(World_2_MaraEye);
-	//glGetFloatv(GL_MODELVIEW_MATRIX,World_2_OGLEye);
-  MatrixStack::Instance()->getFloatv(MS_MODELVIEW_MATRIX,World_2_OGLEye);
-
-  
+	MSI()->translatef(-View.origin.x,-View.origin.y,-View.origin.z);
+	MSI()->getFloatv(MS_MODELVIEW_MATRIX,World_2_MaraEye);
+	
+	// Find the appropriate modelview matrix for 3D-model inhabitant rendering
+	MSI()->loadMatrixf(MaraEye_2_OGLEye);
+	MSI()->multMatrixf(World_2_MaraEye);
+	MSI()->getFloatv(MS_MODELVIEW_MATRIX,World_2_OGLEye);
+		
 	// Find the appropriate modelview matrix for 3D-model skybox rendering
-	if (!useShaderRenderer()) glLoadMatrixf(MaraEye_2_OGLEye);
-  MatrixStack::Instance()->loadMatrixf(MaraEye_2_OGLEye);
-	if (!useShaderRenderer()) glMultMatrixf(CenteredWorld_2_MaraEye);
-  MatrixStack::Instance()->multMatrixf(CenteredWorld_2_MaraEye);
-	//glGetFloatv(GL_MODELVIEW_MATRIX,CenteredWorld_2_OGLEye);
-	MatrixStack::Instance()->getFloatv(MS_MODELVIEW_MATRIX,CenteredWorld_2_OGLEye);
-  
+	MSI()->loadMatrixf(MaraEye_2_OGLEye);
+	MSI()->multMatrixf(CenteredWorld_2_MaraEye);
+	MSI()->getFloatv(MS_MODELVIEW_MATRIX,CenteredWorld_2_OGLEye);
+	
 	// Find world-to-screen and screen-to-world conversion factors;
 	// be sure to have some fallbacks in case of zero
 	XScale = View.world_to_screen_x;
@@ -1128,10 +1067,8 @@ bool OGL_SetView(view_data &View)
 	
 	// Find the OGL-eye-to-screen matrix
 	// Remember that z is small negative to large negative (OpenGL style)
-	glLoadIdentity();
-  MatrixStack::Instance()->loadIdentity();
-	//glGetFloatv(GL_MODELVIEW_MATRIX,OGLEye_2_Screen);
-  MatrixStack::Instance()->getFloatv(MS_MODELVIEW_MATRIX,OGLEye_2_Screen);
+	MSI()->loadIdentity();
+	MSI()->getFloatv(MS_MODELVIEW_MATRIX,OGLEye_2_Screen);
 	OGLEye_2_Screen[0] = XScale;
 	OGLEye_2_Screen[4+1] = YScale;
 	OGLEye_2_Screen[4*2] = - XOffset;
@@ -1142,16 +1079,12 @@ bool OGL_SetView(view_data &View)
 	OGLEye_2_Screen[4*3+3] = 0;
 		
 	// Find the OGL-eye-to-clip matrix:
-	if (!useShaderRenderer()) glLoadMatrixf(Screen_2_Clip);
-  MatrixStack::Instance()->loadMatrixf(Screen_2_Clip);
-	if (!useShaderRenderer()) glMultMatrixf(OGLEye_2_Screen);
-  MatrixStack::Instance()->multMatrixf(OGLEye_2_Screen);
-	//glGetFloatv(GL_MODELVIEW_MATRIX,OGLEye_2_Clip);
-  MatrixStack::Instance()->getFloatv(MS_MODELVIEW_MATRIX,OGLEye_2_Clip);
-
+	MSI()->loadMatrixf(Screen_2_Clip);
+	MSI()->multMatrixf(OGLEye_2_Screen);
+	MSI()->getFloatv(MS_MODELVIEW_MATRIX,OGLEye_2_Clip);
+	
 	// Restore the default modelview matrix
-	if (!useShaderRenderer()) glLoadIdentity();
-  MatrixStack::Instance()->loadIdentity();
+	MSI()->loadIdentity();
 	
 	// Calculate the horizontal-surface projected-texture vectors
 	GLfloat OrigVec[4];
@@ -1199,11 +1132,9 @@ bool OGL_SetForeground()
 	glClear(GL_DEPTH_BUFFER_BIT);
 	
 	// New renderer needs modelview reset
-	if (!useShaderRenderer()) glMatrixMode(GL_MODELVIEW);
-  MatrixStack::Instance()->matrixMode(MS_MODELVIEW);
-	if (!useShaderRenderer()) glLoadIdentity();
-	MatrixStack::Instance()->loadIdentity();
-  
+	MSI()->matrixMode(MS_MODELVIEW);
+	MSI()->loadIdentity();
+	
 	// Disable sRGB mode
 	if (Wanting_sRGB)
 	{
@@ -1230,18 +1161,15 @@ bool OGL_SetForegroundView(bool HorizReflect)
 	};
 
 	// Find the appropriate modelview matrix for 3D-model inhabitant rendering
-	if (!useShaderRenderer()) glLoadMatrixf(Foreground_2_OGLEye);
-  MatrixStack::Instance()->loadMatrixf(Foreground_2_OGLEye);
-	//glGetFloatv(GL_MODELVIEW_MATRIX,World_2_OGLEye);
-  MatrixStack::Instance()->getFloatv(MS_MODELVIEW_MATRIX, World_2_OGLEye);
-  
+	MSI()->loadMatrixf(Foreground_2_OGLEye);
+	MSI()->getFloatv(MS_MODELVIEW_MATRIX,World_2_OGLEye);
+	
 	// Perform the reflection if desired; refer to above definition of Foreground_2_OGLEye
 	if (HorizReflect) World_2_OGLEye[0] = -1;
 	
 	// Restore the default modelview matrix
-	if (!useShaderRenderer()) glLoadIdentity();
-  MatrixStack::Instance()->loadIdentity();
-  
+	MSI()->loadIdentity();
+	
 	return true;
 }
 
@@ -1277,9 +1205,8 @@ struct ExtendedVertexData
 {
 	GLfloat Vertex[4];
 	GLfloat TexCoord[2];
-  // DJB OpenGL ES expect 4 component colors...
-  GLfloat Color[4];
-  GLfloat GlowColor[3];
+	GLfloat Color[3];
+	GLfloat GlowColor[3];
 };
 
 
@@ -1314,6 +1241,7 @@ static void InterpolateByDepth(GLfloat Depth,
 // it returns whether or not the texture is a legitimate wall texture
 static bool RenderAsRealWall(polygon_definition& RenderPolygon, bool IsVertical)
 {
+	
 	// Set up the texture manager with the input manager
 	TextureManager TMgr;
 	TMgr.ShapeDesc = RenderPolygon.ShapeDesc;
@@ -1405,7 +1333,7 @@ static bool RenderAsRealWall(polygon_definition& RenderPolygon, bool IsVertical)
 		// Create some convenient references
 		point2d& Vertex = RenderPolygon.vertices[k];
 		ExtendedVertexData& EVData = ExtendedVertexList[k];
-
+		
 		// Emit a ray from the vertex in OpenGL eye coords;
 		// it had been specified in screen coordinates
 		GLfloat VertexRay[3];
@@ -1485,7 +1413,7 @@ static bool RenderAsRealWall(polygon_definition& RenderPolygon, bool IsVertical)
 	if (TMgr.IsShadeless)
 	{
 		// The shadeless color is E-Z
-		glColor4f(1,1,1,1);
+		MSI()->color3f(1,1,1);
 		GlowColor = 1;
 	}
 	else if (RenderPolygon.ambient_shade < 0)
@@ -1649,18 +1577,13 @@ static bool RenderAsRealWall(polygon_definition& RenderPolygon, bool IsVertical)
 			}
 			
 			// Set up for vertex lighting
-			glEnableClientState(GL_COLOR_ARRAY);
-      // DJB OpenGL glColorPointer must have 4 components per color!!!
-      glColorPointer(4,GL_FLOAT,sizeof(ExtendedVertexData),
-                     ExtendedVertexList[0].Color);
+			//glEnableClientState(GL_COLOR_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
 			//glColorPointer(3,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].Color);
 			
 			// Calculate the lighting
 			for (int k=0; k<NumVertices; k++)
 			{
 				FindShadingColor(-ExtendedVertexList[k].Vertex[2],RenderPolygon.ambient_shade,ExtendedVertexList[k].Color);
-        // DJB OpenGL set alpha
-        ExtendedVertexList[k].Color[3] = 1.0;
 				ExtendedVertexList[k].GlowColor[0] = ExtendedVertexList[k].GlowColor[1] = ExtendedVertexList[k].GlowColor[2] = std::max(GlowColor, ExtendedVertexList[k].Color[0]);
 			}
 		}
@@ -1681,28 +1604,28 @@ static bool RenderAsRealWall(polygon_definition& RenderPolygon, bool IsVertical)
 		if (IsBlended)
 		{
 			glEnable(GL_BLEND);
-			glDisable(GL_ALPHA_TEST);
-			if (Z_Buffering) glDisable(GL_DEPTH_TEST);
+			//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
+			glDisable(GL_DEPTH_TEST);
 		} else {
 			glDisable(GL_BLEND);
-			glEnable(GL_ALPHA_TEST);
+			//glEnable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		}
 	} else {
 		// Completely opaque if can't see through void
 		IsBlended = false;
 		glDisable(GL_BLEND);
-		glDisable(GL_ALPHA_TEST);
+		//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 	}
 	
 	// Proper projection
 	SetProjectionType(Projection_OpenGL_Eye);
-  
+	
 	// Location of data:
-	glVertexPointer(4,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].Vertex);
-	glTexCoordPointer(2,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].TexCoord);
+	//glVertexPointer(4,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].Vertex);
+	//glTexCoordPointer(2,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].TexCoord);
 	
 	// Painting a texture...
-	glEnable(GL_TEXTURE_2D);
+	//glEnable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
 
 	TMgr.SetupTextureMatrix();
 	TMgr.RenderNormal();	
@@ -1714,16 +1637,13 @@ static bool RenderAsRealWall(polygon_definition& RenderPolygon, bool IsVertical)
 
 		if (UseFlatStatic)
 		{
-        // DCW OpenGL GL_POLYGON
-      glDrawArrays(GL_TRIANGLE_FAN,0,NumVertices);
+			glDrawArrays(GL_TRIANGLE_FAN,0,NumVertices);
 		} else {
 			// Do multitextured stippling to create the static effect
 			for (int k=0; k<StaticEffectPasses; k++)
 			{
 				StaticModeIndivSetup(k);
-        
-          // DCW OpenGL GL_POLYGON
-        glDrawArrays(GL_TRIANGLE_FAN,0,NumVertices);
+				glDrawArrays(GL_TRIANGLE_FAN,0,NumVertices);
 			}
 		}
 		TeardownStaticMode();
@@ -1852,17 +1772,15 @@ static bool RenderAsRealWall(polygon_definition& RenderPolygon, bool IsVertical)
 		
 		// Now, go!
 		glDrawElements(GL_TRIANGLES,3*(NumVertices-2),GL_UNSIGNED_INT,VertIndices);
-    
+		
 		// Switch off
-		glDisableClientState(GL_COLOR_ARRAY);
+		//glDisableClientState(GL_COLOR_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
 	}
-  else {
+	else
 		// Go!
 		// Don't care about triangulation here, because the polygon never got split
-    // DJB OpenGL GL_POLYGON
-    glDrawArrays(GL_TRIANGLE_FAN,0,NumVertices);
-  }
-    
+		glDrawArrays(GL_TRIANGLE_FAN,0,NumVertices);
+	
 	// Do textured rendering
 	if (TMgr.IsGlowMapped())
 	{
@@ -1873,18 +1791,18 @@ static bool RenderAsRealWall(polygon_definition& RenderPolygon, bool IsVertical)
 		// Added "IsBlended" test, so that alpha-channel selection would work properly
 		// on a glowmap texture that is atop a texture that is opaque to the void.
 		glEnable(GL_BLEND);
-		glDisable(GL_ALPHA_TEST);
-		if (Z_Buffering) glDisable(GL_DEPTH_TEST);
+		//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
+		glDisable(GL_DEPTH_TEST);
 		
 		TMgr.RenderGlowing();
 		SetBlend(TMgr.GlowBlend());
 		
 		if (PolygonVariableShade)
 		{
-			glEnableClientState(GL_COLOR_ARRAY);
-			glColorPointer(3,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].GlowColor);
+			//glEnableClientState(GL_COLOR_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
+			//glColorPointer(3,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].GlowColor);
 			glDrawElements(GL_TRIANGLES,3*(NumVertices-2),GL_UNSIGNED_INT,VertIndices);
-			glDisableClientState(GL_COLOR_ARRAY);
+			//glDisableClientState(GL_COLOR_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
 		}
 		else
 		{
@@ -1893,19 +1811,10 @@ static bool RenderAsRealWall(polygon_definition& RenderPolygon, bool IsVertical)
 		}
 	}
 	}
-  
-  //DCW debugging
-  /*GLfloat m[16];
-  glGetFloatv (GL_MODELVIEW_MATRIX, m);
-  printf ( "Modelview for realwall: %f %f %f %f, %f %f %f %f, %f %f %f %f, %f %f %f %f\n",
-          m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8],m[9],m[10],m[11],m[12],m[13],m[14],m[15]);
-    glGetFloatv (GL_PROJECTION_MATRIX, m);
-  printf ( "Projectionmatrix for realwall: %f %f %f %f, %f %f %f %f, %f %f %f %f, %f %f %f %f\n",
-          m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8],m[9],m[10],m[11],m[12],m[13],m[14],m[15]);*/
-  
+	
 	// Revert to default blend
 	SetBlend(OGL_BlendType_Crossfade);
-	if (Z_Buffering) glEnable(GL_DEPTH_TEST);
+	glEnable(GL_DEPTH_TEST);
 	TMgr.RestoreTextureMatrix();
 
 	return true;
@@ -1923,14 +1832,14 @@ static bool RenderAsLandscape(polygon_definition& RenderPolygon)
 	if (AffectsLandscapes)
 	{
 		// Render as fog at infinity
-		glDisable(GL_FOG);
-		glDisable(GL_TEXTURE_2D);
+		//glDisable(GL_FOG); //NOT SUPPORTED ANGLE ENUM
+		//glDisable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
 		
 		// Set up the color
-		SglColor3fv(CurrFogColor);
+		MSI()->color3f(CurrFogColor[0], CurrFogColor[1], CurrFogColor[2]);
 		
 		// Set up blending mode: opaque
-		glDisable(GL_ALPHA_TEST);
+		//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		glDisable(GL_BLEND);
 		
 		// Proper projection
@@ -1954,21 +1863,23 @@ static bool RenderAsLandscape(polygon_definition& RenderPolygon)
 			AltEV.Vertex[2] = -1;			// At positive oo
 		}
 		// Fog is flat-colored
-		glDisableClientState(GL_TEXTURE_COORD_ARRAY);		
-		glVertexPointer(3,GL_SHORT,sizeof(AltExtendedVertexData),AltEVList[0].Vertex);
+		//glDisableClientState(GL_TEXTURE_COORD_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
+		//glVertexPointer(3,GL_SHORT,sizeof(AltExtendedVertexData),AltEVList[0].Vertex);
 		
 		// Go!
 		glDrawArrays(GL_TRIANGLE_FAN,0,NumVertices);
 		
 		// Restore
-		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-		glEnable(GL_FOG);
+		//glEnableClientState(GL_TEXTURE_COORD_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
+		//glEnable(GL_FOG); //NOT SUPPORTED ANGLE ENUM
 		
 		return true;
 	}
 	
 	// Otherwise, the landscape would get fogged as a function of its world-geometry location
-	if (IsActive) glDisable(GL_FOG);
+    if (IsActive){
+        //glDisable(GL_FOG); //NOT SUPPORTED ANGLE ENUM
+    }
 
 	// Get the landscape-texturing options
 	LandscapeOptions *LandOpts = View_GetLandscapeOptions(RenderPolygon.ShapeDesc);
@@ -1976,10 +1887,6 @@ static bool RenderAsLandscape(polygon_definition& RenderPolygon)
 	// Adjusted using the texture azimuth (yaw)
 	double AdjustedYaw = Yaw + FullCircleReciprocal*(LandOpts->Azimuth);
 	
-  if( shouldSmoothMouselook() ) {
-    AdjustedYaw += FullCircleReciprocal*(lostMousePrecisionX());
-  }
-  
 	// Horizontal is straightforward
 	double HorizScale = double(1 << LandOpts->HorizExp);
 	// Vertical requires adjustment for aspect ratio;
@@ -2011,7 +1918,9 @@ static bool RenderAsLandscape(polygon_definition& RenderPolygon)
 	// Use that texture
 	if (!TMgr.Setup())
 	{
-		if (IsActive) glEnable(GL_FOG);
+        if (IsActive) {
+            //glEnable(GL_FOG); //NOT SUPPORTED ANGLE ENUM
+        }
 		return false;
 	}
 	
@@ -2046,7 +1955,7 @@ static bool RenderAsLandscape(polygon_definition& RenderPolygon)
 	}
 	
 	// Set up lighting:
-	glColor4f(1,1,1,1);
+	MSI()->color3f(1,1,1);
 	
 	// Cribbed from RenderAsRealWall()
 	// Set up blending mode: either sharp edges or opaque
@@ -2059,26 +1968,26 @@ static bool RenderAsLandscape(polygon_definition& RenderPolygon)
 		if (IsBlended)
 		{
 			glEnable(GL_BLEND);
-			glDisable(GL_ALPHA_TEST);
+			//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		} else {
 			glDisable(GL_BLEND);
-			glEnable(GL_ALPHA_TEST);
+			//glEnable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		}
 	} else {
 		// Completely opaque if can't see through void
 		glDisable(GL_BLEND);
-		glDisable(GL_ALPHA_TEST);
+		//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 	}
 	
 	// Proper projection
 	SetProjectionType(Projection_Screen);
 	
 	// Location of data:
-	glVertexPointer(3,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].Vertex);
-	glTexCoordPointer(2,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].TexCoord);
+	//glVertexPointer(3,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].Vertex);
+	//glTexCoordPointer(2,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].TexCoord);
 	
 	// Painting a texture...
-	glEnable(GL_TEXTURE_2D);
+	//glEnable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
 	TMgr.SetupTextureMatrix();
 	TMgr.RenderNormal();
 	
@@ -2095,9 +2004,9 @@ static bool RenderAsLandscape(polygon_definition& RenderPolygon)
 		// instead of the crisp mode.
 		// Added "IsBlended" test, so that alpha-channel selection would work properly
 		// on a glowmap texture that is atop a texture that is opaque to the void.
-		glColor4f(1,1,1,1);
+		MSI()->color3f(1,1,1);
 		glEnable(GL_BLEND);
-		glDisable(GL_ALPHA_TEST);
+		//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		
 		TMgr.RenderGlowing();
 		SetBlend(TMgr.GlowBlend());
@@ -2108,7 +2017,9 @@ static bool RenderAsLandscape(polygon_definition& RenderPolygon)
 	SetBlend(OGL_BlendType_Crossfade);
 	TMgr.RestoreTextureMatrix();
 	
-	if (IsActive) glEnable(GL_FOG);
+    if (IsActive) {
+        //glEnable(GL_FOG); //NOT SUPPORTED ANGLE ENUM
+    }
 	return true;
 }
 
@@ -2132,7 +2043,7 @@ bool OGL_RenderWall(polygon_definition& RenderPolygon, bool IsVertical)
 		break;
 	}
 	// Standard z-buffering acceptance
-  //	glDepthFunc(GL_LEQUAL); //DCW WTF, A1 guys? If I leave this in, only sprites that are below the floor render!
+	glDepthFunc(GL_LEQUAL);
 	return true;
 }
 
@@ -2140,7 +2051,7 @@ bool OGL_RenderWall(polygon_definition& RenderPolygon, bool IsVertical)
 bool OGL_RenderSprite(rectangle_definition& RenderRectangle)
 {
 	if (!OGL_IsActive()) return false;
-  
+		
 	// Set up the texture manager with the input manager
 	TextureManager TMgr;
 	TMgr.ShapeDesc = RenderRectangle.ShapeDesc;
@@ -2150,7 +2061,7 @@ bool OGL_RenderSprite(rectangle_definition& RenderRectangle)
 	TMgr.TransferMode = RenderRectangle.transfer_mode;
 	TMgr.TransferData = RenderRectangle.transfer_data;
 	TMgr.IsShadeless = (RenderRectangle.flags&_SHADELESS_BIT) != 0;
-
+	
 	// Is this an inhabitant or a weapons-in-hand texture?
 	// Test by using the distance away from the viewpoint
 	bool IsInhabitant;
@@ -2180,7 +2091,7 @@ bool OGL_RenderSprite(rectangle_definition& RenderRectangle)
 			return true;
 		}
 	}
-  
+	
 	// Find texture coordinates
 	ExtendedVertexData ExtendedVertexList[4];
 	
@@ -2219,10 +2130,10 @@ bool OGL_RenderSprite(rectangle_definition& RenderRectangle)
 	// Completely clipped away?
 	if (BottomRight.x <= TopLeft.x) return true;
 	if (BottomRight.y <= TopLeft.y) return true;
-  
+	
 	// Use that texture
 	if (!TMgr.Setup()) return true;
-  
+	
 	// Calculate the texture coordinates;
 	// the scanline direction is downward, (texture coordinate 0)
 	// while the line-to-line direction is rightward (texture coordinate 1)
@@ -2271,111 +2182,48 @@ bool OGL_RenderSprite(rectangle_definition& RenderRectangle)
 	bool IsBlended = TMgr.IsBlended();
 	bool ExternallyLit = false;
 	GLfloat Color[4];
-  
 	DoLightingAndBlending(RenderRectangle, IsBlended,
 		Color, ExternallyLit);
 
-	if (Z_Buffering && IsBlended)
+	if (IsBlended)
 		// alpha test will be disabled, so don't hose z buffer
 		glDisable(GL_DEPTH_TEST);
 
 	// Already corrected
-  // DJB OpenGL
-  if( useShaderRenderer() ){
-    MatrixStack::Instance()->color4f(Color[0],Color[1],Color[2],Color[3]);
-  } else {
-    glColor4f(Color[0],Color[1],Color[2],Color[3]);
-  }
+	MSI()->color4f(Color[0],Color[1],Color[2],Color[3]);
 	
-    //Enable shader, if needed
-  Shader* s_rect = NULL;
-  if ( useShaderRenderer() ) {
-    s_rect = Shader::get(Shader::S_Rect);
-    s_rect->enable();
-  }
-  
-  //DCW debugging
-  /*GLfloat m[16];
-  MatrixStack::Instance()->getFloatv(MS_MODELVIEW_MATRIX, m);
-   printf ( "Modelview for rendersprite: %f %f %f %f, %f %f %f %f, %f %f %f %f, %f %f %f %f\n",
-   m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8],m[9],m[10],m[11],m[12],m[13],m[14],m[15]);
-   MatrixStack::Instance()->getFloatv(MS_PROJECTION_MATRIX, m);
-   printf ( "Projectionmatrix for rendersprite: %f %f %f %f, %f %f %f %f, %f %f %f %f, %f %f %f %f\n",
-   m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8],m[9],m[10],m[11],m[12],m[13],m[14],m[15]);
-   MatrixStack::Instance()->getFloatv(MS_TEXTURE_MATRIX, m);
-   printf ( "Texturematrix for rendersprite: %f %f %f %f, %f %f %f %f, %f %f %f %f, %f %f %f %f\n",
-          m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8],m[9],m[10],m[11],m[12],m[13],m[14],m[15]);*/
-
-  
 	// Location of data:
-  if( useShaderRenderer() ){
-    AOA::vertexAttribPointer(Shader::ATTRIB_TEXCOORDS, 2, GL_FLOAT, 0, sizeof(ExtendedVertexData), ExtendedVertexList[0].TexCoord);
-    AOA::enableVertexAttribArray(Shader::ATTRIB_TEXCOORDS);
-    
-    AOA::vertexAttribPointer(Shader::ATTRIB_VERTEX, 3, GL_FLOAT, GL_FALSE, sizeof(ExtendedVertexData), ExtendedVertexList[0].Vertex);
-    AOA::enableVertexAttribArray(Shader::ATTRIB_VERTEX);
-  } else {
-    glVertexPointer(3,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].Vertex);
-    glTexCoordPointer(2,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].TexCoord);
-    glEnable(GL_TEXTURE_2D);
-  }
-    //DCW Smart trigger
-  if( IsInhabitant && RenderRectangle.isLivingMonster ) {
-    if ( (ExtendedVertexList[1].Vertex[0] >= 0 &&ExtendedVertexList[3].Vertex[0] <= 0) || (ExtendedVertexList[1].Vertex[0] <= 0 && ExtendedVertexList[3].Vertex[0] >= 0) ) {
-        monsterIsCentered();
-    } else {
-      if( ExtendedVertexList[1].Vertex[0] < 0  ) {
-         monsterIsOnRight();
-      } else  {
-         monsterIsOnLeft();
-      }
-    }
-  }
-  
+	//glVertexPointer(3,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].Vertex);
+	//glTexCoordPointer(2,GL_FLOAT,sizeof(ExtendedVertexData),ExtendedVertexList[0].TexCoord);
+	//glEnable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
+		
 	// Go!
 	TMgr.SetupTextureMatrix();
 	TMgr.RenderNormal();	// Always do this, of course
-  
-  //DCW set texture filtering to make the 2d sampler show anything but black.
-  glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-  glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  
-  if (useShaderRenderer()) {
-    GLfloat modelProjectionMatrix[16], textureMatrix[16];
-    
-    MatrixStack::Instance()->getFloatvModelviewProjection(modelProjectionMatrix);
-    MatrixStack::Instance()->getFloatv(MS_TEXTURE_MATRIX, textureMatrix);
-    
-    s_rect->setMatrix4(Shader::U_MS_ModelViewProjectionMatrix, modelProjectionMatrix);
-    s_rect->setMatrix4(Shader::U_MS_TextureMatrix, textureMatrix);
-    s_rect->setVec4(Shader::U_MS_Color, MatrixStack::Instance()->color());
-    
-  }
-  
 	if (RenderRectangle.transfer_mode == _static_transfer)
 	{
-    SetupStaticMode(RenderRectangle.transfer_data);
-    if (UseFlatStatic)
-    {
-      if (Z_Buffering) glDisable(GL_DEPTH_TEST);
-      glDrawArrays(GL_TRIANGLE_FAN,0,4);
-    } else {
-      // Do multitextured stippling to create the static effect
-      for (int k=0; k<StaticEffectPasses; k++)
-      {
-        StaticModeIndivSetup(k);
-        glDrawArrays(GL_TRIANGLE_FAN,0,4);
-      }
-    }
-    TeardownStaticMode();
+		SetupStaticMode(RenderRectangle.transfer_data);
+		if (UseFlatStatic)
+		{
+			glDisable(GL_DEPTH_TEST);
+			glDrawArrays(GL_TRIANGLE_FAN,0,4);
+		} else {
+			// Do multitextured stippling to create the static effect
+			for (int k=0; k<StaticEffectPasses; k++)
+			{
+				StaticModeIndivSetup(k);
+				glDrawArrays(GL_TRIANGLE_FAN,0,4);
+			}
+		}
+		TeardownStaticMode();
 	}
 	else
 	{
 		// Ought not to set this for static mode
 		SetBlend(TMgr.NormalBlend());
-    
+
 		// Do textured rendering
-    glDrawArrays(GL_TRIANGLE_FAN,0,4);
+		glDrawArrays(GL_TRIANGLE_FAN,0,4);
 		
 		if (TMgr.IsGlowMapped())
 		{
@@ -2383,14 +2231,10 @@ bool OGL_RenderSprite(rectangle_definition& RenderRectangle)
 			// push the cutoff down so 0.5*0.5 (half of half-transparency)
 		  // DON'T sRGB this.
 			GLfloat GlowColor = TMgr.MinGlowIntensity();
-      if(useShaderRenderer()) {
-        MatrixStack::Instance()->color4f(std::max(GlowColor,Color[0]),std::max(GlowColor,Color[1]),std::max(GlowColor,Color[2]),Color[3]);
-      } else {
-        glColor4f(std::max(GlowColor,Color[0]),std::max(GlowColor,Color[1]),std::max(GlowColor,Color[2]),Color[3]);
-      }
+			MSI()->color4f(std::max(GlowColor,Color[0]),std::max(GlowColor,Color[1]),std::max(GlowColor,Color[2]),Color[3]);
 			glEnable(GL_BLEND);
-			glDisable(GL_ALPHA_TEST);
-			if (Z_Buffering) glDisable(GL_DEPTH_TEST);
+			//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
+			glDisable(GL_DEPTH_TEST);
 			
 			TMgr.RenderGlowing();
 			SetBlend(TMgr.GlowBlend());
@@ -2398,22 +2242,17 @@ bool OGL_RenderSprite(rectangle_definition& RenderRectangle)
 		}
 	}
 	
-  if ( useShaderRenderer() ) {
-    Shader::disable();
-  }
-  
 	// Revert to default blend
 	SetBlend(OGL_BlendType_Crossfade);
 	TMgr.RestoreTextureMatrix();
 
-	if (Z_Buffering)
-		glEnable(GL_DEPTH_TEST);
+	glEnable(GL_DEPTH_TEST);
 		
 	return true;
 }
 
 bool RenderModelSetup(rectangle_definition& RenderRectangle)
-{  
+{
 	OGL_ModelData *ModelPtr = RenderRectangle.ModelPtr;
 	assert(ModelPtr);
 	
@@ -2466,54 +2305,50 @@ bool RenderModelSetup(rectangle_definition& RenderRectangle)
 	if (RenderRectangle.clip_left >= RenderRectangle.x0)
 	{
 		ClipLeft = true;
-		glEnable(GL_CLIP_PLANE0);
+        MSI()->enablePlane(0);
 		ClipPlane[0] = 1;
 		ClipPlane[1] = 0;
 		ClipPlane[2] = XScaleRecip*(RenderRectangle.clip_left - XOffset);
-		glClipPlanef(GL_CLIP_PLANE0,ClipPlane);
+		MSI()->clipPlanef(0,ClipPlane);
 	}
 	
 	if (RenderRectangle.clip_right <= RenderRectangle.x1)
 	{
 		ClipRight = true;
-		glEnable(GL_CLIP_PLANE1);
+        MSI()->enablePlane(1);
 		ClipPlane[0] = - 1;
 		ClipPlane[1] = 0;
 		ClipPlane[2] = - XScaleRecip*(RenderRectangle.clip_right - XOffset);
-		glClipPlanef(GL_CLIP_PLANE1,ClipPlane);
+		MSI()->clipPlanef(1,ClipPlane);
 	}
 	
 	if (RenderRectangle.clip_top >= RenderRectangle.y0)
 	{
 		ClipTop = true;
-		glEnable(GL_CLIP_PLANE2);
+        MSI()->enablePlane(2);
 		ClipPlane[0] = 0;
 		ClipPlane[1] = - 1;
 		ClipPlane[2] = - YScaleRecip*(RenderRectangle.clip_top - YOffset);
-		glClipPlanef(GL_CLIP_PLANE2,ClipPlane);
+		MSI()->clipPlanef(2,ClipPlane);
 	}
 	
 	if (RenderRectangle.clip_bottom <= RenderRectangle.y1)
 	{
 		ClipBottom = true;
-		glEnable(GL_CLIP_PLANE3);
+        MSI()->enablePlane(3);
 		ClipPlane[0] = 0;
 		ClipPlane[1] = 1;
 		ClipPlane[2] = YScaleRecip*(RenderRectangle.clip_bottom - YOffset);
-		glClipPlanef(GL_CLIP_PLANE3,ClipPlane);
+		MSI()->clipPlanef(3,ClipPlane);
 	}
 	
 	// Get from the model coordinates to the screen coordinates.
 	SetProjectionType(Projection_OpenGL_Eye);
-	if (!useShaderRenderer()) glMatrixMode(GL_MODELVIEW);
-  MatrixStack::Instance()->matrixMode(MS_MODELVIEW);
-	if (!useShaderRenderer()) glPushMatrix();
-  MatrixStack::Instance()->pushMatrix();
-  if (!useShaderRenderer()) glLoadMatrixf(World_2_OGLEye);
-  MatrixStack::Instance()->loadMatrixf(World_2_OGLEye);
+	MSI()->matrixMode(MS_MODELVIEW);
+	MSI()->pushMatrix();
+	MSI()->loadMatrixf(World_2_OGLEye);
 	world_point3d& Position = RenderRectangle.Position;
-	if (!useShaderRenderer()) glTranslatef(Position.x,Position.y,Position.z);
-  MatrixStack::Instance()->translatef(Position.x,Position.y,Position.z);
+	MSI()->translatef(Position.x,Position.y,Position.z);
 	
 	// At model's position; now apply the liquid clipping
 	if (RenderRectangle.BelowLiquid)
@@ -2522,11 +2357,11 @@ bool RenderModelSetup(rectangle_definition& RenderRectangle)
 		if (LiquidRelHeight >= ModelFloor)
 		{
 			ClipLiquid = true;
-			glEnable(GL_CLIP_PLANE4);
+            MSI()->enablePlane(4);
 			ClipPlane[0] = ClipPlane[1] = 0;
 			ClipPlane[2] = - 1;
 			ClipPlane[3] = LiquidRelHeight;
-			glClipPlanef(GL_CLIP_PLANE4,ClipPlane);
+			MSI()->clipPlanef(4,ClipPlane);
 		}
 	}
 	else
@@ -2535,37 +2370,33 @@ bool RenderModelSetup(rectangle_definition& RenderRectangle)
 		if (LiquidRelHeight <= ModelCeiling)
 		{
 			ClipLiquid = true;
-			glEnable(GL_CLIP_PLANE4);
+            MSI()->enablePlane(4);
 			ClipPlane[0] = ClipPlane[1] = 0;
 			ClipPlane[2] = 1;
 			ClipPlane[3] = - LiquidRelHeight;
-			glClipPlanef(GL_CLIP_PLANE4,ClipPlane);
+            MSI()->clipPlanef(4,ClipPlane);
 		}
 	}
 	
 	// Its orientation and size
-	if (!useShaderRenderer()) glRotatef((360.0/FULL_CIRCLE)*RenderRectangle.Azimuth,0,0,1);
-  MatrixStack::Instance()->rotatef((360.0/FULL_CIRCLE)*RenderRectangle.Azimuth,0,0,1);
+	MSI()->rotatef((360.0/FULL_CIRCLE)*RenderRectangle.Azimuth,0,0,1);
 	GLfloat HorizScale = Scale*RenderRectangle.HorizScale;
-	if (!useShaderRenderer()) glScalef(HorizScale,HorizScale,Scale);
-  MatrixStack::Instance()->scalef(HorizScale,HorizScale,Scale);
-  
+	MSI()->scalef(HorizScale,HorizScale,Scale);
+	
 	// Be sure to include texture-mode effects as appropriate.
 	short CollColor = GET_DESCRIPTOR_COLLECTION(RenderRectangle.ShapeDesc);
 	short Collection = GET_COLLECTION(CollColor);
 	short CLUT = ModifyCLUT(RenderRectangle.transfer_mode,GET_COLLECTION_CLUT(CollColor));
 	bool ModelRendered = RenderModel(RenderRectangle,Collection,CLUT);
-  //printf ( "model collection: %d CollCOlor: %d\n",Collection, CollColor );
-
- if (!useShaderRenderer())  glPopMatrix();
-  MatrixStack::Instance()->popMatrix();
+	
+	MSI()->popMatrix();
 	
 	// No need for the clip planes anymore
-	if (ClipLeft) glDisable(GL_CLIP_PLANE0);
-	if (ClipRight) glDisable(GL_CLIP_PLANE1);
-	if (ClipTop) glDisable(GL_CLIP_PLANE2);
-	if (ClipBottom) glDisable(GL_CLIP_PLANE3);
-	if (ClipLiquid) glDisable(GL_CLIP_PLANE4);
+	if (ClipLeft) MSI()->disablePlane(0);
+	if (ClipRight) MSI()->disablePlane(1);
+	if (ClipTop) MSI()->disablePlane(2);
+	if (ClipBottom) MSI()->disablePlane(3);
+	if (ClipLiquid) MSI()->disablePlane(4);
 	
 	return ModelRendered;
 }
@@ -2590,16 +2421,11 @@ bool RenderModel(rectangle_definition& RenderRectangle, short Collection, short 
 	ShaderData.SkinPtr = SkinPtr;
 	ShaderData.Collection = Collection;
 	ShaderData.CLUT = CLUT;
-
+	
 	// Don't care about the magnitude of this vector
 	short Azimuth = normalize_angle(RenderRectangle.Azimuth);
 	GLfloat Cosine = cosine_table[Azimuth];
 	GLfloat Sine = sine_table[Azimuth];
-  
-  //DCW mouselook smoothing test.
-  /*Cosine = interpolateAngleTable(cosine_table, Azimuth);
-  Sine = interpolateAngleTable(sine_table, Azimuth);*/
-  
 	ModelRenderObject.ViewDirection[0] =   ViewDir[0]*Cosine + ViewDir[1]*Sine;
 	ModelRenderObject.ViewDirection[1] = - ViewDir[0]*Sine + ViewDir[1]*Cosine;
 	// The z-component is already set -- to 0
@@ -2626,11 +2452,11 @@ bool RenderModel(rectangle_definition& RenderRectangle, short Collection, short 
 			// Do explicit depth sort because these textures are semitransparent
 			StandardShaders[0].Flags = ModelRenderer::Textured;
 			ModelRenderObject.Render(ModelPtr->Model, StandardShaders,
-				1, 0, Z_Buffering);
+				1, 0, true);
 		} else {
 			// Do multitextured stippling to create the static effect
 			ModelRenderObject.Render(ModelPtr->Model, StaticModeShaders,
-				StaticEffectPasses, SeparableStaticEffectPasses, Z_Buffering);
+				StaticEffectPasses, SeparableStaticEffectPasses, true);
 		}
 		TeardownStaticMode();
 	}
@@ -2697,13 +2523,15 @@ bool RenderModel(rectangle_definition& RenderRectangle, short Collection, short 
 		}
 		
 		ModelRenderObject.Render(ModelPtr->Model, StandardShaders, NumShaders,
-			NumSeparableShaders, Z_Buffering);
+			NumSeparableShaders, true);
 		
 		// Revert to default blend
 		SetBlend(OGL_BlendType_Crossfade);
 		
 		// Restore default
-		if (ExternallyLit) glDisableClientState(GL_COLOR_ARRAY);
+        if (ExternallyLit) {
+            //glDisableClientState(GL_COLOR_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
+        }
 	}
 	
 	// Restore the default render sidedness
@@ -2730,9 +2558,8 @@ bool DoLightingAndBlending(rectangle_definition& RenderRectangle, bool& IsBlende
 		// Crisp, no glowmap
 		IsBlended = false;
 		IsGlowmappable = false;
-		glEnable(GL_ALPHA_TEST);
+		//glEnable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		glDisable(GL_BLEND);
-    
 		return IsGlowmappable;
 	}
 	else if (RenderRectangle.transfer_mode == _tinted_transfer)
@@ -2771,11 +2598,11 @@ bool DoLightingAndBlending(rectangle_definition& RenderRectangle, bool& IsBlende
 	// or are otherwise semitransparent
 	if (IsInvisible || IsBlended || (RenderRectangle.Opacity < 1))
 	{
-		glDisable(GL_ALPHA_TEST);
+		//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		glEnable(GL_BLEND);
 		IsBlended = true;
 	} else { 
-		glEnable(GL_ALPHA_TEST);
+		//glEnable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		glDisable(GL_BLEND);
 	}
 	
@@ -2793,14 +2620,9 @@ void SetupStaticMode(int16 transfer_data)
 		FlatStaticColor[3] = 65535 - transfer_data;
 		
 		// Do flat-color version of static effect
-		glDisable(GL_ALPHA_TEST);
+		//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		glEnable(GL_BLEND);
-    if(useShaderRenderer()) {
-      MatrixStack::Instance()->color4f ( sRGB_frob(FlatStaticColor[0]*(1.f/65535.f)), sRGB_frob(FlatStaticColor[1]*(1.f/65535.f)), sRGB_frob(FlatStaticColor[2]*(1.f/65535.f)), FlatStaticColor[3]*(1.f/65535.f) );
-    } else {
-      SglColor4usv(FlatStaticColor);
-    }
-    
+		SglColor4usv(FlatStaticColor);
 	} else {
 #ifdef USE_STIPPLE_STATIC_EFFECT
 		// Do multitextured stippling to create the static effect
@@ -2837,8 +2659,7 @@ void SetupStaticMode(int16 transfer_data)
 		}
 		
 		// Get ready to use those static patterns
-    // DJB OpenGL no static effect
-    // glEnable(GL_POLYGON_STIPPLE);
+		//glEnable(GL_POLYGON_STIPPLE);
 #else
 		// Use the stencil buffer to create the static effect
 		glEnable(GL_STENCIL_TEST);
@@ -2857,11 +2678,10 @@ void TeardownStaticMode()
 	else
 	{
 #ifdef USE_STIPPLE_STATIC_EFFECT
-    // Restore the default blending
-    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    // glDisable(GL_COLOR_LOGIC_OP);
-    // DJB OpenGL Static
-    // glDisable(GL_POLYGON_STIPPLE);
+		// Restore the default blending
+		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+		// glDisable(GL_COLOR_LOGIC_OP);
+		//glDisable(GL_POLYGON_STIPPLE);
 #else
 		// Done with the stencil buffer
 		glDisable(GL_STENCIL_TEST);
@@ -2888,7 +2708,7 @@ void GlowingShader(void *Data)
 	GLfloat GlowColor = ShaderData.SkinPtr->MinGlowIntensity;
 	SglColor4f(std::max(ShaderData.Color[0],GlowColor),std::max(ShaderData.Color[1],GlowColor),std::max(ShaderData.Color[2],GlowColor),ShaderData.Color[3]*(Using_sRGB ? ShaderData.Color[3] : 1.0));
 	glEnable(GL_BLEND);
-	glDisable(GL_ALPHA_TEST);
+	//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 	
 	if (ShaderData.ModelPtr->Use(ShaderData.CLUT,OGL_SkinManager::Glowing))
 	{
@@ -2921,13 +2741,10 @@ void StaticModeIndivSetup(int SeqNo)
 	}
 
 	// no need to correct
-  if( useShaderRenderer() ){
-    MatrixStack::Instance()->color4f(StaticBaseColors[SeqNo][0],StaticBaseColors[SeqNo][1],StaticBaseColors[SeqNo][2],1.0);
-  } else {
-    glColor4f(StaticBaseColors[SeqNo][0],StaticBaseColors[SeqNo][1],StaticBaseColors[SeqNo][2],1.0);
-  }
-  // DJB OpenGL Static
-  // glPolygonStipple((byte *)StaticPatterns[SeqNo]);
+    MSI()->color3f(StaticBaseColors[SeqNo][0], StaticBaseColors[SeqNo][1], StaticBaseColors[SeqNo][2]);
+
+    //Static in OpenGL now.
+    //glPolygonStipple((byte *)StaticPatterns[SeqNo]);
 #else
 	// Stencil buffering
 	switch(SeqNo)
@@ -2938,14 +2755,14 @@ void StaticModeIndivSetup(int SeqNo)
 		glStencilOp(GL_KEEP, GL_ZERO, GL_ZERO);
 		glStencilMask(1);
 		glDisable(GL_BLEND);
-		glDisable(GL_ALPHA_TEST);
+		//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);
 		break;
 		
 	case 1:
 		// The stencil buffer will become 1 everywhere a pixel is to be rendered
 		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-		glEnable(GL_ALPHA_TEST);
+		//glEnable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		break;
 		
 	case 2:
@@ -2953,10 +2770,10 @@ void StaticModeIndivSetup(int SeqNo)
 		glStencilFunc(GL_EQUAL,1,1);
 		glStencilMask(0);
 		glEnable(GL_BLEND);
-		glDisable(GL_ALPHA_TEST);
+		//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		if(Using_sRGB) glDisable(GL_FRAMEBUFFER_sRGB);
 		glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
-		glColor4f(1,1,1,Using_sRGB ? StencilTxtrOpacity*StencilTxtrOpacity : StencilTxtrOpacity);	// Static is fully bright and partially transparent
+		MSI()->color4f(1,1,1,Using_sRGB ? StencilTxtrOpacity*StencilTxtrOpacity : StencilTxtrOpacity);	// Static is fully bright and partially transparent
 		break;
 	}
 #endif
@@ -2979,7 +2796,7 @@ void StaticModeShader(void *Data)
 	else
 	{
 		// For the static effect
-		AOA::bindTexture(GL_TEXTURE_2D,0, NULL, 0);
+		glBindTexture(GL_TEXTURE_2D,0);
 		
 		const int TxSize = 64;
 		const int TxPxls = TxSize*TxSize;
@@ -2996,7 +2813,7 @@ void StaticModeShader(void *Data)
 			Buffer[k] = Pxl;
 		}
 		
-		AOA::texImage2D(GL_TEXTURE_2D, 0, Using_sRGB ? GL_SRGB_ALPHA : GL_RGBA8, TxSize, TxSize,
+		glTexImage2D(GL_TEXTURE_2D, 0, Using_sRGB ? GL_SRGB_ALPHA : GL_RGBA8, TxSize, TxSize,
 			0, GL_RGBA, GL_UNSIGNED_BYTE, Buffer);
 		
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
@@ -3117,8 +2934,8 @@ bool OGL_RenderCrosshairs()
 	SetProjectionType(Projection_Screen);
 
 	// No textures painted here, but will blend
-	glDisable(GL_TEXTURE_2D);
-	glDisable(GL_ALPHA_TEST);
+	//glDisable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
+	//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 	glEnable(GL_BLEND);
 	
 	// What color; make 50% transparent (Alexander Strange's idea)
@@ -3134,9 +2951,9 @@ bool OGL_RenderCrosshairs()
 	SglColor4fv(Crosshairs.GLColorsPreCalc);
 	
 	// Create a new modelview matrix for the occasion
-	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
-	glTranslatef(ViewWidth / 2, ViewHeight / 2, 1);
+	MSI()->matrixMode(MS_MODELVIEW);
+	MSI()->pushMatrix();
+	MSI()->translatef(ViewWidth / 2, ViewHeight / 2, 1);
 	
 	// To keep pixels aligned, we have to draw on pixel boundaries.
 	// The SW renderer always offsets down and to the right when faced
@@ -3188,55 +3005,53 @@ bool OGL_RenderCrosshairs()
 				
 				// at the initial rotation, this is the bottom right
 				GLfloat vertices[16] = {
-          static_cast<GLfloat>(LenMax + WidthMin), static_cast<GLfloat>(LenMin + HeightMin),
-          static_cast<GLfloat>(LenMax + WidthMax), static_cast<GLfloat>(LenMin + HeightMin),
-          static_cast<GLfloat>(LenMax + WidthMin), static_cast<GLfloat>(LenMid + HeightMin),
-          static_cast<GLfloat>(LenMax + WidthMax), static_cast<GLfloat>(LenMid + HeightMax),
-          static_cast<GLfloat>(LenMid + WidthMin), static_cast<GLfloat>(LenMax + HeightMin),
-          static_cast<GLfloat>(LenMid + WidthMax), static_cast<GLfloat>(LenMax + HeightMax),
-          static_cast<GLfloat>(LenMin + WidthMin), static_cast<GLfloat>(LenMax + HeightMin),
-          static_cast<GLfloat>(LenMin + WidthMin), static_cast<GLfloat>(LenMax + HeightMax)
-				};
-				glVertexPointer(2, GL_FLOAT, 0, vertices);
+                    static_cast<GLfloat>(LenMax + WidthMin), static_cast<GLfloat>(LenMin + HeightMin),
+                    static_cast<GLfloat>(LenMax + WidthMax), static_cast<GLfloat>(LenMin + HeightMin),
+                    static_cast<GLfloat>(LenMax + WidthMin), static_cast<GLfloat>(LenMid + HeightMin),
+                    static_cast<GLfloat>(LenMax + WidthMax), static_cast<GLfloat>(LenMid + HeightMax),
+                    static_cast<GLfloat>(LenMid + WidthMin), static_cast<GLfloat>(LenMax + HeightMin),
+                    static_cast<GLfloat>(LenMid + WidthMax), static_cast<GLfloat>(LenMax + HeightMax),
+                    static_cast<GLfloat>(LenMin + WidthMin), static_cast<GLfloat>(LenMax + HeightMin),
+                    static_cast<GLfloat>(LenMin + WidthMin), static_cast<GLfloat>(LenMax + HeightMax)
+                };
+                //glVertexPointer(2, GL_FLOAT, 0, vertices);
 				glDrawArrays(GL_TRIANGLE_STRIP, 0, 8);
 			}
 			break;
 		}
-		glRotatef(-90.0, 0, 0, 1); // turn clockwise
+		MSI()->rotatef(-90.0, 0, 0, 1); // turn clockwise
 	}
 	
 	// Done with that modelview matrix
-	glPopMatrix();
+	MSI()->popMatrix();
 			
+	return true;
+}
+
+bool OGL_TextWidth(const char* Text, int count, int& width)
+{
+	if (!OGL_IsActive()) return false;
+
+	std::string s(Text, count);
+
+	width = GetOnScreenFont().TextWidth(s.c_str());
 	return true;
 }
 
 // Rendering text
 bool OGL_RenderText(short BaseX, short BaseY, const char *Text, unsigned char r, unsigned char g, unsigned char b)
 {
-	if (!OGL_IsActive()) return false;
-  AOA::pushGroupMarker(0, "Render Text");
-  
-  Shader* previousShader = NULL;
-  int previousMode;
-  if(useShaderRenderer()) {
+    if (!OGL_IsActive()) return false;
+	
+    Shader* previousShader = NULL;
+    int previousMode;
     previousShader = lastEnabledShader();
-    previousMode = MatrixStack::Instance()->currentActiveMode();
-    MatrixStack::Instance()->pushMatrix();
-  }
+    previousMode = MSI()->currentActiveMode();
+    MSI()->pushMatrix();
 
-  
-	// Create display list for the current text string;
-	// use the "standard" text-font display list (display lists can be nested)
-  // DJB Unused
-  // GLuint TextDisplayList;
-  // DJB OpenGL, don't use display lists
-  // TextDisplayList = glGenLists(1);
-  // glNewList(TextDisplayList,GL_COMPILE);
-  
-  //Enable shader, if needed
-  Shader* s_rect = NULL;
-  if ( useShaderRenderer() ) {
+    
+    //Enable shader, if needed
+    Shader* s_rect = NULL;
     s_rect = Shader::get(Shader::S_Rect);
     s_rect->enable();
     ///?????
@@ -3244,131 +3059,101 @@ bool OGL_RenderText(short BaseX, short BaseY, const char *Text, unsigned char r,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
     glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  }
-  
-  GetOnScreenFont().OGL_Render(Text);
-	//glEndList();
-	
-	// Place the text in the foreground of the display
-	SetProjectionType(Projection_Screen);
-	GLfloat Depth = 0;
-	
-	// Using a modelview matrix, of course
-  
-  if (!useShaderRenderer()) glMatrixMode(GL_MODELVIEW);
-  MatrixStack::Instance()->matrixMode(GL_MODELVIEW);
-	
-	if (!useShaderRenderer()) glPushMatrix();
-	MatrixStack::Instance()->pushMatrix();
-  
-	// Background
-  if (!useShaderRenderer()) glColor4f(0,0,0,1);
-  MatrixStack::Instance()->color4f(0,0,0,1);
+    
+    GetOnScreenFont().OGL_Render(Text);
+    
+    // Place the text in the foreground of the display
+    SetProjectionType(Projection_Screen);
+    GLfloat Depth = 0;
+    
+    // Using a modelview matrix, of course
+    MSI()->matrixMode(MS_MODELVIEW);
+    MSI()->pushMatrix();
+    
+    // Background
+    MSI()->color4f(0,0,0,1);
+    
+    // Changed to drop shadow only for performance reasons
+    /*
+    glLoadIdentity();
+    glTranslatef(BaseX-1,BaseY-1,Depth);
+    glCallList(TextDisplayList);
+    
+    glLoadIdentity();
+    glTranslatef(BaseX,BaseY-1,Depth);
+    glCallList(TextDisplayList);
+    
+    glLoadIdentity();
+    glTranslatef(BaseX+1,BaseY-1,Depth);
+    glCallList(TextDisplayList);
+    
+    glLoadIdentity();
+    glTranslatef(BaseX-1,BaseY,Depth);
+    glCallList(TextDisplayList);
+    
+    glLoadIdentity();
+    glTranslatef(BaseX+1,BaseY,Depth);
+    glCallList(TextDisplayList);
+    
+    glLoadIdentity();
+    glTranslatef(BaseX-1,BaseY+1,Depth);
+    glCallList(TextDisplayList);
+    
+    glLoadIdentity();
+    glTranslatef(BaseX,BaseY+1,Depth);
+    glCallList(TextDisplayList);
+    */
+    
+    MSI()->loadIdentity();
 
-	// Changed to drop shadow only for performance reasons
-	/*
-	glLoadIdentity();
-	glTranslatef(BaseX-1,BaseY-1,Depth);
-	glCallList(TextDisplayList);
-	
-	glLoadIdentity();
-	glTranslatef(BaseX,BaseY-1,Depth);
-	glCallList(TextDisplayList);
-	
-	glLoadIdentity();
-	glTranslatef(BaseX+1,BaseY-1,Depth);
-	glCallList(TextDisplayList);
-	
-	glLoadIdentity();
-	glTranslatef(BaseX-1,BaseY,Depth);
-	glCallList(TextDisplayList);
-	
-	glLoadIdentity();
-	glTranslatef(BaseX+1,BaseY,Depth);
-	glCallList(TextDisplayList);
-	
-	glLoadIdentity();
-	glTranslatef(BaseX-1,BaseY+1,Depth);
-	glCallList(TextDisplayList);
-	
-	glLoadIdentity();
-	glTranslatef(BaseX,BaseY+1,Depth);
-	glCallList(TextDisplayList);
-	*/
-	
-	
-  if (!useShaderRenderer()) glLoadIdentity();
-  MatrixStack::Instance()->loadIdentity();
+    MSI()->translatef(BaseX+1.0F,BaseY+1.0F,Depth);
+    GetOnScreenFont().OGL_Render(Text);
+    
+    // Foreground
+    MSI()->color4f(r/255.0f,g/255.0f,b/255.0f,1);
 
-	if (!useShaderRenderer()) glTranslatef(BaseX+1.0F,BaseY+1.0F,Depth);
-  MatrixStack::Instance()->translatef(BaseX+1.0F,BaseY+1.0F,Depth);
-  // DJB OpenGL Render text, not display list
-  // glCallList(TextDisplayList);
-  GetOnScreenFont().OGL_Render(Text);
-	
-	// Foreground
-  if (!useShaderRenderer()) SglColor3f(r/255.0f,g/255.0f,b/255.0f);
-  MatrixStack::Instance()->color4f(r/255.0f,g/255.0f,b/255.0f,1);
-  
-  if (!useShaderRenderer()) glLoadIdentity();
-  MatrixStack::Instance()->loadIdentity();
-  
-  if (!useShaderRenderer()) glTranslatef(BaseX,BaseY,Depth);
-  MatrixStack::Instance()->translatef(BaseX,BaseY,Depth);
-  
-  // DJB OpenGL Render text, not display list
-  // glCallList(TextDisplayList);
-  GetOnScreenFont().OGL_Render(Text);
-		
-	// Clean up
-	//glDeleteLists(TextDisplayList,1);
-  if (!useShaderRenderer()) {
-    glPopMatrix();
-  } else {
-    MatrixStack::Instance()->popMatrix();
-    MatrixStack::Instance()->matrixMode(previousMode);
-    MatrixStack::Instance()->popMatrix(); //Lets not hose the active matrix for others, ok?
+    MSI()->loadIdentity();
+    MSI()->loadIdentity();
+    MSI()->translatef(BaseX,BaseY,Depth);
+    GetOnScreenFont().OGL_Render(Text);
+        
+    // Clean up
+    MSI()->popMatrix();
+    MSI()->matrixMode(previousMode);
+    MSI()->popMatrix(); //Lets not hose the active matrix for others, ok?
     if(previousShader) {
       previousShader->enable();
     }
-  }
-  
-  glPopGroupMarkerEXT();
-
-	return true;
+    
+    return true;
 }
 
 void OGL_RenderRect(float x, float y, float w, float h)
 {
-  AOA::pushGroupMarker(0, "OGL_RenderRect");
-  
-  GLfloat vertices[8] = { x, y, x + w, y, x + w, y + h, x, y + h };
-  
-	glDisable(GL_TEXTURE_2D);
-  
-  if(useShaderRenderer()){
+	//glDisable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
+	//glDisableClientState(GL_TEXTURE_COORD_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
+	
+	GLfloat vertices[8] = { x, y, x + w, y, x + w, y + h, x, y + h };
+    
+	//glVertexPointer(2, GL_FLOAT, 0, vertices);
     Shader *lastShader = lastEnabledShader();
     if(lastShader) {
-      lastShader->setVec4(Shader::U_MS_Color, MatrixStack::Instance()->color());
+      lastShader->setVec4(Shader::U_Color, MatrixStack::Instance()->color());
+        
+     GLfloat modelProjection[16];
+     MatrixStack::Instance()->getFloatvModelviewProjection(modelProjection);
+     lastShader->setMatrix4(Shader::U_ModelViewProjectionMatrix, modelProjection);
 
-      AOA::vertexAttribPointer(Shader::ATTRIB_VERTEX, 2, GL_FLOAT, GL_FALSE, 0, vertices);
-      AOA::enableVertexAttribArray(Shader::ATTRIB_VERTEX);
+      glVertexAttribPointer(Shader::ATTRIB_VERTEX, 2, GL_FLOAT, GL_FALSE, 0, vertices);
+      glEnableVertexAttribArray(Shader::ATTRIB_VERTEX);
+    } else {
+        printf ("No Shader in OGL_RenderRect! \n");
     }
-  } else {
-      glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-      glVertexPointer(2, GL_FLOAT, 0, vertices);
-  }
-	
-
+    
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
-	glEnable(GL_TEXTURE_2D);
-  
-  if(!useShaderRenderer()){
-    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-  }
-  
-  glPopGroupMarkerEXT();
+	//glEnable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
+	//glEnableClientState(GL_TEXTURE_COORD_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
 }
 
 void OGL_RenderRect(const SDL_Rect& rect)
@@ -3378,15 +3163,55 @@ void OGL_RenderRect(const SDL_Rect& rect)
 
 void OGL_RenderTexturedRect(float x, float y, float w, float h, float tleft, float ttop, float tright, float tbottom)
 {
-  if ( useShaderRenderer() ) {
-    DrawQuad(x, y, w, h, tleft, ttop, tright, tbottom);
-  } else {
-    GLfloat vertices[8] = { x, y, x + w, y, x + w, y + h, x, y + h };
+//    GLfloat vertices[8] = { x, y, x + w, y, x + w, y + h, x, y + h };
+    GLfloat vertices[12] = { x, y, 0,
+                               x + w, y, 0,
+                               x + w, y + h, 0,
+                               x, y + h, 0};
     GLfloat texcoords[8] = { tleft, ttop, tright, ttop, tright, tbottom, tleft, tbottom };
-    glVertexPointer(2, GL_FLOAT, 0, vertices);
+    
+    GLubyte indices[] =    {0,1,2,
+                            0,2,3};
+    
+    Shader* previousShader = lastEnabledShader();
+    
+    //Enable shader, if needed
+    Shader* s_plain_rect = NULL;
+    s_plain_rect = Shader::get(Shader::S_PlainRect);
+    s_plain_rect->enable();
+    
+    //Textured rects really like being fed the whole ModelView*Projection matrix.
+    MSI()->pushMatrix();
+    GLfloat modelProjection[16];
+    MSI()->getFloatvModelviewProjection(modelProjection);
+    MSI()->loadMatrixf(modelProjection);
+    
+    MatrixStack::Instance()->transformVertex(vertices[0], vertices[1], vertices[2]);
+    MatrixStack::Instance()->transformVertex(vertices[3], vertices[4], vertices[5]);
+    MatrixStack::Instance()->transformVertex(vertices[6], vertices[7], vertices[8]);
+    MatrixStack::Instance()->transformVertex(vertices[9], vertices[10], vertices[11]);
+    
+    MSI()->popMatrix();
+    
+    s_plain_rect->setVec4(Shader::U_Color, MatrixStack::Instance()->color());
+
+    glVertexAttribPointer(Shader::ATTRIB_VERTEX, 3, GL_FLOAT, GL_FALSE, 0, vertices);
+    glEnableVertexAttribArray(Shader::ATTRIB_VERTEX);
+    
+    glVertexAttribPointer(Shader::ATTRIB_TEXCOORDS, 2, GL_FLOAT, 0, 0, texcoords);
+    glEnableVertexAttribArray(Shader::ATTRIB_TEXCOORDS);
+    
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, indices);
+ 
+    glDisableVertexAttribArray(0);
+
+    /*glVertexPointer(2, GL_FLOAT, 0, vertices);
     glTexCoordPointer(2, GL_FLOAT, 0, texcoords);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-  }
+    glDrawArrays(GL_POLYGON, 0, 4);*/
+    
+    if(previousShader) {
+      previousShader->enable();
+    }
 }
 
 void OGL_RenderTexturedRect(const SDL_Rect& rect, float tleft, float ttop, float tright, float tbottom)
@@ -3396,8 +3221,8 @@ void OGL_RenderTexturedRect(const SDL_Rect& rect, float tleft, float ttop, float
 
 void OGL_RenderFrame(float x, float y, float w, float h, float t)
 {
-	glDisable(GL_TEXTURE_2D);
-	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+	//glDisable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
+	//glDisableClientState(GL_TEXTURE_COORD_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
 	
 	GLfloat vertices[20] = {
 		x,         y,
@@ -3411,11 +3236,16 @@ void OGL_RenderFrame(float x, float y, float w, float h, float t)
 		x,		   y,
 		x + t,	   y + t
 	};
-	glVertexPointer(2, GL_FLOAT, 0, vertices);
+	//glVertexPointer(2, GL_FLOAT, 0, vertices);
+    
+    //DCW honestly I don't know what this function is even for.
+    glVertexAttribPointer(Shader::ATTRIB_VERTEX, 2, GL_FLOAT, GL_FALSE, 0, vertices);
+    glEnableVertexAttribArray(Shader::ATTRIB_VERTEX);
+
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 10);
 	
-	glEnable(GL_TEXTURE_2D);
-	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	//glEnable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
+	//glEnableClientState(GL_TEXTURE_COORD_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
 }
 
 void OGL_RenderLines(const std::vector<world_point2d>& points, float thickness)
@@ -3423,8 +3253,8 @@ void OGL_RenderLines(const std::vector<world_point2d>& points, float thickness)
 	if (points.empty())
 		return;
 	
-	glDisable(GL_TEXTURE_2D);
-	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+	//glDisable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
+	//glDisableClientState(GL_TEXTURE_COORD_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
 	
 	std::vector<GLfloat> coords;
 	for (size_t i = 1; i < points.size(); i += 2)
@@ -3434,7 +3264,13 @@ void OGL_RenderLines(const std::vector<world_point2d>& points, float thickness)
 		
 		float rise = cur.y - prev.y;
 		float run = cur.x - prev.x;
-		float scale = thickness / sqrtf(rise*rise + run*run);
+		float length = sqrtf(rise*rise + run*run);
+		
+		// Skip degenerate lines
+		if (length == 0)
+			continue;
+		
+		float scale = thickness / length;
 		float xd = run * scale * 0.5f;
 		float yd = rise * scale * 0.5f;
 		
@@ -3452,20 +3288,21 @@ void OGL_RenderLines(const std::vector<world_point2d>& points, float thickness)
 		coords.push_back(cur.x - yd);
 		coords.push_back(cur.y + xd);
 	}
-  if(useShaderRenderer()) {
-    Shader* lastShader = lastEnabledShader();
-    if (lastShader) {
-      lastShader->setVec4(Shader::U_MS_Color, MatrixStack::Instance()->color());
-      AOA::vertexAttribPointer(Shader::ATTRIB_VERTEX, 2, GL_FLOAT, GL_FALSE, 0, &coords.front());
-      AOA::enableVertexAttribArray(Shader::ATTRIB_VERTEX);
-    }
-  } else {
-    glVertexPointer(2, GL_FLOAT, 0, &coords.front());
-  }
-	glDrawArrays(GL_TRIANGLES, 0, coords.size() / 2);
 	
-	glEnable(GL_TEXTURE_2D);
-	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	if (!coords.empty())
+	{
+        Shader* lastShader = lastEnabledShader();
+        if (lastShader) {
+          lastShader->setVec4(Shader::U_Color, MSI()->color());
+          glVertexAttribPointer(Shader::ATTRIB_VERTEX, 2, GL_FLOAT, GL_FALSE, 0, &coords.front());
+          glEnableVertexAttribArray(Shader::ATTRIB_VERTEX);
+        }
+		//glVertexPointer(2, GL_FLOAT, 0, &coords.front());
+		glDrawArrays(GL_TRIANGLES, 0, coords.size() / 2);
+	}
+	
+	//glEnable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
+	//glEnableClientState(GL_TEXTURE_COORD_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
 }
 
 // Render the console cursor

@@ -58,6 +58,9 @@ on very small maps, choose_random_flood_node() may not terminate
 #define NODE_IS_UNEXPANDED(n) (!NODE_IS_EXPANDED(n))
 #define MARK_NODE_AS_EXPANDED(n) ((n)->flags|=(uint16)0x8000)
 
+namespace alephone {
+namespace flood_map {
+
 struct node_data /* 16 bytes */
 {
 	uint16 flags;
@@ -70,6 +73,11 @@ struct node_data /* 16 bytes */
 
 	int32 user_flags;
 };
+
+}
+}
+
+using namespace alephone::flood_map;
 
 /* ---------- globals */
 
@@ -91,7 +99,6 @@ void allocate_flood_map_memory(
 	nodes= new node_data[MAXIMUM_FLOOD_NODES];
 	if (visited_polygons) delete []visited_polygons;
 	visited_polygons= new short[MAXIMUM_POLYGONS_PER_MAP];
-	assert(nodes&&visited_polygons);
 }
 
 /* returns next polygon index or NONE if there are no more polygons left cheaper than maximum_cost */
@@ -163,7 +170,7 @@ short flood_map(
 			break;
 	}
 
-	/* if we found a node, mark it as expanded and add itÕs adjacent non-solid polygons to the search tree */
+	/* if we found a node, mark it as expanded and add itâ€™s adjacent non-solid polygons to the search tree */
 	if (lowest_cost_node_index!=NONE)
 	{
 		struct polygon_data *polygon;
@@ -305,7 +312,7 @@ static void add_node(
 				than the cost we are attempting to add, replace it (because we are doing
 				a best-first search, we are guarenteed never to find a better path to an
 				expanded node, and in fact if we find a path to a node we have already
-				expanded weÕre backtracking and can ignore the node) */
+				expanded weâ€™re backtracking and can ignore the node) */
 			assert(node_index>=0&&node_index<node_count);
 			node= nodes+node_index;
 			if (NODE_IS_EXPANDED(node)||node->cost<=cost) node= (struct node_data *) NULL;

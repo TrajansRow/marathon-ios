@@ -51,35 +51,40 @@ struct render_object_data
 	struct rectangle_definition rectangle;
 	
 	int16 ymedia;
-  
-    //Hints to feed dynamic lighting
-  short object_owner_type; //_object_is_projectile or _object_is_projectile.
-  short object_owner_permutation_type; //If defined,
-
+    
+        //Hints to feed dynamic lighting
+    short object_owner_type; //_object_is_projectile or _object_is_projectile.
+    short object_owner_permutation_type; //If defined, will be the specific object type
 };
 
 
 class RenderPlaceObjsClass
 {
-	// Auxiliary data and routines:
+	struct span_data;
 
 	void initialize_render_object_list();
 	
-	render_object_data *build_render_object(long_point3d *origin,
-		_fixed floor_intensity, _fixed ceiling_intensity,
-		sorted_node_data **base_nodes, short *base_node_count,
-		short object_index, float Opacity, long_point3d *rel_origin);
+	render_object_data* build_render_object(
+		object_data* object,
+		_fixed floor_intensity,
+		_fixed ceiling_intensity,
+		float Opacity,
+		long_point3d* origin,
+		long_point3d* rel_origin);
 	
-	void sort_render_object_into_tree(render_object_data *new_render_object,
-		sorted_node_data **base_nodes, short base_node_count);
+	void sort_render_object_into_tree(render_object_data* new_render_object, const span_data& span);
 
-	short build_base_node_list(short origin_polygon_index,
-		world_point3d *origin, world_distance left_distance, world_distance right_distance,
-		sorted_node_data **base_nodes);
+	span_data build_base_node_list(const render_object_data* render_object, short origin_polygon_index);
 	
-	void build_aggregate_render_object_clipping_window(render_object_data *render_object,
-		sorted_node_data **base_nodes, short base_node_count);
+	void build_aggregate_render_object_clipping_window(render_object_data* render_object, const span_data& span);
 		
+	bool add_object_to_sorted_nodes(
+		object_data* object,
+		short object_index,
+		_fixed floor_intensity,
+		_fixed ceiling_intensity,
+		float Opacity);
+	
 	shape_information_data *rescale_shape_information(shape_information_data *unscaled,
 		shape_information_data *scaled, uint16 flags);
 

@@ -63,6 +63,7 @@
 #include    "mouse.h"   // (ZZZ) NUM_SDL_MOUSE_BUTTONS, SDLK_BASE_MOUSE_BUTTON
 #include "joystick.h"
 
+#include <functional>
 #include <sstream>
 
 /*
@@ -236,35 +237,6 @@ void w_slider_text::draw(SDL_Surface *s) const
 	draw_text(s, text, rect.x, rect.y + font->get_ascent() + (rect.h - font->get_line_height()) / 2, get_theme_color(LABEL_WIDGET, state, FOREGROUND_COLOR), font, style);
 }
 
-/*
- *  Picture (PICT resource)
- */
-
-w_pict::w_pict(int id)
-{
-	LoadedResource rsrc;
-	get_resource(FOUR_CHARS_TO_INT('P', 'I', 'C', 'T'), id, rsrc);
-	picture = picture_to_surface(rsrc);
-	if (picture) {
-		rect.w = static_cast<uint16>(picture->w);
-		rect.h = static_cast<uint16>(picture->h);
-		SDL_SetColorKey(picture, SDL_TRUE, SDL_MapRGB(picture->format, 0xff, 0xff, 0xff));
-	} else
-		rect.w = rect.h = 0;
-}
-
-w_pict::~w_pict()
-{
-	if (picture)
-		SDL_FreeSurface(picture);
-}
-
-void w_pict::draw(SDL_Surface *s) const
-{
-	if (picture)
-		SDL_BlitSurface(picture, NULL, s, const_cast<SDL_Rect *>(&rect));
-}
-
 
 /*
  *  Button
@@ -400,7 +372,7 @@ void w_button_base::click(int /*x*/, int /*y*/)
 {
 	// simulate a mouse press
 	mouse_down(0, 0);
-	SDL_Delay(1000 / 12);
+	sleep_for_machine_ticks(MACHINE_TICKS_PER_SECOND / 12);
 	mouse_up(0, 0);
 }
 
@@ -415,7 +387,7 @@ void w_hyperlink::prochandler(void *arg)
 	get_owning_dialog()->draw();
 }
 
-w_hyperlink::w_hyperlink(const char *url, const char *txt) : w_button_base((txt ? txt : url), boost::bind(&w_hyperlink::prochandler, this, _1), const_cast<char *>(url), HYPERLINK_WIDGET)
+w_hyperlink::w_hyperlink(const char *url, const char *txt) : w_button_base((txt ? txt : url), std::bind(&w_hyperlink::prochandler, this, std::placeholders::_1), const_cast<char *>(url), HYPERLINK_WIDGET)
 {
 	rect.w = text_width(text.c_str(), font, style);
 	rect.h = font->get_line_height();
@@ -779,7 +751,7 @@ w_select::w_select(size_t s, const char **l) : widget(LABEL_WIDGET), labels(l), 
         if(labels) {
             while (labels[num_labels])
                     num_labels++;
-            if (selection >= num_labels || selection < 0)
+            if (selection >= num_labels)
                     selection = 0;
         }
 
@@ -1072,17 +1044,9 @@ w_player_color::w_player_color(int selection) : w_select(selection, NULL)
 void w_player_color::draw(SDL_Surface *s) const
 {
 	int y = rect.y + font->get_ascent();
-
-	// Selection
-	if (selection >= 0) {
-		uint32 pixel = get_dialog_player_color(selection);
-		SDL_Rect r = {rect.x, rect.y + 1, 48, rect.h - 2};
-		SDL_FillRect(s, &r, pixel);
-	} else {
-		int state = enabled ? (active ? ACTIVE_STATE : DEFAULT_STATE) : DISABLED_STATE;
-
-		draw_text(s, "<unknown>", rect.x, y, get_theme_color(ITEM_WIDGET, state), font, style);
-	}
+	uint32 pixel = get_dialog_player_color(selection);
+	SDL_Rect r = {rect.x, rect.y + 1, 48, rect.h - 2};
+	SDL_FillRect(s, &r, pixel);
 
 	// Cursor
 	if (active)	{
@@ -1236,12 +1200,7 @@ void w_text_entry::draw(SDL_Surface *s) const
 void w_text_entry::set_active(bool new_active) {
 	if (new_active && !active) {
 		cursor_position = num_chars;
-		
-    //DCW we only want to listen for input, but not display the keyboard (which SDL_StartTextInput does). This is so an iOS dialog can send the text input itself.
-    // SDL_StartTextInput();
-    SDL_EventState(SDL_TEXTINPUT, SDL_ENABLE);
-    SDL_EventState(SDL_TEXTEDITING, SDL_ENABLE);
-    
+		SDL_StartTextInput();
 	} else if (!new_active && active) {
 		SDL_StopTextInput();
 	}
@@ -1250,7 +1209,6 @@ void w_text_entry::set_active(bool new_active) {
 
 void w_text_entry::event(SDL_Event &e)
 {
-    //DCW adding keyup for enter
 	if (e.type == SDL_KEYDOWN) {
 		switch (e.key.keysym.sym) {
 			case SDLK_LEFT:
@@ -1411,24 +1369,8 @@ end:			if (cursor_position < num_chars) {
 	}
 }
 
-#include "AlephOneHelper.h"
-
 void w_text_entry::click(int x, int y)
 {
-  
-  //DCW this might be a good place to handle text input differently on ios.
-  char *label = this->associated_label->text;
-  const char *currentText = this->get_text();
-  get_owning_dialog()->activate_widget(this);
-  
-    //If this widget can't activate, don't ask for input.
-  if(active) {
-    dirty = true;
-    getSomeTextFromIOS(label, currentText);
-    this->set_text("");
-  }
-  return;
-    
 	bool was_active = active;
 	get_owning_dialog()->activate_widget(this);
 	
@@ -1493,7 +1435,7 @@ void w_number_entry::event(SDL_Event &e)
 		for (std::string::iterator it = input_roman.begin(); it != input_roman.end(); ++it)
 		{
 			uint16 uc = *it;
-			if (uc >= '0' && (uc < 0x80 || enable_mac_roman) && (num_chars + 1) < max_chars) {
+			if (uc >= '0' && uc <= '9' && (num_chars + 1) < max_chars) {
 				memmove(&buf[cursor_position + 1], &buf[cursor_position], num_chars - cursor_position);
 				buf[cursor_position++] = static_cast<char>(uc);
 				buf[++num_chars] = 0;
@@ -1502,9 +1444,10 @@ void w_number_entry::event(SDL_Event &e)
 			}
 		}
 	}
-
-    //DCW commenting this out, because it causes extra numbers to get stuffed into the widget. WTF, people?
-	//w_text_entry::event(e);
+	else
+	{
+		w_text_entry::event(e);
+	}
 }
 
 void w_number_entry::set_number(int number)
@@ -1531,13 +1474,14 @@ void w_password_entry::draw(SDL_Surface *s) const
  *  Key name widget
  */
 
-static const char *WAITING_TEXT = "waiting for new key";
+static const std::vector<std::string> WAITING_TEXT = { "waiting for key", "waiting for button", "waiting for button" };
+static const std::vector<std::string> UNBOUND_TEXT = { "none", "none", "none" };
 
-w_key::w_key(SDL_Scancode key) : widget(LABEL_WIDGET), binding(false)
+w_key::w_key(SDL_Scancode key, w_key::Type event_type) : widget(LABEL_WIDGET), binding(false), event_type(event_type)
 {
 	set_key(key);
 
-	saved_min_width = text_width(WAITING_TEXT, font, style);
+	saved_min_width = text_width(WAITING_TEXT[event_type].c_str(), font, style);
 	saved_min_height = font->get_line_height();
 }
 
@@ -1559,25 +1503,50 @@ static const char* sMouseButtonKeyName[NUM_SDL_MOUSE_BUTTONS] = {
         "Mouse X1",
         "Mouse X2",
         "Mouse Scroll Up",
-        "Mouse Scroll Down",
-        "mouse 8"
+        "Mouse Scroll Down"
 };
 
-static const char* sJoystickButtonKeyName[NUM_SDL_JOYSTICK_BUTTONS] = {
-	"A", "B", "X", "Y", "Back", "Guide", "Start",
-	"LS", "RS", "LB", "RB", "Up", "Down", "Left", "Right",
-	"LT", "RT", "Unknown"
-};
+static const char* get_joystick_button_key_name(int offset)
+{
+	static_assert(SDL_CONTROLLER_BUTTON_MAX <= 21 &&
+				  SDL_CONTROLLER_AXIS_MAX <= 12,
+				  "SDL changed the number of buttons/axes again!");
+
+	static const char* buttons[] = {
+		"A", "B", "X", "Y", "Back", "Guide", "Start",
+		"LS", "RS", "LB", "RB", "Up", "Down", "Left", "Right",
+		// new in SDL 2.0.14
+		"Misc", "Paddle 1", "Paddle 2", "Paddle 3", "Paddle 4", "TP Button",
+	};
+
+	static const char* axes[] = {
+		"LS Right", "LS Down", "RS Right", "RS Down", "LT", "RT",
+		"LS Left", "LS Up", "RS Left", "RS Up", "LT Neg", "RT Neg"
+	};
+
+	if (offset < SDL_CONTROLLER_BUTTON_MAX)
+	{
+		return buttons[offset];
+	}
+	else
+	{
+		return axes[offset - SDL_CONTROLLER_BUTTON_MAX];
+	}
+}
 
 // ZZZ: this injects our phony key names but passes along the rest.
-static const char*
+const char*
 GetSDLKeyName(SDL_Scancode inKey) {
-    if(inKey >= AO_SCANCODE_BASE_MOUSE_BUTTON && inKey < AO_SCANCODE_BASE_MOUSE_BUTTON + NUM_SDL_MOUSE_BUTTONS)
+	if (w_key::event_type_for_key(inKey) == w_key::MouseButton)
         return sMouseButtonKeyName[inKey - AO_SCANCODE_BASE_MOUSE_BUTTON];
-    else if (inKey >= AO_SCANCODE_BASE_JOYSTICK_BUTTON && inKey < AO_SCANCODE_BASE_JOYSTICK_BUTTON + NUM_SDL_JOYSTICK_BUTTONS)
-	    return sJoystickButtonKeyName[inKey - AO_SCANCODE_BASE_JOYSTICK_BUTTON];
+	else if (w_key::event_type_for_key(inKey) == w_key::JoystickButton)
+	    return get_joystick_button_key_name(inKey - AO_SCANCODE_BASE_JOYSTICK_BUTTON);
     else
-        return SDL_GetScancodeName(inKey);
+	{
+		static std::string s;
+		s = utf8_to_mac_roman(SDL_GetKeyName(SDL_GetKeyFromScancode(inKey)));
+		return s.c_str();
+	}
 }
 
 void w_key::draw(SDL_Surface *s) const
@@ -1587,12 +1556,13 @@ void w_key::draw(SDL_Surface *s) const
 	// Key
 	int16 x = rect.x + key_x;
 	if (binding) {
-		draw_text(s, WAITING_TEXT, x, y, get_theme_color(ITEM_WIDGET, ACTIVE_STATE), font, style);
+		draw_text(s, WAITING_TEXT[event_type].c_str(), x, y, get_theme_color(ITEM_WIDGET, ACTIVE_STATE), font, style);
+	} else if (key == SDL_SCANCODE_UNKNOWN) {
+		int state = enabled ? (active ? ACTIVE_STATE : DISABLED_STATE) : DISABLED_STATE;
+		draw_text(s, UNBOUND_TEXT[event_type].c_str(), x, y, get_theme_color(ITEM_WIDGET, state), font, style);
 	} else {
         int state = enabled ? (active ? ACTIVE_STATE : DEFAULT_STATE) : DISABLED_STATE;
-
-        // ZZZ: potential to use the phony (i.e. mouse-button) key names
-	draw_text(s, GetSDLKeyName(key), x, y, get_theme_color(ITEM_WIDGET, state), font, style);
+		draw_text(s, GetSDLKeyName(key), x, y, get_theme_color(ITEM_WIDGET, state), font, style);
 	}
 }
 
@@ -1607,6 +1577,22 @@ void w_key::click(int /*x*/, int /*y*/)
     }
 }
 
+void w_key::set_active(bool new_active) {
+	if (!new_active && binding) {
+		binding = false;
+		dirty = true;
+	}
+	widget::set_active(new_active);
+}
+
+w_key::Type w_key::event_type_for_key(SDL_Scancode key) {
+	if (key >= AO_SCANCODE_BASE_MOUSE_BUTTON && key < (AO_SCANCODE_BASE_MOUSE_BUTTON + NUM_SDL_MOUSE_BUTTONS))
+		return MouseButton;
+	else if (key >= AO_SCANCODE_BASE_JOYSTICK_BUTTON && key < (AO_SCANCODE_BASE_JOYSTICK_BUTTON + NUM_SDL_JOYSTICK_BUTTONS))
+		return JoystickButton;
+	return KeyboardKey;
+}
+
 void w_key::event(SDL_Event &e)
 {
     if(binding) {
@@ -1614,39 +1600,54 @@ void w_key::event(SDL_Event &e)
 		bool up = false;
 		switch (e.type) {
 			case SDL_MOUSEBUTTONDOWN:
-				if (e.button.button < NUM_SDL_MOUSE_BUTTONS) {
-					set_key(static_cast<SDL_Scancode>(AO_SCANCODE_BASE_MOUSE_BUTTON + e.button.button - 1));
-					handled = true;
+				if (event_type == MouseButton) {
+					if (e.button.button < NUM_SDL_REAL_MOUSE_BUTTONS + 1) {
+						set_key(static_cast<SDL_Scancode>(AO_SCANCODE_BASE_MOUSE_BUTTON + e.button.button - 1));
+						handled = true;
+					}
 				}
 				break;
 			case SDL_CONTROLLERBUTTONDOWN:
-				if (e.cbutton.button < NUM_SDL_JOYSTICK_BUTTONS) {
-					set_key(static_cast<SDL_Scancode>(AO_SCANCODE_BASE_JOYSTICK_BUTTON + e.cbutton.button));
+				if ((e.cbutton.button + AO_SCANCODE_BASE_JOYSTICK_BUTTON) == AO_SCANCODE_JOYSTICK_ESCAPE) {
+					set_key(SDL_SCANCODE_UNKNOWN);
 					handled = true;
+				} else if (event_type == JoystickButton) {
+					if (e.cbutton.button < SDL_CONTROLLER_BUTTON_MAX) {
+						set_key(static_cast<SDL_Scancode>(AO_SCANCODE_BASE_JOYSTICK_BUTTON + e.cbutton.button));
+						handled = true;
+					}
 				}
 				break;
 			case SDL_CONTROLLERAXISMOTION:
-				if (e.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT) {
-					set_key(static_cast<SDL_Scancode>(AO_SCANCODE_BASE_JOYSTICK_BUTTON + AO_CONTROLLER_BUTTON_LEFTTRIGGER));
-					handled = true;
-				} else if (e.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT) {
-					set_key(static_cast<SDL_Scancode>(AO_SCANCODE_BASE_JOYSTICK_BUTTON + AO_CONTROLLER_BUTTON_RIGHTTRIGGER));
-					handled = true;
+				if (event_type == JoystickButton) {
+					if (e.caxis.value >= 16384) {
+						set_key(static_cast<SDL_Scancode>(AO_SCANCODE_BASE_JOYSTICK_AXIS_POSITIVE + e.caxis.axis));
+						handled = true;
+					} else if (e.caxis.value <= -16384) {
+						set_key(static_cast<SDL_Scancode>(AO_SCANCODE_BASE_JOYSTICK_AXIS_NEGATIVE + e.caxis.axis));
+						handled = true;
+					}
 				}
 				break;
 			case SDL_MOUSEWHEEL:
-				up = (e.wheel.y > 0);
+				if (event_type == MouseButton) {
+					up = (e.wheel.y > 0);
 #if SDL_VERSION_ATLEAST(2,0,4)
-				if (e.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
-					up = !up;
+					if (e.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
+						up = !up;
 #endif
-				set_key(static_cast<SDL_Scancode>(up ? AO_SCANCODE_MOUSESCROLL_UP : AO_SCANCODE_MOUSESCROLL_DOWN));
-				handled = true;
+					set_key(static_cast<SDL_Scancode>(up ? AO_SCANCODE_MOUSESCROLL_UP : AO_SCANCODE_MOUSESCROLL_DOWN));
+					handled = true;
+				}
 				break;
 			case SDL_KEYDOWN:
-				if (e.key.keysym.scancode != SDL_SCANCODE_ESCAPE)
+				if (e.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
+					set_key(SDL_SCANCODE_UNKNOWN);
+					handled = true;
+				} else if (event_type == KeyboardKey) {
 					set_key(e.key.keysym.scancode);
-				handled = true;
+					handled = true;
+				}
 				break;
 			case SDL_MOUSEMOTION:
 				e.type = SDL_LASTEVENT; // suppress motion while assigning
@@ -1665,6 +1666,7 @@ void w_key::event(SDL_Event &e)
 		}
     }
 }
+
 
 void w_key::set_key(SDL_Scancode k)
 {
@@ -1708,7 +1710,7 @@ const int SLIDER_THUMB_WIDTH = 8;
 const int SLIDER_TROUGH_HEIGHT = 8;
 const int SLIDER_LABEL_SPACE = 5;
 
-w_slider::w_slider(int num, int s) : widget(LABEL_WIDGET), selection(s), num_items(num), thumb_dragging(false), readout(NULL)
+w_slider::w_slider(int num, int s) : widget(LABEL_WIDGET), selection(s), num_items(num), thumb_dragging(false), readout(NULL), slider_changed_callback(NULL)
 {
 	slider_l = get_theme_image(SLIDER_WIDGET, DEFAULT_STATE, SLIDER_L_IMAGE);
 	slider_r = get_theme_image(SLIDER_WIDGET, DEFAULT_STATE, SLIDER_R_IMAGE);
@@ -1886,6 +1888,9 @@ std::string w_slider::formatted_value()
 void w_slider::selection_changed()
 {
 	readout->set_text(formatted_value().c_str());
+	
+	if (slider_changed_callback != NULL)
+		slider_changed_callback(this);
 }
 
 void w_slider::init_formatted_value()
@@ -1913,7 +1918,7 @@ std::string w_percentage_slider::formatted_value()
  *  List selection
  */
 
-w_list_base::w_list_base(uint16 width, size_t lines, size_t /*sel*/) : widget(ITEM_WIDGET), num_items(0), shown_items(lines), thumb_dragging(false), top_item(0)
+w_list_base::w_list_base(uint16 width, size_t lines, size_t /*sel*/) : widget(ITEM_WIDGET), selection(0), num_items(0), shown_items(lines), thumb_dragging(false), top_item(0)
 {
 	rect.w = width;
 	rect.h = item_height() * static_cast<uint16>(shown_items) + get_theme_space(LIST_WIDGET, T_SPACE) + get_theme_space(LIST_WIDGET, B_SPACE);
@@ -2036,7 +2041,7 @@ void w_list_base::mouse_move(int x, int y)
 		    || y < get_theme_space(LIST_WIDGET, T_SPACE) || y >= rect.h - get_theme_space(LIST_WIDGET, B_SPACE))
 			return;
 
-		if ((y - get_theme_space(LIST_WIDGET, T_SPACE)) / item_height() + top_item < min(num_items, top_item + shown_items))
+		if ((y - get_theme_space(LIST_WIDGET, T_SPACE)) / item_height() + top_item < std::min(num_items, top_item + shown_items))
 		{	set_selection((y - get_theme_space(LIST_WIDGET, T_SPACE)) / item_height() + top_item); }
 //		else
 //		{	set_selection(num_items - 1); }
@@ -2125,11 +2130,7 @@ void w_list_base::event(SDL_Event &e)
 			dirty = true;
 		}
 	} else if (e.type == SDL_MOUSEWHEEL) {
-		int amt = e.wheel.y * kListScrollSpeed;
-#if SDL_VERSION_ATLEAST(2,0,4)
-		if (e.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
-			amt = amt * -1;
-#endif
+		int amt = e.wheel.y * -1 * kListScrollSpeed;
 		if (amt < 0) {
 			amt = amt * -1;
 			if (top_item > amt)
@@ -2241,12 +2242,12 @@ void w_list_base::set_top_item(size_t i)
  */
 
 w_levels::w_levels(const vector<entry_point> &items, dialog *d)
-	  : w_list<entry_point>(items, 400, 8, 0), parent(d), show_level_numbers(true) {}
+	: w_list<entry_point>(items, 400, 8, 0), parent(d), show_level_numbers(true), offset{1} {}
 
 // ZZZ: new constructor gives more control over widget's appearance.
 w_levels::w_levels(const vector<entry_point>& items, dialog* d, uint16 inWidth,
         size_t inNumLines, size_t inSelectedItem, bool in_show_level_numbers)
-	  : w_list<entry_point>(items, inWidth, inNumLines, inSelectedItem), parent(d), show_level_numbers(in_show_level_numbers) {}
+	: w_list<entry_point>(items, inWidth, inNumLines, inSelectedItem), parent(d), show_level_numbers(in_show_level_numbers), offset{1} {}
 
 void
 w_levels::item_selected(void)
@@ -2261,7 +2262,7 @@ w_levels::draw_item(vector<entry_point>::const_iterator i, SDL_Surface *s, int16
 	char str[256];
 
     if(show_level_numbers)
-    	sprintf(str, "%d - %s", i->level_number + 1, i->level_name);
+    	sprintf(str, "%d - %s", i->level_number + offset, i->level_name);
     else
         sprintf(str, "%s", i->level_name);
 
@@ -2465,7 +2466,7 @@ void w_games_in_room::draw_item(const GameListMessage::GameListEntry& item, SDL_
 	width -= 2;
 	y += font->get_ascent() + 1;
 
-	ostringstream time_or_ping;
+	std::ostringstream time_or_ping;
 	int right_text_width = 0;
 
 	// first line, game name, ping or time remaining
@@ -2504,7 +2505,7 @@ void w_games_in_room::draw_item(const GameListMessage::GameListEntry& item, SDL_
 
 	y += font->get_line_height();
 
-	ostringstream game_and_map;
+	std::ostringstream game_and_map;
 
 	if (!item.compatible())
 	{
@@ -2528,7 +2529,7 @@ void w_games_in_room::draw_item(const GameListMessage::GameListEntry& item, SDL_
 	right_text_width = font->styled_text_width(item.m_hostPlayerName, item.m_hostPlayerName.size(), game_style);
 	set_drawing_clip_rectangle(0, x, static_cast<short>(s->h), x + width - right_text_width);
 
-	ostringstream game_settings;
+	std::ostringstream game_settings;
 	if (item.running())
 	{
 		if (item.m_description.m_numPlayers == 1)
@@ -2685,7 +2686,7 @@ void w_colorful_chat::append_entry(const ColoredChatEntry& e)
 		name = string(e.sender, 0, font->trunc_styled_text(e.sender, kNameWidth, style | styleShadow));
 	else
 		name = e.sender;
-  
+	
 	int message_style = style;
 	int available_width = rect.w - get_theme_space(LIST_WIDGET, L_SPACE) - get_theme_space(LIST_WIDGET, R_SPACE);
 	if (e.type == ColoredChatEntry::ChatMessage)
@@ -2749,7 +2750,6 @@ void w_colorful_chat::append_entry(const ColoredChatEntry& e)
 	}
 	
 	append_entry(e_rest);
-  
 }
 
 void w_colorful_chat::draw_item(vector<ColoredChatEntry>::const_iterator it, SDL_Surface *s, int16 x, int16 y, uint16 width, bool selected) const

@@ -20,51 +20,36 @@ LUA_HUD_SCRIPT.CPP
     Implements Lua HUD state and trigger callbacks
 */
 
-// cseries defines HAVE_LUA on A1/SDL
 #include "cseries.h"
 
 #include "mouse.h"
 #include "interface.h"
 
-#ifdef HAVE_LUA
 extern "C"
 {
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
 }
-#endif
 
 #include <string>
-using namespace std;
 #include <stdlib.h>
 #include <set>
 
 
 #include "Logging.h"
 #include "preferences.h"
-#include "game_errors.h"
 #include "Plugins.h"
 
 #include "lua_hud_script.h"
 #include "lua_hud_objects.h"
 
-#include <boost/shared_ptr.hpp>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream_buffer.hpp>
 namespace io = boost::iostreams;
 
 
 bool use_lua_hud_crosshairs;
-
-#ifndef HAVE_LUA
-
-void L_Call_HUDInit() {}
-void L_Call_HUDCleanup() {}
-void L_Call_HUDDraw() {}
-void L_Call_HUDResize() {}
-
-#else /* HAVE_LUA */
 
 // LP: used by several functions here
 extern float AngleConvert;
@@ -129,7 +114,7 @@ protected:
 
 	virtual void RegisterFunctions();
 
-	boost::shared_ptr<lua_State> state_;
+	std::shared_ptr<lua_State> state_;
 	lua_State* State() { return state_.get(); }
 
 public:
@@ -362,9 +347,6 @@ void LoadHUDLua()
 
 	if (file.size())
 	{
-		// protect Lua errors from harming error checking
-		short SavedType, SavedError = get_game_error(&SavedType);
-
 		FileSpecifier fs (file.c_str());
 		if (directory.size())
 		{
@@ -387,7 +369,6 @@ void LoadHUDLua()
 				}
 			}
 		}
-		set_game_error(SavedType, SavedError);
 	}
 }
 
@@ -399,7 +380,7 @@ void CloseLuaHUDScript()
 
 void MarkLuaHUDCollections(bool loading)
 {
-	static set<short> collections;
+	static std::set<short> collections;
 	if (loading)
 	{
 		collections.clear();
@@ -408,13 +389,9 @@ void MarkLuaHUDCollections(bool loading)
 	}
 	else
 	{
-		for (set<short>::iterator it = collections.begin(); it != collections.end(); it++)
+		for (std::set<short>::iterator it = collections.begin(); it != collections.end(); it++)
 		{
 			mark_collection_for_unloading(*it);
 		}
 	}
 }
-
-
-
-#endif /* HAVE_LUA */

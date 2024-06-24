@@ -30,13 +30,12 @@ LUA_OBJECTS.CPP
 #include "scenery.h"
 #include "player.h"
 #define DONT_REPEAT_DEFINITIONS
+#include "item_definitions.h"
 #include "scenery_definitions.h"
 
+#include <functional>
+
 #include "SoundManager.h"
-
-#include <boost/bind.hpp>
-
-#ifdef HAVE_LUA
 
 const float AngleConvert = 360/float(FULL_CIRCLE);
 
@@ -65,6 +64,20 @@ int lua_play_object_sound(lua_State *L)
 }
 
 template<class T>
+int lua_teleport_object_in(lua_State* L)
+{
+	teleport_object_in(T::Index(L, 1));
+	return 0;
+}
+
+template<class T>
+int lua_teleport_object_out(lua_State* L)
+{
+	teleport_object_out(T::Index(L, 1));
+	return 0;
+}
+
+template<class T>
 static int get_object_facing(lua_State *L)
 {
 	object_data *object = get_object_data(T::Index(L, 1));
@@ -85,6 +98,14 @@ static int get_object_type(lua_State *L)
 {
 	object_data *object = get_object_data(T::Index(L, 1));
 	TT::Push(L, object->permutation);
+	return 1;
+}
+
+template<class T>
+static int get_object_visible(lua_State* L)
+{
+	auto object = get_object_data(T::Index(L, 1));
+	lua_pushboolean(L, OBJECT_IS_VISIBLE(object));
 	return 1;
 }
 
@@ -120,6 +141,14 @@ static int set_object_facing(lua_State *L)
 
 	object_data *object = get_object_data(T::Index(L, 1));
 	object->facing = static_cast<int>(lua_tonumber(L, 2) / AngleConvert);
+	return 0;
+}
+
+template<class T>
+static int set_object_visible(lua_State* L)
+{
+	auto object = get_object_data(T::Index(L, 1));
+	SET_OBJECT_INVISIBILITY(object, !lua_toboolean(L, 2));
 	return 0;
 }
 
@@ -346,8 +375,25 @@ char Lua_Item_Name[] = "item";
 
 int Lua_Item_Delete(lua_State* L)
 {
-	object_data* object = get_object_data(Lua_Item::Index(L, 1));
+	auto object_index = Lua_Item::Index(L, 1);
+	object_data* object = get_object_data(object_index);
 	int16 item_type = object->permutation;
+
+	// check if the item is teleporting in and remove associated effect
+	if (OBJECT_IS_INVISIBLE(object))
+	{
+		for (auto i = 0; i < MAXIMUM_EFFECTS_PER_MAP; ++i)
+		{
+			auto effect = &effects[i];
+			if (SLOT_IS_USED(effect) &&
+				effect->type == _effect_teleport_object_in &&
+				effect->data == object_index)
+			{
+				remove_effect(i);
+				break;
+			}
+		}
+	}
 
 	remove_map_object(Lua_Item::Index(L, 1));
 	if (L_Get_Proper_Item_Accounting(L))
@@ -363,7 +409,10 @@ const luaL_Reg Lua_Item_Get[] = {
 	{"play_sound", L_TableFunction<lua_play_object_sound<Lua_Item> >},
 	{"polygon", get_object_polygon<Lua_Item>},
 	{"position", L_TableFunction<lua_object_position<Lua_Item> >},
+	{"teleport_in", L_TableFunction<lua_teleport_object_in<Lua_Item>>},
+	{"teleport_out", L_TableFunction<lua_teleport_object_out<Lua_Item>>},
 	{"type", get_object_type<Lua_Item, Lua_ItemType>},
+	{"visible", get_object_visible<Lua_Item>},
 	{"x", get_object_x<Lua_Item>},
 	{"y", get_object_y<Lua_Item>},
 	{"z", get_object_z<Lua_Item>},
@@ -372,6 +421,7 @@ const luaL_Reg Lua_Item_Get[] = {
 
 const luaL_Reg Lua_Item_Set[] = {
 	{"facing", set_object_facing<Lua_Item>},
+	{"visible", set_object_visible<Lua_Item>},
 	{0, 0}
 };
 
@@ -432,9 +482,26 @@ bool Lua_Item_Valid(int32 index)
 	return (SLOT_IS_USED(object) && GET_OBJECT_OWNER(object) == _object_is_item);
 }
 
+char Lua_ItemKind_Name[] = "item_kind";
+typedef L_Enum<Lua_ItemKind_Name> Lua_ItemKind;
+
+static bool Lua_ItemKind_Valid(int32 index)
+{
+	return index >= 0 && index <= NUMBER_OF_ITEM_TYPES;
+}
+
+char Lua_ItemKinds_Name[] = "ItemKinds";
+typedef L_EnumContainer<Lua_ItemKinds_Name, Lua_ItemKind> Lua_ItemKinds;
+
 static int Lua_ItemType_Get_Ball(lua_State *L)
 {
 	lua_pushboolean(L, (get_item_kind(Lua_ItemType::Index(L, 1)) == _ball));
+	return 1;
+}
+
+static int Lua_ItemType_Get_Kind(lua_State* L)
+{
+	Lua_ItemKind::Push(L, get_item_kind(Lua_ItemType::Index(L, 1)));
 	return 1;
 }
 
@@ -447,6 +514,14 @@ static int Lua_ItemType_Get_Initial_Count(lua_State* L)
 static int Lua_ItemType_Get_Maximum_Count(lua_State* L)
 {
 	lua_pushnumber(L, get_placement_info()[Lua_ItemType::Index(L, 1)].maximum_count);
+	return 1;
+}
+
+static int Lua_ItemType_Get_Maximum_Inventory(lua_State* L)
+{
+	auto is_m1 = static_world->environment_flags & _environment_m1_weapons;
+	auto difficulty_level = dynamic_world->game_information.difficulty_level;
+	lua_pushnumber(L, get_item_definition_external(Lua_ItemType::Index(L, 1))->get_maximum_count_per_player(is_m1, difficulty_level));
 	return 1;
 }
 
@@ -497,6 +572,23 @@ static int Lua_ItemType_Set_Maximum_Count(lua_State* L)
 	{
 		return luaL_error(L, "maximum_count: incorrect argument type");
 	}
+	return 0;
+}
+
+static int Lua_ItemType_Set_Maximum_Inventory(lua_State* L)
+{
+	if (lua_isnumber(L, 2))
+	{
+		auto definition = get_item_definition_external(Lua_ItemType::Index(L, 1));
+		const auto difficulty_level = dynamic_world->game_information.difficulty_level;
+		definition->extended_maximum_count[difficulty_level] = static_cast<int16_t>(lua_tonumber(L, 2));
+		definition->has_extended_maximum_count[difficulty_level] = true;
+	}
+	else
+	{
+		return luaL_error(L, "maximum_inventory: incorrect argument type");
+	}
+
 	return 0;
 }
  
@@ -567,8 +659,10 @@ static bool Lua_ItemType_Valid(int32 index) {
 char Lua_ItemType_Name[] = "item_type";
 const luaL_Reg Lua_ItemType_Get[] = {
 	{"ball", Lua_ItemType_Get_Ball},
+	{"kind", Lua_ItemType_Get_Kind},
 	{"initial_count", Lua_ItemType_Get_Initial_Count},
 	{"maximum_count", Lua_ItemType_Get_Maximum_Count},
+	{"maximum_inventory", Lua_ItemType_Get_Maximum_Inventory},
 	{"minimum_count", Lua_ItemType_Get_Minimum_Count},
 	{"random_chance", Lua_ItemType_Get_Random_Chance},
 	{"random_location", Lua_ItemType_Get_Random_Location},
@@ -579,6 +673,7 @@ const luaL_Reg Lua_ItemType_Get[] = {
 const luaL_Reg Lua_ItemType_Set[] = {
 	{"initial_count", Lua_ItemType_Set_Initial_Count},
 	{"maximum_count", Lua_ItemType_Set_Maximum_Count},
+	{"maximum_inventory", Lua_ItemType_Set_Maximum_Inventory},
 	{"minimum_count", Lua_ItemType_Set_Minimum_Count},
 	{"random_chance", Lua_ItemType_Set_Random_Chance},
 	{"random_location", Lua_ItemType_Set_Random_Location},
@@ -633,7 +728,10 @@ const luaL_Reg Lua_Scenery_Get[] = {
 	{"polygon", get_object_polygon<Lua_Scenery>},
 	{"position", L_TableFunction<lua_object_position<Lua_Scenery> >},
 	{"solid", Lua_Scenery_Get_Solid},
+	{"teleport_in", L_TableFunction<lua_teleport_object_in<Lua_Scenery>>},
+	{"teleport_out", L_TableFunction<lua_teleport_object_out<Lua_Scenery>>},
 	{"type", get_object_type<Lua_Scenery, Lua_SceneryType>},
+	{"visible", get_object_visible<Lua_Scenery>},
 	{"x", get_object_x<Lua_Scenery>},
 	{"y", get_object_y<Lua_Scenery>},
 	{"z", get_object_z<Lua_Scenery>},
@@ -653,6 +751,7 @@ static int Lua_Scenery_Set_Solid(lua_State *L)
 const luaL_Reg Lua_Scenery_Set[] = {
 	{"facing", set_object_facing<Lua_Scenery>},
 	{"solid", Lua_Scenery_Set_Solid},
+	{"visible", set_object_visible<Lua_Scenery>},
 	{0, 0}
 };
 
@@ -760,25 +859,31 @@ int Lua_Objects_register(lua_State *L)
 	Lua_Effect::Valid = Lua_Effect_Valid;
 
 	Lua_Effects::Register(L, Lua_Effects_Methods);
-	Lua_Effects::Length = boost::bind(get_dynamic_limit, (int) _dynamic_limit_effects);
+	Lua_Effects::Length = std::bind(get_dynamic_limit, (int) _dynamic_limit_effects);
 
 	Lua_Item::Register(L, Lua_Item_Get, Lua_Item_Set);
 	Lua_Item::Valid = Lua_Item_Valid;
 
 	Lua_Items::Register(L, Lua_Items_Methods);
-	Lua_Items::Length = boost::bind(get_dynamic_limit, (int) _dynamic_limit_objects);
+	Lua_Items::Length = std::bind(get_dynamic_limit, (int) _dynamic_limit_objects);
 
 	Lua_Scenery::Register(L, Lua_Scenery_Get, Lua_Scenery_Set);
 	Lua_Scenery::Valid = Lua_Scenery_Valid;
 
 	Lua_Sceneries::Register(L, Lua_Sceneries_Methods);
-	Lua_Sceneries::Length = boost::bind(get_dynamic_limit, (int) _dynamic_limit_objects);
+	Lua_Sceneries::Length = std::bind(get_dynamic_limit, (int) _dynamic_limit_objects);
 
 	Lua_EffectType::Register(L, 0, 0, 0, Lua_EffectType_Mnemonics);
 	Lua_EffectType::Valid = Lua_EffectType::ValidRange(NUMBER_OF_EFFECT_TYPES);
 
 	Lua_EffectTypes::Register(L);
 	Lua_EffectTypes::Length = Lua_EffectTypes::ConstantLength(NUMBER_OF_EFFECT_TYPES);
+
+	Lua_ItemKind::Register(L, 0, 0, 0, Lua_ItemKind_Mnemonics);
+	Lua_ItemKind::Valid = Lua_ItemKind_Valid;
+
+	Lua_ItemKinds::Register(L);
+	Lua_ItemKinds::Length = Lua_ItemKinds::ConstantLength(NUMBER_OF_ITEM_TYPES);
 
 	Lua_ItemType::Register(L, Lua_ItemType_Get, Lua_ItemType_Set, 0, Lua_ItemType_Mnemonics);
 	Lua_ItemType::Valid = Lua_ItemType_Valid;
@@ -814,5 +919,3 @@ static void compatibility(lua_State *L)
 	luaL_loadbuffer(L, compatibility_script, strlen(compatibility_script), "items_compatibility");
 	lua_pcall(L, 0, 0, 0);
 }
-
-#endif

@@ -25,14 +25,18 @@
  *  Written in 2000 by Christian Bauer
  */
 
+#if defined _MSC_VER
+#define NOMINMAX
+#include <algorithm>
+#endif
+
 #ifndef SDL_FONTS_H
 #define SDL_FONTS_H
 
 #include "csfonts.h"
 #include "FileHandler.h"
-#include "SDL_ttf.h"
-#include <boost/tuple/tuple.hpp>
-
+#include <SDL2/SDL_ttf.h>
+#include <tuple>
 #include <string>
 
 /*
@@ -59,7 +63,7 @@ public:
 	int styled_text_width(const std::string& text, size_t length, uint16 initial_style, bool utf8 = false) const;
 	int trunc_styled_text(const std::string& text, int max_width, uint16 style) const;
 	std::string style_at(const std::string& text, std::string::const_iterator pos, uint16 style) const;
-
+	virtual ~font_info() = default;
 protected:
 	virtual int _draw_text(SDL_Surface *s, const char *text, size_t length, int x, int y, uint32 pixel, uint16 style, bool utf8) const = 0;
 	virtual uint16 _text_width(const char *text, size_t length, uint16 style, bool utf8) const = 0;
@@ -78,7 +82,7 @@ class sdl_font_info : public font_info {
 public:
 	sdl_font_info() : first_character(0), last_character(0),
 		ascent(0), descent(0), leading(0), pixmap(NULL), ref_count(0) {}
-	~sdl_font_info() {if (pixmap) free(pixmap);}
+	virtual ~sdl_font_info() {if (pixmap) free(pixmap);}
 
 	uint16 get_ascent(void) const {return ascent;}
 	uint16 get_height(void) const {return ascent + descent;}
@@ -111,25 +115,27 @@ private:
 	LoadedResource rsrc;
 };
 
-typedef boost::tuple<std::string, uint16, int16> ttf_font_key_t;
+typedef std::tuple<std::string, uint16, int16> ttf_font_key_t;
 
 class ttf_font_info : public font_info { 
 public:
 	uint16 get_ascent() const { return TTF_FontAscent(m_styles[styleNormal]); };
 	uint16 get_height() const { return TTF_FontHeight(m_styles[styleNormal]); };
-	uint16 get_line_height() const { return max(TTF_FontLineSkip(m_styles[styleNormal]), TTF_FontHeight(m_styles[styleNormal])) + m_adjust_height; }
+	uint16 get_line_height() const { return m_line_height + m_adjust_height; }
 	uint16 get_descent() const { return -TTF_FontDescent(m_styles[styleNormal]); }
 	int16 get_leading() const { return get_line_height() - get_ascent() - get_descent(); }
 
 	TTF_Font* m_styles[styleUnderline];
 	ttf_font_key_t m_keys[styleUnderline];
 	int m_adjust_height;
+	int m_line_height;
 
 	int8 char_width(uint8, uint16) const;
 
 	ttf_font_info() { 
 		for (int i = 0; i < styleUnderline; i++) { m_styles[i] = 0; } 
 	}
+	virtual ~ttf_font_info() = default;
 protected:
 	virtual int _draw_text(SDL_Surface *s, const char *text, size_t length, int x, int y, uint32 pixel, uint16 style, bool utf8) const;
 	virtual uint16 _text_width(const char *text, size_t length, uint16 style, bool utf8) const;

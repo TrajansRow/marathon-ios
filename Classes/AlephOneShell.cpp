@@ -26,7 +26,7 @@
 #include "vbl.h"
 #include "preferences.h"
 #include "tags.h" /* for scenario file type.. */
-#include "network_sound.h"
+//Still needed for iOS 6-19-24?#include "network_sound.h"
 #include "mouse.h"
 #include "screen_drawing.h"
 #include "computer_interface.h"
@@ -87,7 +87,7 @@
 #endif
 
 #ifdef HAVE_SDL_IMAGE
-#include "SDL_image.h"
+#include "SDL2/SDL_image.h"
 #if defined(__WIN32__)
 #include "alephone32.xpm"
 #elif !(defined(__APPLE__) && defined(__MACH__)) && !defined(__MACOS__)
@@ -194,7 +194,7 @@ void AlephOneMainLoop()
     idle_game_state(SDL_GetTicks());
   
   if (game_state == _game_in_progress &&
-      !graphics_preferences->hog_the_cpu &&
+      /*!graphics_preferences->hog_the_cpu &&*/
       (TICKS_PER_SECOND - (SDL_GetTicks() - cur_time)) > 10) {
     SDL_Delay(1);
   }

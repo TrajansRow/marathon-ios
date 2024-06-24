@@ -19,7 +19,7 @@
 */
 
 #include "Statistics.h"
-#include "network/a1HTTP.h"
+#include "HTTP.h"
 #include "lua_script.h"
 
 #include "sdl_widgets.h"
@@ -27,10 +27,8 @@
 #include "preferences.h"
 #include "sdl_network.h"
 
+#include <functional>
 #include <sstream>
-#include <boost/bind.hpp>
-
-StatsManager* StatsManager::instance_ = 0;
 
 class ScopedMutex
 {
@@ -46,7 +44,7 @@ private:
 	SDL_mutex* mutex_;
 };
 
-StatsManager::StatsManager() : thread_(0), run_(true)
+StatsManager::StatsManager() : thread_(0), run_(true), busy_(false)
 {
 	entry_mutex_ = SDL_CreateMutex();
 
@@ -89,7 +87,7 @@ void StatsManager::Finish()
 		d.set_widget_placer(placer);
 		d.activate_widget(button);
 		
-		d.set_processing_function(boost::bind(&StatsManager::CheckForDone, this, _1));
+		d.set_processing_function(std::bind(&StatsManager::CheckForDone, this, std::placeholders::_1));
 		d.run();
 	}
 	else
@@ -118,7 +116,7 @@ int StatsManager::Run(void *pv)
 
 	while (sm->run_)
 	{
-		std::auto_ptr<Entry> entry;
+		std::unique_ptr<Entry> entry;
 		{
 			ScopedMutex mutex(sm->entry_mutex_);
 			if (sm->entries_.empty())
@@ -127,7 +125,7 @@ int StatsManager::Run(void *pv)
 			}
 			else
 			{
-				entry.reset(new Entry(sm->entries_.front()));
+				entry = std::make_unique<Entry>(sm->entries_.front());
 				sm->entries_.pop();
 			}
 		}
@@ -156,7 +154,7 @@ int StatsManager::Run(void *pv)
 		}
 		else
 		{
-			SDL_Delay(200);
+			sleep_for_machine_ticks(MACHINE_TICKS_PER_SECOND / 5);
 		}
 		
 	}

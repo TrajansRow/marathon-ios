@@ -22,20 +22,19 @@
 */
 
 #include "OGL_Blitter.h"
+
+#include <memory>
+
 #include "OGL_Setup.h"
 #include "shell.h"
 #include "screen.h"
 
 #ifdef HAVE_OPENGL
 #include "OGL_Render.h"
-
-// DJB OpenGL debug
-#include "AlephOneHelper.h"
-#include "AlephOneAcceleration.hpp"
 #include "MatrixStack.hpp"
 
 const int OGL_Blitter::tile_size;
-set<OGL_Blitter*> *OGL_Blitter::m_blitter_registry = NULL;
+std::set<OGL_Blitter*> *OGL_Blitter::m_blitter_registry = NULL;
 
 OGL_Blitter::OGL_Blitter() : m_textures_loaded(false)
 {
@@ -63,16 +62,16 @@ void OGL_Blitter::_LoadTextures()
 		m_tile_height = std::max(m_tile_height, 128);
 	}
 
-	SDL_Surface *t;
-#ifdef ALEPHONE_LITTLE_ENDIAN
-	t = SDL_CreateRGBSurface(SDL_SWSURFACE, m_tile_width, m_tile_height, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
-#else
-	t = SDL_CreateRGBSurface(SDL_SWSURFACE, m_tile_width, m_tile_height, 32, 0xff000000, 0x00ff0000, 0x0000ff00, 0x000000ff);
-#endif
+	std::unique_ptr<SDL_Surface, decltype(&SDL_FreeSurface)> t(nullptr, SDL_FreeSurface);
+	if (PlatformIsLittleEndian()) {
+		t.reset(SDL_CreateRGBSurface(SDL_SWSURFACE, m_tile_width, m_tile_height, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000));
+	} else {
+		t.reset(SDL_CreateRGBSurface(SDL_SWSURFACE, m_tile_width, m_tile_height, 32, 0xff000000, 0x00ff0000, 0x0000ff00, 0x000000ff));
+	}
 	if (!t)
 		return;
 	
-	SDL_SetSurfaceBlendMode(t, SDL_BLENDMODE_NONE);
+	SDL_SetSurfaceBlendMode(t.get(), SDL_BLENDMODE_NONE);
 	
 	// calculate how many rects we need
 	int v_rects = ((m_src.h + m_tile_height - 1) / m_tile_height);
@@ -85,7 +84,7 @@ void OGL_Blitter::_LoadTextures()
 
 	uint32 rgb_mask = ~(t->format->Amask);
 
-	glEnable(GL_TEXTURE_2D);
+	//glEnable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
 	int i = 0;
 	for (int y = 0; y < v_rects; y++)
 	{
@@ -97,7 +96,7 @@ void OGL_Blitter::_LoadTextures()
 			m_rects[i].h = std::min(m_tile_height, static_cast<int>(m_src.h - y * m_tile_height));
 
 			SDL_Rect sr = { m_rects[i].x, m_rects[i].y, m_rects[i].w, m_rects[i].h }; 
-			SDL_BlitSurface(m_surface, &sr, t, NULL);
+			SDL_BlitSurface(m_surface, &sr, t.get(), NULL);
 
 			// to avoid edge artifacts, smear edge pixels out to texture boundary
 			for (int row = 0; row < m_rects[i].h; ++row)
@@ -119,21 +118,20 @@ void OGL_Blitter::_LoadTextures()
 				}
 			}
 			
-			AOA::genTextures(1, &m_refs[i]);
-			AOA::bindTexture(GL_TEXTURE_2D, m_refs[i], NULL, 1);
+			glGenTextures(1, &m_refs[i]);
+			glBindTexture(GL_TEXTURE_2D, m_refs[i]);
 
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 			
-			AOA::texImage2DCopy(GL_TEXTURE_2D, 0, GL_RGBA, m_tile_width, m_tile_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, t->pixels, 1);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_tile_width, m_tile_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, t->pixels);
 
 			i++;
 		}
 	}
 	
-	SDL_FreeSurface(t);
 	m_textures_loaded = true;
 	return;
 }
@@ -150,7 +148,7 @@ void OGL_Blitter::_UnloadTextures()
 		return;
 	Deregister(this);
 	if (m_refs.size())
-		AOA::deleteTextures(m_refs.size(), &m_refs[0]);
+		glDeleteTextures(m_refs.size(), &m_refs[0]);
 	m_refs.clear();
 	m_rects.clear();
 	m_textures_loaded = false;
@@ -161,7 +159,7 @@ void OGL_Blitter::StopTextures()
 	if (!m_blitter_registry)
 		return;
 	
-	set<OGL_Blitter*>::iterator it;
+	std::set<OGL_Blitter*>::iterator it;
 	for (it = m_blitter_registry->begin();
 	     it != m_blitter_registry->end();
 	     it = m_blitter_registry->begin())
@@ -193,14 +191,6 @@ void OGL_Blitter::WindowToScreen(int& x, int& y, bool in_game)
 	alephone::Screen::instance()->window_to_screen(x, y);
 }
 
-void OGL_Blitter::Draw(const SDL_Rect& dst)
-{
-  Image_Rect idst = { static_cast<float>(dst.x), static_cast<float>(dst.y), static_cast<float>(dst.w), static_cast<float>(dst.h) };
-    Draw(idst);
-}
-
-// DJB OpenGL SaveState
-#include "SaveState.h"
 void OGL_Blitter::Draw(const Image_Rect& dst, const Image_Rect& raw_src)
 {
 	if (!Loaded())
@@ -209,23 +199,24 @@ void OGL_Blitter::Draw(const Image_Rect& dst, const Image_Rect& raw_src)
 	if (!m_textures_loaded)
 		return;
 
-  // DJB OpenGL
-  // glPushAttrib(GL_ALL_ATTRIB_BITS);
-  SaveState ss0 (GL_CULL_FACE);
-  SaveState ss1 (GL_DEPTH_TEST);
-  SaveState ss2 (GL_BLEND);
-  SaveState ss3 (GL_FOG);
-  SaveState ss4 (GL_TEXTURE_2D);
-  
+    //glPushAttrib(GL_ALL_ATTRIB_BITS);
+//    bool isEnabled_GT2 = glIsEnabled (GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
+    bool isEnabled_GCF = glIsEnabled (GL_CULL_FACE);
+    bool isEnabled_GDT = glIsEnabled (GL_DEPTH_TEST);
+//    bool isEnabled_GAT = glIsEnabled (GL_ALPHA_TEST);  //NOT SUPPORTED ANGLE ENUM
+    bool isEnabled_GST = glIsEnabled (GL_STENCIL_TEST);
+    bool isEnabled_GB = glIsEnabled (GL_BLEND);
+//    bool isEnabled_GF = glIsEnabled (GL_FOG);  //NOT SUPPORTED ANGLE ENUM
+	
 	// disable everything but alpha blending and clipping
 	glDisable(GL_DEPTH_TEST);
 //	glDisable(GL_ALPHA_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glDisable(GL_FOG);
-//	glDisable(GL_SCISSOR_TEST);
+//	glDisable(GL_FOG);  //NOT SUPPORTED ANGLE ENUM
+	//  glDisable(GL_SCISSOR_TEST);
 //	glDisable(GL_STENCIL_TEST);
-	glEnable(GL_TEXTURE_2D);
+	//glEnable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
 
 	Image_Rect src;
 	if (m_src.w != m_scaled_src.w)
@@ -255,26 +246,14 @@ void OGL_Blitter::Draw(const Image_Rect& dst, const Image_Rect& raw_src)
 	bool rotating = (rotation > 0.1 || rotation < -0.1);
 	if (rotating)
 	{
-    if(useShaderRenderer()) {
-      MatrixStack::Instance()->matrixMode(MS_MODELVIEW);
-      MatrixStack::Instance()->pushMatrix();
-      MatrixStack::Instance()->translatef((dst.x + dst.w/2.0), (dst.y + dst.h/2.0), 0.0);
-      MatrixStack::Instance()->rotatef(rotation, 0.0, 0.0, 1.0);
-      MatrixStack::Instance()->translatef(-(dst.x + dst.w/2.0), -(dst.y + dst.h/2.0), 0.0);
-    } else {
-      glMatrixMode(GL_MODELVIEW);
-      glPushMatrix();
-      glTranslatef((dst.x + dst.w/2.0), (dst.y + dst.h/2.0), 0.0);
-      glRotatef(rotation, 0.0, 0.0, 1.0);
-      glTranslatef(-(dst.x + dst.w/2.0), -(dst.y + dst.h/2.0), 0.0);
-    }
+		MSI()->matrixMode(MS_MODELVIEW);
+		MSI()->pushMatrix();
+		MSI()->translatef((dst.x + dst.w/2.0), (dst.y + dst.h/2.0), 0.0);
+		MSI()->rotatef(rotation, 0.0, 0.0, 1.0);
+		MSI()->translatef(-(dst.x + dst.w/2.0), -(dst.y + dst.h/2.0), 0.0);
 	}
-  
-  if(useShaderRenderer()) {
-    MatrixStack::Instance()->color4f(tint_color_r, tint_color_g, tint_color_b, tint_color_a);
-  } else {
-    glColor4f(tint_color_r, tint_color_g, tint_color_b, tint_color_a);
-  }
+	
+	MSI()->color4f(tint_color_r, tint_color_g, tint_color_b, tint_color_a);
 	
 	for (int i = 0; i < m_rects.size(); i++)
 	{
@@ -299,27 +278,29 @@ void OGL_Blitter::Draw(const Image_Rect& dst, const Image_Rect& raw_src)
 		GLfloat ttop    = ((m_rects[i].y + ty) * y_scale) + (GLfloat) (dst.y - (src.y * y_scale));
 		GLfloat tbottom = ttop + (th * y_scale);
 		
-		AOA::bindTexture(GL_TEXTURE_2D, m_refs[i], NULL, 0);
+		glBindTexture(GL_TEXTURE_2D, m_refs[i]);
 		
 		OGL_RenderTexturedRect(tleft, ttop, tright - tleft, tbottom - ttop,
 							   VMin, UMin, VMax, UMax);
 	}
 	
-  if (rotating) {
-    if(useShaderRenderer()) {
-      MatrixStack::Instance()->popMatrix();
-    } else {
-      glPopMatrix();
-    }
-  }
-  // DJB OpenGL
-  // glPopAttrib();
+	if (rotating)
+		MSI()->popMatrix();
+    
+	 //glPopAttrib();
+   //if ( isEnabled_GT2 ) { glEnable ( GL_TEXTURE_2D ) ; } else { glDisable ( GL_TEXTURE_2D ); }  //NOT SUPPORTED ANGLE ENUM
+   if ( isEnabled_GCF ) { glEnable ( GL_CULL_FACE ) ; } else { glDisable ( GL_CULL_FACE ); }
+   if ( isEnabled_GDT ) { glEnable ( GL_DEPTH_TEST ) ; } else { glDisable ( GL_DEPTH_TEST ); }
+   //if ( isEnabled_GAT ) { glEnable ( GL_ALPHA_TEST ) ; } else { glDisable ( GL_ALPHA_TEST ); }  //NOT SUPPORTED ANGLE ENUM
+   if ( isEnabled_GST ) { glEnable ( GL_STENCIL_TEST ) ; } else { glDisable ( GL_STENCIL_TEST ); }
+   if ( isEnabled_GB )  { glEnable ( GL_BLEND ) ; } else { glDisable ( GL_BLEND ); }
+   //if ( isEnabled_GF )  { glEnable ( GL_FOG ) ; } else { glDisable ( GL_FOG ); }  //NOT SUPPORTED ANGLE ENUM
 }
 
 void OGL_Blitter::Register(OGL_Blitter *B)
 {
 	if (!m_blitter_registry)
-		m_blitter_registry = new set<OGL_Blitter*>;
+		m_blitter_registry = new std::set<OGL_Blitter*>;
 	m_blitter_registry->insert(B);
 }
 

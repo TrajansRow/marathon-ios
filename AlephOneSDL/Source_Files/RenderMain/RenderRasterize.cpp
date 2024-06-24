@@ -46,12 +46,10 @@ Sep 2, 2000 (Loren Petrich):
 #include "screen.h"
 #include "platforms.h"
 
+#include "DrawCache.hpp"
+
 #include <string.h>
 
-//DCW
-#include "MatrixStack.hpp"
-#include "AlephOneHelper.h"
-#include "DrawCache.hpp"
 
 /* maximum number of vertices a polygon can be world-clipped into (one per clip line) */
 #define MAXIMUM_VERTICES_PER_WORLD_POLYGON (MAXIMUM_VERTICES_PER_POLYGON+4)
@@ -82,13 +80,7 @@ void RenderRasterizerClass::render_tree(RenderStep renderStep)
 	
 	// LP change: added support for semitransparent liquids
 	bool SeeThruLiquids = get_screen_mode()->acceleration != _no_acceleration ? TEST_FLAG(Get_OGL_ConfigureData().Flags,OGL_Flag_LiqSeeThru) : graphics_preferences->software_alpha_blending != _sw_alpha_off;
-  
-  //There is a bug here where setting SeeThruLiquids to 0 makes 5d space sometimes appear beneath it. Disabling until there is a fix.
-  if(useClassicVisuals()) {
-    SeeThruLiquids = 0;
-  }
-  SeeThruLiquids = 1;
-  
+	
 	/* walls, ceilings, interior objects, floors, exterior objects for all nodes, back to front */
 	for (node= SortedNodes.begin(); node != SortedNodes.end(); ++node)
 		render_node(&*node, SeeThruLiquids, renderStep);
@@ -189,28 +181,10 @@ void RenderRasterizerClass::render_node(
 	// LP change: always render liquids that are semitransparent
 	else if (!SeeThruLiquids)
 	{
-		// if weÕre trying to draw a polygon without media from under a polygon with media, donÕt
+		// if weâ€™re trying to draw a polygon without media from under a polygon with media, donâ€™t
 		if (view->under_media_boundary) return;
 	}
 	
-  
-  //DCW If there is media in this node, set the surface to plane 6. We can use that for under media tinting.
-  short polyIndex=node->polygon_index;
-  if (useShaderRenderer()) {
-    if (media) {
-      float h = media->height;
-      
-      GLfloat plane[] = { 0.0, 0.0, 1.0, 0.0 };
-      plane[3] = (0-h) + (headBelowMedia() ? -2.0 : 2.0); //Artifically reduce/increase the plane height a bit, to reduce fighting at media surface.
-      
-      MatrixStack::Instance()->clipPlanef(6, plane);
-      MatrixStack::Instance()->enablePlane(6);
-
-    }
-  }
-
-  
-  
 	// LP: this loop renders the walls
 	for (window= node->clipping_windows; window; window= window->next_window)
 	{
@@ -237,16 +211,19 @@ void RenderRasterizerClass::render_node(
 					surface.length= line->length;
 					store_endpoint(get_endpoint_data(polygon->endpoint_indexes[i]), surface.p0);
 					store_endpoint(get_endpoint_data(polygon->endpoint_indexes[WRAP_HIGH(i, polygon->vertex_count-1)]), surface.p1);
+					
+					if (surface.p0 == surface.p1)
+						continue; // skip sides that are degenerate, as produced by store_endpoint()
+					
 					surface.ambient_delta= side->ambient_delta;
 					
 					// LP change: indicate in all cases whether the void is on the other side;
 					// added a workaround for full-side textures with a polygon on the other side
-					bool void_present;
+					bool void_present = true;
 					
 					switch (side->type)
 					{
 						case _full_side:
-							void_present = true;
 							// Suppress the void if there is a polygon on the other side.
 							if (polygon->adjacent_polygon_indexes[i] != NONE) void_present = false;
 							
@@ -266,6 +243,11 @@ void RenderRasterizerClass::render_node(
 							surface.texture_definition= &side->secondary_texture;
 							surface.transfer_mode= side->secondary_transfer_mode;
 							render_node_side(window, &surface, true, renderStep);
+							
+							// Ensure the high side draws over the low side if they overlap
+							if (line->lowest_adjacent_ceiling < line->highest_adjacent_floor)
+								void_present = false;
+							
 							/* fall through and render high side */
 						case _high_side:
 							surface.lightsource_index= side->primary_lightsource_index;
@@ -274,7 +256,7 @@ void RenderRasterizerClass::render_node(
 							surface.h1= polygon->ceiling_height - view->origin.z;
 							surface.texture_definition= &side->primary_texture;
 							surface.transfer_mode= side->primary_transfer_mode;
-							render_node_side(window, &surface, true, renderStep);
+							render_node_side(window, &surface, void_present, renderStep);
 							// render_node_side(view, destination, window, &surface);
 							break;
 						case _low_side:
@@ -346,13 +328,13 @@ void RenderRasterizerClass::render_node(
 			LiquidSurface.transfer_mode= media->transfer_mode;
 			LiquidSurface.transfer_mode_data= 0;
 			
-      //We need to flush before drawing see-through liquids.
-      //In the future, we should cache this status so we can buffer media surfaces, too.
-      DC()->drawAll();
-      
+			//We need to flush before drawing see-through liquids.
+			//In the future, we should cache this status so we can buffer media surfaces, too.
+			//DC()->drawAll();
+			
 			for (window= node->clipping_windows; window; window= window->next_window)
 			{
-        render_node_floor_or_ceiling(window, polygon, &LiquidSurface, false, ceil, renderStep);
+				render_node_floor_or_ceiling(window, polygon, &LiquidSurface, false, ceil, renderStep);
 			}
 		}
 	}
@@ -363,12 +345,6 @@ void RenderRasterizerClass::render_node(
 	{
 		render_node_object(object, false, renderStep);
 	}
-  
-  //DCW disable plane 6 if we had media earlier
-  if(/*media &&*/ useShaderRenderer()) {
-    MatrixStack::Instance()->disablePlane(6);
-  }
-
 }
 
 void RenderRasterizerClass::store_endpoint(
@@ -471,6 +447,14 @@ void RenderRasterizerClass::render_node_floor_or_ceiling(
 			
 			/* setup the other parameters of the textured polygon */
 			textured_polygon.flags= 0;
+			if (surface->transfer_mode == _xfer_2x)
+			{
+				textured_polygon.flags |= _SCALE_2X_BIT;
+			}
+			else if (surface->transfer_mode == _xfer_4x)
+			{
+				textured_polygon.flags |= _SCALE_4X_BIT;
+			}
 			textured_polygon.origin.x= view->origin.x + surface->origin.x;
 			textured_polygon.origin.y= view->origin.y + surface->origin.y;
 			textured_polygon.origin.z= adjusted_height;
@@ -545,16 +529,27 @@ void RenderRasterizerClass::render_node_side(
 			{
 				world_distance dx= surface->p1.i - surface->p0.i;
 				world_distance dy= surface->p1.j - surface->p0.j;
-				world_distance x0= WORLD_FRACTIONAL_PART(surface->texture_definition->x0);
-				world_distance y0= WORLD_FRACTIONAL_PART(surface->texture_definition->y0);
-				
+
+				auto scale = WORLD_ONE;
+				if (surface->transfer_mode == _xfer_2x)
+				{
+					scale *= 2;
+				}
+				else if (surface->transfer_mode == _xfer_4x)
+				{
+					scale *= 4;
+				}
+
+				world_distance x0 = surface->texture_definition->x0 & (scale - 1);
+				world_distance y0 = surface->texture_definition->y0 & (scale - 1);
+
 				/* calculate texture origin and direction */	
 				world_distance divisor = surface->length;
 				if (divisor == 0)
 					divisor = 1;
-				textured_polygon.vector.i= (WORLD_ONE*dx)/divisor;
-				textured_polygon.vector.j= (WORLD_ONE*dy)/divisor;
-				textured_polygon.vector.k= -WORLD_ONE;
+				textured_polygon.vector.i= (scale*dx)/divisor;
+				textured_polygon.vector.j= (scale*dy)/divisor;
+				textured_polygon.vector.k= -scale;
 				textured_polygon.origin.x= surface->p0.i - (x0*dx)/divisor;
 				textured_polygon.origin.y= surface->p0.j - (x0*dy)/divisor;
 				textured_polygon.origin.z= surface->h1 + y0;
@@ -730,7 +725,7 @@ short RenderRasterizerClass::xy_clip_horizontal_polygon(
 //					dprintf("vertex#%d is on the clip line s==#%d", vertex_index, state);
 					switch (state)
 					{
-						/* if weÕre testing the first vertex, this tells us nothing */
+						/* if weâ€™re testing the first vertex, this tells us nothing */
 						
 						case _searching_cw_for_out_in_transition:
 							entrance_vertex= vertex_index;
@@ -767,7 +762,7 @@ short RenderRasterizerClass::xy_clip_horizontal_polygon(
 			}
 
 			/* adjust vertex_index (clockwise or counterclockwise, depending on vertex_delta)
-				if weÕve come back to the first vertex without finding an entrance point weÕre
+				if weâ€™ve come back to the first vertex without finding an entrance point weâ€™re
 				either all the way in or all the way out */
 			vertex_index= (vertex_delta<0) ? WRAP_LOW(vertex_index, vertex_count-1) :
 				WRAP_HIGH(vertex_index, vertex_count-1);
@@ -787,7 +782,7 @@ short RenderRasterizerClass::xy_clip_horizontal_polygon(
 		}
 		while (state!=NONE);
 		
-		if (exit_vertex!=NONE) /* weÕve got clipping to do */
+		if (exit_vertex!=NONE) /* weâ€™ve got clipping to do */
 		{
 			flagged_world_point2d new_entrance_point, new_exit_point;
 			
@@ -862,9 +857,9 @@ short RenderRasterizerClass::xy_clip_horizontal_polygon(
 }
 
 /* sort points before clipping to assure consistency; there is a way to make this more accurate
-	but it requires the downshifting game, as played in SCOTTISH_TEXTURES.C.  itÕs tempting to
+	but it requires the downshifting game, as played in SCOTTISH_TEXTURES.C.  itâ€™s tempting to
 	think that having a smaller scale for our world coordinates would help here (i.e., less bits
-	per distance) but then wouldnÕt we be screwed when we tried to rotate? */
+	per distance) but then wouldnâ€™t we be screwed when we tried to rotate? */
 // LP change: make it better able to do long-distance views
 void RenderRasterizerClass::xy_clip_flagged_world_points(
 	flagged_world_point2d *p0,
@@ -877,13 +872,13 @@ void RenderRasterizerClass::xy_clip_flagged_world_points(
 	flagged_world_point2d *local_p1= swap ? p0 : p1;
 	world_distance dx= local_p1->x - local_p0->x;
 	world_distance dy= local_p1->y - local_p0->y;
-	int32 numerator= line->j*local_p0->x - line->i*local_p0->y;
-	int32 denominator= line->i*dy - line->j*dx;
+	int32 numerator = int32(1LL*line->j*local_p0->x - 1LL*line->i*local_p0->y);
+	int32 denominator = int32(1LL*line->i*dy - 1LL*line->j*dx);
 	short shift_count= FIXED_FRACTIONAL_BITS;
 	_fixed t;
 
-	/* give numerator 16 significant bits over denominator and then calculate t==n/d;  MPWÕs PPCC
-		didnÕt seem to like (INT32_MIN>>1) and i had to substitute 0xc0000000 instead (hmmm) */
+	/* give numerator 16 significant bits over denominator and then calculate t==n/d;  MPWâ€™s PPCC
+		didnâ€™t seem to like (INT32_MIN>>1) and i had to substitute 0xc0000000 instead (hmmm) */
 	while (numerator<=(int32)0x3fffffff && numerator>=(int32)0xc0000000 && shift_count--) numerator<<= 1;
 	if (shift_count>0) denominator>>= shift_count;
 	t= numerator;
@@ -891,8 +886,8 @@ void RenderRasterizerClass::xy_clip_flagged_world_points(
 		t /= denominator;
 
 	/* calculate the clipped point */
-	clipped->x= local_p0->x + FIXED_INTEGERAL_PART(t*dx);
-	clipped->y= local_p0->y + FIXED_INTEGERAL_PART(t*dy);
+	clipped->x = local_p0->x + FIXED_INTEGERAL_PART(int32(1LL*t*dx));
+	clipped->y = local_p0->y + FIXED_INTEGERAL_PART(int32(1LL*t*dy));
 	clipped->flags= local_p0->flags&local_p1->flags;
 }
 
@@ -969,7 +964,7 @@ short RenderRasterizerClass::z_clip_horizontal_polygon(
 				{
 					switch (state)
 					{
-						/* if weÕre testing the first vertex (_testing_first_vertex), this tells us nothing */
+						/* if weâ€™re testing the first vertex (_testing_first_vertex), this tells us nothing */
 						
 						case _searching_cw_for_out_in_transition:
 							entrance_vertex= vertex_index;
@@ -989,7 +984,7 @@ short RenderRasterizerClass::z_clip_horizontal_polygon(
 			}
 
 			/* adjust vertex_index (clockwise or counterclockwise, depending on vertex_delta)
-				if weÕve come back to the first vertex without finding an entrance point weÕre
+				if weâ€™ve come back to the first vertex without finding an entrance point weâ€™re
 				either all the way in or all the way out */
 			vertex_index= (vertex_delta<0) ? WRAP_LOW(vertex_index, vertex_count-1) :
 				WRAP_HIGH(vertex_index, vertex_count-1);
@@ -1009,7 +1004,7 @@ short RenderRasterizerClass::z_clip_horizontal_polygon(
 		}
 		while (state!=NONE);
 		
-		if (exit_vertex!=NONE) /* weÕve got clipping to do */
+		if (exit_vertex!=NONE) /* weâ€™ve got clipping to do */
 		{
 			flagged_world_point2d new_entrance_point, new_exit_point;
 			
@@ -1083,7 +1078,7 @@ short RenderRasterizerClass::z_clip_horizontal_polygon(
 	return vertex_count;
 }
 
-/* sort points before clipping to assure consistency; this is almost identical to xz_clipÉ()
+/* sort points before clipping to assure consistency; this is almost identical to xz_clipâ€¦()
 	except that it clips 2d points in the xy-plane at the given height. */
 // LP change: make it better able to do long-distance views
 void RenderRasterizerClass::z_clip_flagged_world_points(
@@ -1098,13 +1093,13 @@ void RenderRasterizerClass::z_clip_flagged_world_points(
 	flagged_world_point2d *local_p1= swap ? p0 : p1;
 	world_distance dx= local_p1->x - local_p0->x;
 	world_distance dy= local_p1->y - local_p0->y;
-	int32 numerator= line->j*local_p0->x - line->i*height;
-	int32 denominator= - line->j*dx;
+	int32 numerator = int32(1LL*line->j*local_p0->x - 1LL*line->i*height);
+	int32 denominator = int32(-1LL*line->j*dx);
 	short shift_count= FIXED_FRACTIONAL_BITS;
 	_fixed t;
 
-	/* give numerator 16 significant bits over denominator and then calculate t==n/d;  MPWÕs PPCC
-		didnÕt seem to like (INT32_MIN>>1) and i had to substitute 0xc0000000 instead (hmmm) */
+	/* give numerator 16 significant bits over denominator and then calculate t==n/d;  MPWâ€™s PPCC
+		didnâ€™t seem to like (INT32_MIN>>1) and i had to substitute 0xc0000000 instead (hmmm) */
 	while (numerator<=(int32)0x3fffffff && numerator>=(int32)0xc0000000 && shift_count--) numerator<<= 1;
 	if (shift_count>0) denominator>>= shift_count;
 	t= numerator;
@@ -1112,8 +1107,8 @@ void RenderRasterizerClass::z_clip_flagged_world_points(
 		t /= denominator;
 
 	/* calculate the clipped point */
-	clipped->x= local_p0->x + FIXED_INTEGERAL_PART(t*dx);
-	clipped->y= local_p0->y + FIXED_INTEGERAL_PART(t*dy);
+	clipped->x = local_p0->x + FIXED_INTEGERAL_PART(int32(1LL*t*dx));
+	clipped->y = local_p0->y + FIXED_INTEGERAL_PART(int32(1LL*t*dy));
 	clipped->flags= local_p0->flags&local_p1->flags;
 }
 
@@ -1221,7 +1216,7 @@ short RenderRasterizerClass::xz_clip_vertical_polygon(
 //					dprintf("vertex#%d is on the clip line s==#%d", vertex_index, state);
 					switch (state)
 					{
-						/* if weÕre testing the first vertex, this tells us nothing */
+						/* if weâ€™re testing the first vertex, this tells us nothing */
 						
 						case _searching_cw_for_out_in_transition:
 							entrance_vertex= vertex_index;
@@ -1258,7 +1253,7 @@ short RenderRasterizerClass::xz_clip_vertical_polygon(
 			}
 
 			/* adjust vertex_index (clockwise or counterclockwise, depending on vertex_delta)
-				if weÕve come back to the first vertex without finding an entrance point weÕre
+				if weâ€™ve come back to the first vertex without finding an entrance point weâ€™re
 				either all the way in or all the way out */
 			vertex_index= (vertex_delta<0) ? WRAP_LOW(vertex_index, vertex_count-1) :
 				WRAP_HIGH(vertex_index, vertex_count-1);
@@ -1278,7 +1273,7 @@ short RenderRasterizerClass::xz_clip_vertical_polygon(
 		}
 		while (state!=NONE);
 		
-		if (exit_vertex!=NONE) /* weÕve got clipping to do */
+		if (exit_vertex!=NONE) /* weâ€™ve got clipping to do */
 		{
 			flagged_world_point3d new_entrance_point, new_exit_point;
 			
@@ -1366,13 +1361,13 @@ void RenderRasterizerClass::xz_clip_flagged_world_points(
 	world_distance dx= local_p1->x - local_p0->x;
 	world_distance dy= local_p1->y - local_p0->y;
 	world_distance dz= local_p1->z - local_p0->z;
-	int32 numerator= line->j*local_p0->x - line->i*local_p0->z;
-	int32 denominator= line->i*dz - line->j*dx;
+	int32 numerator = int32(1LL*line->j*local_p0->x - 1LL*line->i*local_p0->z);
+	int32 denominator = int32(1LL*line->i*dz - 1LL*line->j*dx);
 	short shift_count= FIXED_FRACTIONAL_BITS;
 	_fixed t;
 
-	/* give numerator 16 significant bits over denominator and then calculate t==n/d;  MPWÕs PPCC
-		didnÕt seem to like (INT32_MIN>>1) and i had to substitute 0xc0000000 instead (hmmm) */
+	/* give numerator 16 significant bits over denominator and then calculate t==n/d;  MPWâ€™s PPCC
+		didnâ€™t seem to like (INT32_MIN>>1) and i had to substitute 0xc0000000 instead (hmmm) */
 	while (numerator<=(int32)0x3fffffff && numerator>=(int32)0xc0000000 && shift_count--) numerator<<= 1;
 	if (shift_count>0) denominator>>= shift_count;
 	t = numerator;
@@ -1380,8 +1375,8 @@ void RenderRasterizerClass::xz_clip_flagged_world_points(
 		t /= denominator;
 
 	/* calculate the clipped point */
-	clipped->x= local_p0->x + FIXED_INTEGERAL_PART(t*dx);
-	clipped->y= local_p0->y + FIXED_INTEGERAL_PART(t*dy);
-	clipped->z= local_p0->z + FIXED_INTEGERAL_PART(t*dz);
+	clipped->x = local_p0->x + FIXED_INTEGERAL_PART(int32(1LL*t*dx));
+	clipped->y = local_p0->y + FIXED_INTEGERAL_PART(int32(1LL*t*dy));
+	clipped->z = local_p0->z + FIXED_INTEGERAL_PART(int32(1LL*t*dz));
 	clipped->flags= local_p0->flags&local_p1->flags;
 }

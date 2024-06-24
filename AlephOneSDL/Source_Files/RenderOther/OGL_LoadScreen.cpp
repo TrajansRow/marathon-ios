@@ -27,15 +27,11 @@
 #ifdef HAVE_OPENGL
 #include "OGL_Render.h"
 
-#include "AlephOneHelper.h"
-#include "MatrixStack.hpp"
-
 extern bool OGL_SwapBuffers();
-
-OGL_LoadScreen *OGL_LoadScreen::instance_;
 
 OGL_LoadScreen *OGL_LoadScreen::instance()
 {
+	static OGL_LoadScreen *instance_ = nullptr;
 	if (!instance_) 
 		instance_ = new OGL_LoadScreen();
 	
@@ -47,15 +43,15 @@ extern bool OGL_ClearScreen();
 bool OGL_LoadScreen::Start()
 {
 	// load the image
-	FileSpecifier File;
+	FileSpecifier File(path);
 	if (path.size() == 0) return use = false;
-	if (!File.SetNameWithPath(path.c_str())) return use = false;
+	if (!File.Exists() && !File.SetNameWithPath(path.c_str())) return use = false;
 	if (!image.LoadFromFile(File, ImageLoader_Colors, 0)) return use = false;
 
 	if (!blitter.Load(image)) return use = false;
 
-	int screenWidth = MainScreenLogicalWidth();
-	int screenHeight = MainScreenLogicalHeight();
+	int screenWidth = 640;
+	int screenHeight = 480;
 	alephone::Screen::instance()->bound_screen(true);
 	
 	// the true width/height
@@ -116,20 +112,13 @@ void OGL_LoadScreen::Progress(const int progress)
 
 	if (useProgress) 
 	{
-    if (useShaderRenderer()){
-      MatrixStack::Instance()->matrixMode(GL_MODELVIEW);
-      MatrixStack::Instance()->pushMatrix();
-      MatrixStack::Instance()->translatef(x_offset, y_offset, 0.0);
-      MatrixStack::Instance()->scalef(x_scale, y_scale, 1.0);
-    } else {
-      glMatrixMode(GL_MODELVIEW);
-      glPushMatrix();
-      glTranslatef(x_offset, y_offset, 0.0);
-      glScalef(x_scale, y_scale, 1.0);
-    }
+		MSI()->matrixMode(MS_MODELVIEW);
+		MSI()->pushMatrix();
+		MSI()->translatef(x_offset, y_offset, 0.0);
+		MSI()->scalef(x_scale, y_scale, 1.0);
 		
 		// draw the progress bar background
-		SglColor3us(colors[0].red, colors[0].green, colors[0].blue); //DCW
+		SglColor3us(colors[0].red, colors[0].green, colors[0].blue);
 		OGL_RenderRect(x, y, w, h);
 		
 		int height = h, width = w;
@@ -145,13 +134,10 @@ void OGL_LoadScreen::Progress(const int progress)
 		}
 			
 		// draw the progress bar foreground
-		SglColor3us(colors[1].red, colors[1].green, colors[1].blue); //DCW
+		SglColor3us(colors[1].red, colors[1].green, colors[1].blue);
 		OGL_RenderRect(left, top, width, height);
-    if (useShaderRenderer()){
-      MatrixStack::Instance()->popMatrix();
-    } else {
-      glPopMatrix();
-    }
+		
+		MSI()->popMatrix();
 	}
 	
 	OGL_SwapBuffers();

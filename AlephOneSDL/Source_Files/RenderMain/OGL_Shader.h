@@ -27,6 +27,7 @@
 #include "OGL_Headers.h"
 #include "FileHandler.h"
 
+#ifdef HAVE_OPENGL
 
 class Shader {
 
@@ -35,9 +36,13 @@ friend class Shader_MML_Parser;
 public:
 	enum UniformName {
 		U_Texture0,
+        U_Texture0_Size,
 		U_Texture1,
+        U_Texture1_Size,
 		U_Texture2,
+        U_Texture2_Size,
 		U_Texture3,
+        U_Texture3_Size,
 		U_Time,
 		U_Pulsate,
 		U_Wobble,
@@ -48,9 +53,12 @@ public:
 		U_OffsetX,
 		U_OffsetY,
 		U_Pass,
-		U_UseStatic,
-		U_UseFog,
+		U_FogMix,
+		U_FogMode,
+		U_FogStart,
+		U_FogEnd,
 		U_Visibility,
+		U_TransferFadeOut,
 		U_Depth,
 		U_StrictDepthMode,
 		U_Glow,
@@ -61,83 +69,90 @@ public:
 		U_Pitch,
 		U_SelfLuminosity,
 		U_GammaAdjust,
-    //DCW below are compatibiliy uniforms to replace the FFP ones.
-    U_MS_ModelViewProjectionMatrix,
-    U_MS_ModelViewMatrix,
-    U_MS_ModelViewMatrixInverse,
-    U_MS_TextureMatrix,
-    U_MS_Color,
-    U_MS_FogColor,
-    U_TexCoords4,
-    U_ClipPlane0,
-    U_ClipPlane1,
-    U_ClipPlane2,
-    U_ClipPlane3,
-    U_ClipPlane4,
-    U_ClipPlane5,
-    U_MediaPlane6,
-    U_RefractionType,
-    U_LogicalWidth,
-    U_LogicalHeight,
-    U_PixelWidth,
-    U_PixelHeight,
-    U_LightPositions,
-    U_LightColors,
-    U_UseUniformFeatures,
+		U_LogicalWidth,
+		U_LogicalHeight,
+		U_PixelWidth,
+		U_PixelHeight,
+        U_ModelViewProjectionMatrix,
+        U_ModelViewMatrix,
+        U_ModelViewMatrixInverse,
+        U_TextureMatrix,
+        U_Color,
+        U_FogColor,
+        U_TexCoords4,
+        U_ClipPlane0,
+        U_ClipPlane1,
+        U_ClipPlane2,
+        U_ClipPlane3,
+        U_ClipPlane4,
+        U_ClipPlane5,
+        U_ClipPlane6,
+        U_PointLights,
+        U_SpotLights,
+		U_AreaLights,
 		NUMBER_OF_UNIFORM_LOCATIONS
 	};
 
 	enum ShaderType {
-		S_Blur,
+		S_Error,
+        S_Blur,
 		S_Bloom,
 		S_Landscape,
 		S_LandscapeBloom,
+		S_LandscapeInfravision,
 		S_Sprite,
 		S_SpriteBloom,
+		S_SpriteInfravision,
 		S_Invincible,
 		S_InvincibleBloom,
 		S_Invisible,
 		S_InvisibleBloom,
 		S_Wall,
 		S_WallBloom,
+		S_WallInfravision,
 		S_Bump,
 		S_BumpBloom,
 		S_Gamma,
-    S_Debug,
-    S_Rect,
-    S_SolidColor,
+        S_Rect,
+        S_PlainRect,
+        S_SolidColor,
 		NUMBER_OF_SHADER_TYPES
 	};
-  
-  // DCW attribute index
-  enum {
-    ATTRIB_VERTEX,
-    ATTRIB_TEXCOORDS,
-    ATTRIB_NORMAL,
-    ATTRIB_COLOR,
-    ATTRIB_TEXCOORDS4,
-    ATTRIB_CLIPPLANE0,
-    ATTRIB_CLIPPLANE1,
-    ATTRIB_CLIPPLANE5,
-    ATTRIB_SxOxSyOy, //Pack in scaleX, offsetX, scaleY, offsetY
-    ATTRIB_BsBtFlSl, //Pack in bloomScale, bloomShift, flare, selfLuminosity
-    ATTRIB_PuWoDeGl, //Pack in pulsate, wobble, depth, glow
-    NUM_ATTRIBUTES
-  };
-  
+    
+    enum {
+        ATTRIB_VERTEX,
+        ATTRIB_TEXCOORDS,
+        ATTRIB_NORMAL,
+        ATTRIB_COLOR,
+        ATTRIB_TEXCOORDS4,
+        ATTRIB_CLIPPLANE0,
+        ATTRIB_CLIPPLANE1,
+        ATTRIB_CLIPPLANE5,
+        NUM_ATTRIBUTES
+    };
+    
 private:
 
 	GLuint _programObj;
+	std::string _vert;
+	std::string _frag;
 	int16 _passes;
 	bool _loaded;
-  int nameIndex; //DCW
+    std::string shaderName;
 
+	static const char* _shader_names[NUMBER_OF_SHADER_TYPES];
 	static std::vector<Shader> _shaders;
 
+	static const char* _uniform_names[NUMBER_OF_UNIFORM_LOCATIONS];
 	GLint _uniform_locations[NUMBER_OF_UNIFORM_LOCATIONS];
 	float _cached_floats[NUMBER_OF_UNIFORM_LOCATIONS];
 
-	
+	GLint getUniformLocation(UniformName name) { 
+		if (_uniform_locations[name] == -1) {
+			_uniform_locations[name] = glGetUniformLocation(_programObj, _uniform_names[name]);
+		}
+		return _uniform_locations[name];
+	}
 	
 public:
 
@@ -154,35 +169,17 @@ public:
 	void init();
 	void enable();
 	void unload();
-  void enableAndSetStandardUniforms();
+    void enableAndSetStandardUniforms();
 	void setFloat(UniformName name, float); // shader must be enabled
+	void setFloatv(UniformName name, int count, float *f);
 	void setMatrix4(UniformName name, float *f);
-  void setVec4(UniformName name, float *f);
-  void setVec4v(UniformName name, int count, float *f);
-  void setVec2(UniformName name, float *f);
+    void setVec4(UniformName name, float *f);
+    void setVec4v(UniformName name, int count, float *f);
+    void setVec2(UniformName name, float *f);
 
 	int16 passes();
 
 	static void disable();
-  static void drawDebugRect(); //DCW draws a debugging rect to middle of current binding.
-  
-  int getNameIndex() {
-    return nameIndex;
-  }
-  
-    //DCW: Needed for AOA OpenGL Only
-  std::string _vert;
-  std::string _frag;
-  GLint getUniformLocation(UniformName name) {
-    if (_uniform_locations[name] == -1) {
-      _uniform_locations[name] = glGetUniformLocation(_programObj, _uniform_names[name]); //DCW no ARB in ios
-    }
-    return _uniform_locations[name];
-  }
-  //DCW also want this public
-  static const char* _shader_names[NUMBER_OF_SHADER_TYPES];
-  static const char* _uniform_names[NUMBER_OF_UNIFORM_LOCATIONS];
-
 };
 
 
@@ -190,8 +187,8 @@ class InfoTree;
 void parse_mml_opengl_shader(const InfoTree& root);
 void reset_mml_opengl_shader();
 
-GLuint parseShader(const GLcharARB* str, GLenum shaderType); //DCW for AOA
-
 Shader* lastEnabledShader();
+
+#endif
 
 #endif

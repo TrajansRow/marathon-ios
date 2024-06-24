@@ -9,12 +9,12 @@
 #import "MovePadView.h"
 #import "GameViewController.h"
 extern "C" {  
-#include "SDL_keyboard_c.h"
-#include "SDL_keyboard.h"
-#include "SDL_stdinc.h"
-#include "SDL_mouse_c.h"
-#include "SDL_mouse.h"
-#include "SDL_events.h"
+//Still needed for iOS 6-19-24?#include "SDL2/SDL_keyboard_c.h"
+#include "SDL2/SDL_keyboard.h"
+#include "SDL2/SDL_stdinc.h"
+//Still needed for iOS 6-19-24?#include "SDL2/SDL_mouse_c.h"
+#include "SDL2/SDL_mouse.h"
+#include "SDL2/SDL_events.h"
 }
 #include "cseries.h"
 #include <string.h>
@@ -46,7 +46,7 @@ extern "C" {
   [dPadSwimmingView setHidden:YES];
   
   // Kill a warning
-  (void)all_key_definitions;
+	//Still needed for iOS 6-19-24?(void)all_key_definitions;
 
   // Initialization code
   //moveCenterPoint = CGPointMake(self.bounds.size.width / 2.0, self.bounds.size.height / 2.0 );

@@ -29,7 +29,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 
 #ifdef HAVE_SDL_IMAGE
-#include "SDL_image.h"
+#include <SDL2/SDL_image.h>
 #endif
 #ifdef HAVE_PNG
 #include "IMG_savepng.h"
@@ -89,15 +89,14 @@ public:
 
 private:
     QuickSaveImageCache() {};
-    static QuickSaveImageCache* m_instance;
     static const int k_max_items = 100;
     
     std::list<cache_pair_t> m_used;
     std::map<std::string, cache_iter_t> m_images;
 };
 
-QuickSaveImageCache* QuickSaveImageCache::m_instance = 0;
 QuickSaveImageCache* QuickSaveImageCache::instance() {
+    static QuickSaveImageCache* m_instance = nullptr;
     if (!m_instance) {
         m_instance = new QuickSaveImageCache;
     }
@@ -207,7 +206,7 @@ void w_saves::click(int x, int y)
             || y < get_theme_space(LIST_WIDGET, T_SPACE) || y >= rect.h - get_theme_space(LIST_WIDGET, B_SPACE))
             return;
         
-        if ((y - get_theme_space(LIST_WIDGET, T_SPACE)) / item_height() + top_item < min(num_items, top_item + shown_items))
+        if ((y - get_theme_space(LIST_WIDGET, T_SPACE)) / item_height() + top_item < std::min(num_items, top_item + shown_items))
         {
             size_t old_sel = selection;
             set_selection((y - get_theme_space(LIST_WIDGET, T_SPACE)) / item_height() + top_item);
@@ -500,7 +499,7 @@ bool load_quick_save_dialog(FileSpecifier& saved_game)
 extern SDL_Surface *draw_surface;
 extern bool OGL_MapActive;
 
-//DCW making non-static
+//Needed non-static for iOS port
 bool build_map_preview(std::ostringstream& ostream)
 {
     SDL_Rect r = {0, 0, RENDER_WIDTH, RENDER_HEIGHT};
@@ -588,6 +587,10 @@ void create_updated_save(QuickSave& save)
 		err = currentFile.GetError();
 		close_wad_file(currentFile);
 	}
+	else
+	{
+		err = save.save_file.GetError();
+	}
 	
 	// create updated save file
 	int32 offset, meta_wad_length;
@@ -661,7 +664,7 @@ bool create_quick_save(void)
     time(&(save.save_time));
     char fmt_time[256];
     tm *time_info = localtime(&(save.save_time));
-    strftime(fmt_time, 256, "%x %R", time_info);
+    strftime(fmt_time, 256, "%x %H:%M", time_info);
     save.formatted_time = fmt_time;
 
     save.level_name = mac_roman_to_utf8(static_world->level_name);
@@ -732,7 +735,7 @@ bool QuickSaveLoader::ParseQuickSave(FileSpecifier& file_name)
 				std::istringstream strm(metadata);
 				try {
 					pt = InfoTree::load_ini(strm);
-				} catch (InfoTree::ini_error e) {
+				} catch (const InfoTree::ini_error& e) {
 					return false;
 				}
 				
@@ -774,8 +777,8 @@ bool QuickSaveLoader::ParseDirectory(FileSpecifier& dir)
 }
 
 
-QuickSaves* QuickSaves::m_instance = 0;
 QuickSaves* QuickSaves::instance() {
+	static QuickSaves* m_instance = nullptr;
     if (!m_instance) {
         m_instance = new QuickSaves;
     }

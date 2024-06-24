@@ -17,11 +17,11 @@
 ////#import "TestFlight.h"
 
 extern "C" {
-#import "SDL.h" //DCW include main for SDL
-#include "SDL_hints.h" //DCW
+#import "SDL2/SDL.h" //DCW include main for SDL
+#include "SDL2/SDL_hints.h" //DCW
 
 //#import "SDL_sysvideo.h" //DCW not sure if this is needed in SDL2
-#import "SDL_events_c.h"
+//Still needed for iOS 6-19-24?#import "SDL2/SDL_events_c.h"
 #import "jumphack.h"
 }
 #import "SDL_uikitopenglview.h"
@@ -30,7 +30,7 @@ extern "C" {
 #import "AlephOneHelper.h"
 #include "preferences.h"
 #include "map.h" //Needed for detecting whether we are networked when going into background.
-#include <bgfx/bgfx.h>
+//#include <bgfx/bgfx.h>
 
 
   //DCW
@@ -132,8 +132,8 @@ SDL_IdleTimerDisabledChanged(void *userdata, const char *name, const char *oldVa
   OpenGLESVersion = 1;
 
 	//DCW: provide a common way to get the current screen dimensions for landscape.
-	longScreenDimension = max([[UIScreen mainScreen] bounds].size.height,[[UIScreen mainScreen] bounds].size.width);
-	shortScreenDimension = min([[UIScreen mainScreen] bounds].size.height,[[UIScreen mainScreen] bounds].size.width);
+	longScreenDimension = fmax([[UIScreen mainScreen] bounds].size.height,[[UIScreen mainScreen] bounds].size.width);
+	shortScreenDimension = fmin([[UIScreen mainScreen] bounds].size.height,[[UIScreen mainScreen] bounds].size.width);
 	
   //DCW clear fake key map:
   for(int i=0; i<SDL_NUM_SCANCODES; ++i)
@@ -554,7 +554,10 @@ SDL_IdleTimerDisabledChanged(void *userdata, const char *name, const char *oldVa
             abort();
         } 
     }
-  SDL_SendQuit();
+	
+	//Still needed for iOS 6-19-24?SDL_SendQuit();
+	SDL_Quit();
+	
   /* hack to prevent automatic termination.  See SDL_uikitevents.m for details */
 	// DJB We really don't need the long jump...
   // longjmp(*(jump_env()), 1);

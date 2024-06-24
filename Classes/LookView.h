@@ -9,7 +9,7 @@
 #import <UIKit/UIKit.h>
 #import "LookPadView.h"
 #import "SDL_uikitopenglview.h"
-#include "SDL_keyboard.h"
+#include "SDL2/SDL_keyboard.h"
 
 @interface LookView : UIView {
   CGPoint lastPanPoint;

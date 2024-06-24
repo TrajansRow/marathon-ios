@@ -58,7 +58,8 @@ Nov 19, 2000 (Loren Petrich):
 #include "dynamic_limits.h"
 
 #include <vector>
-using namespace std;
+
+using std::vector;
 
 /* ---------- constants */
 
@@ -201,24 +202,19 @@ struct entry_point
 struct player_start_data 
 {
 	int16 team;
-	int16 identifier; /* [weapon_switch_flag.1] [recenter_flag.1] [identifier.14] */
+	int16 identifier; /* [weapon_switch_flag.1] [UNUSED.1] [identifier.14] */
 	int16 color;
 	char name[MAXIMUM_PLAYER_START_NAME_LENGTH+1]; /* PLAYER_NAME_LENGTH+1 */
 };
 
 enum {
-	_player_start_doesnt_auto_recenter_flag= 0x4000,
 	_player_start_doesnt_auto_switch_weapons_flag= 0x8000
 };
 
-const uint16 player_start_identifier_mask=
-	(uint16)~(_player_start_doesnt_auto_recenter_flag | _player_start_doesnt_auto_switch_weapons_flag);
+const uint16 player_start_identifier_mask = (1<<14) - 1;
 
 int16 player_identifier_value(int16 identifier);
 int16 player_start_identifier_value(const player_start_data * const p);
-bool player_identifier_doesnt_auto_recenter(int16 identifier);
-bool player_start_doesnt_auto_recenter(const player_start_data * const p);
-void set_player_start_doesnt_auto_recenter_status(player_start_data * const p, bool v);
 bool player_identifier_doesnt_auto_switch_weapons(int16 identifier);
 bool player_start_doesnt_auto_switch_Weapons(const player_start_data * const p);
 void set_player_start_doesnt_auto_switch_weapons_status(player_start_data * const p, bool v);
@@ -229,15 +225,6 @@ inline int16 player_identifier_value(int16 identifier)
 
 inline int16 player_start_identifier_value(const player_start_data * const p)
 { return (p)->identifier & player_start_identifier_mask; }
-
-inline bool player_identifier_doesnt_auto_recenter(int16 identifier)
-{ return TEST_FLAG(identifier, _player_start_doesnt_auto_recenter_flag); }
-
-inline bool player_start_doesnt_auto_recenter(const player_start_data * const p)
-{ return TEST_FLAG(p->identifier, _player_start_doesnt_auto_recenter_flag); }
-
-inline void set_player_start_doesnt_auto_recenter_status(player_start_data * const p, bool v)
-{	SET_FLAG(p->identifier, _player_start_doesnt_auto_recenter_flag, v); }
 
 inline bool player_identifier_doesnt_auto_switch_weapons(int16 identifier)
 { return TEST_FLAG(identifier, _player_start_doesnt_auto_switch_weapons_flag); }
@@ -327,15 +314,15 @@ const int SIZEOF_random_sound_image_data = 32;
 	for monsters, effects and projectiles */
 #define SLOT_IS_USED(o) ((o)->flags&(uint16)0x8000)
 #define SLOT_IS_FREE(o) (!SLOT_IS_USED(o))
-#define MARK_SLOT_AS_FREE(o) ((o)->flags&=(uint16)~0x8000)
-#define MARK_SLOT_AS_USED(o) ((o)->flags|=(uint16)0x8000)
+#define MARK_SLOT_AS_FREE(o) ((o)->flags&=(uint16)~0xC000)
+#define MARK_SLOT_AS_USED(o) ((o)->flags=((o)->flags|(uint16)0x8000)&(uint16)~0x4000)
 
 #define OBJECT_WAS_RENDERED(o) ((o)->flags&(uint16)0x4000)
 #define SET_OBJECT_RENDERED_FLAG(o) ((o)->flags|=(uint16)0x4000)
 #define CLEAR_OBJECT_RENDERED_FLAG(o) ((o)->flags&=(uint16)~0x4000)
 
 /* this field is only valid after transmogrify_object_shape is called; in terms of our pipeline, that
-	means that itÕs only valid if OBJECT_WAS_RENDERED returns true *and* was cleared before
+	means that itâ€™s only valid if OBJECT_WAS_RENDERED returns true *and* was cleared before
 	the last call to render_scene() ... this means that if OBJECT_WAS_RENDERED returns false,
 	the monster and projectile managers will probably call transmogrif_object_shape themselves.
 	for reasons beyond this scope of this comment to explain, the keyframe cannot be frame zero!
@@ -423,6 +410,13 @@ enum /* object transfer modes (high-level) */
 	_xfer_wander,
 	_xfer_fast_wander,
 	_xfer_big_landscape,
+	_xfer_reverse_horizontal_slide,
+	_xfer_reverse_fast_horizontal_slide,
+	_xfer_reverse_vertical_slide,
+	_xfer_reverse_fast_vertical_slide,
+	_xfer_2x,				  // scales texture by 2x
+	_xfer_4x,				  // scales texture by 4x
+	
 	NUMBER_OF_TRANSFER_MODES
 };
 
@@ -442,7 +436,7 @@ struct object_data /* 32 bytes */
 		and velocity fields */
 	world_point3d location;
 	int16 polygon;
-	
+
 	angle facing;
 	
 	/* this is not really a shape descriptor: (and this is the only place in the game where you
@@ -499,6 +493,7 @@ const int SIZEOF_world_point2d = 4;
 #define ELEVATION_LINE_BIT 0x800
 #define VARIABLE_ELEVATION_LINE_BIT 0x400
 #define LINE_HAS_TRANSPARENT_SIDE_BIT 0x200
+#define LINE_IS_DECORATIVE_BIT 0x100
 
 #define SET_LINE_SOLIDITY(l,v) ((v)?((l)->flags|=(uint16)SOLID_LINE_BIT):((l)->flags&=(uint16)~SOLID_LINE_BIT))
 #define LINE_IS_SOLID(l) ((l)->flags&SOLID_LINE_BIT)
@@ -535,6 +530,16 @@ struct line_data /* 32 bytes */
 	int16 clockwise_polygon_owner, counterclockwise_polygon_owner;
 	
 	int16 unused[6];
+
+	// decorative lines always pass projectiles through their transparent sides
+	bool is_decorative() const {
+		return flags & LINE_IS_DECORATIVE_BIT;
+	}
+
+	void set_decorative(bool b) {
+		if (b) flags |= LINE_IS_DECORATIVE_BIT;
+		else flags &= ~LINE_IS_DECORATIVE_BIT;
+	}
 };
 const int SIZEOF_line_data = 32;
 
@@ -550,8 +555,12 @@ enum /* side flags */
 	_side_switch_can_be_destroyed= 0x0020, // projectile hits toggle and destroy this switch
 	_side_switch_can_only_be_hit_by_projectiles= 0x0040,
 	_side_item_is_optional= 0x0080, // in Marathon, switches still work without items
+	_side_is_m1_lighted_switch = 0x0100, // in Marathon, lighted switches must be above 50% (unlike M2, 75%)
 
-	_editor_dirty_bit= 0x4000 // used by the editor...
+	_editor_dirty_bit= 0x4000, // used by the editor...
+	_reserved_side_flag = 0x8000 // some maps written by an old map editor
+								 // (Pfhorte?) set lots of side flags; use this
+								 // to detect and correct
 };
 
 enum /* control panel side types */
@@ -796,7 +805,7 @@ struct object_frequency_definition
 	
 	int16 initial_count;   // number that initially appear. can be greater than maximum_count
 	int16 minimum_count;   // this number of objects will be maintained.
-	int16 maximum_count;   // canÕt exceed this, except at the beginning of the level.
+	int16 maximum_count;   // canâ€™t exceed this, except at the beginning of the level.
 	
 	int16 random_count;    // maximum random occurences of the object
 	uint16 random_chance;    // in (0, 65535]
@@ -832,7 +841,7 @@ enum /* environment flags */
 	_environment_terminals_stop_time = 0x0100, // solo only
 	_environment_activation_ranges = 0x0200, // Marathon 1 monster activation limits
 	_environment_m1_weapons = 0x0400,    // multiple weapon pickups on TC; low gravity grenades
-
+        
 	_environment_network= 0x2000,	// these two pseudo-environments are used to prevent items 
 	_environment_single_player= 0x4000 // from arriving in the items.c code.
 };
@@ -1005,24 +1014,24 @@ extern struct static_data *static_world;
 extern struct dynamic_data *dynamic_world;
 
 extern vector<object_data> ObjectList;
-#define objects (&ObjectList[0])
+#define objects (ObjectList.data())
 
 // extern struct object_data *objects;
 
 extern vector<endpoint_data> EndpointList;
-#define map_endpoints (&EndpointList[0])
+#define map_endpoints (EndpointList.data())
 #define MAXIMUM_ENDPOINTS_PER_MAP (EndpointList.size())
 
 extern vector<line_data> LineList;
-#define map_lines (&LineList[0])
+#define map_lines (LineList.data())
 #define MAXIMUM_LINES_PER_MAP (LineList.size())
 
 extern vector<side_data> SideList;
-#define map_sides (&SideList[0])
+#define map_sides (SideList.data())
 #define MAXIMUM_SIDES_PER_MAP (SideList.size())
 
 extern vector<polygon_data> PolygonList;
-#define map_polygons (&PolygonList[0])
+#define map_polygons (PolygonList.data())
 #define MAXIMUM_POLYGONS_PER_MAP (PolygonList.size())
 
 // extern struct polygon_data *map_polygons;
@@ -1032,36 +1041,36 @@ extern vector<polygon_data> PolygonList;
 
 extern vector<ambient_sound_image_data> AmbientSoundImageList;
 #define MAXIMUM_AMBIENT_SOUND_IMAGES_PER_MAP (AmbientSoundImageList.size())
-#define ambient_sound_images (&AmbientSoundImageList[0])
+#define ambient_sound_images (AmbientSoundImageList.data())
 
 extern vector<random_sound_image_data> RandomSoundImageList;
 #define MAXIMUM_RANDOM_SOUND_IMAGES_PER_MAP (RandomSoundImageList.size())
-#define random_sound_images (&RandomSoundImageList[0])
+#define random_sound_images (RandomSoundImageList.data())
 
 // extern struct ambient_sound_image_data *ambient_sound_images;
 // extern struct random_sound_image_data *random_sound_images;
 
 extern vector<int16> MapIndexList;
-#define map_indexes (&MapIndexList[0])
+#define map_indexes (MapIndexList.data())
 
 // extern int16 *map_indexes;
 
 extern vector<uint8> AutomapLineList;
-#define automap_lines (&AutomapLineList[0])
+#define automap_lines (AutomapLineList.data())
 
 extern vector<uint8> AutomapPolygonList;
-#define automap_polygons (&AutomapPolygonList[0]) 
+#define automap_polygons (AutomapPolygonList.data())
 
 // extern byte *automap_lines;
 // extern byte *automap_polygons;
 
 extern vector<map_annotation> MapAnnotationList;
 #define MAXIMUM_ANNOTATIONS_PER_MAP (MapAnnotationList.size())
-#define map_annotations (&MapAnnotationList[0])
+#define map_annotations (MapAnnotationList.data())
 
 extern vector<map_object> SavedObjectList;
 #define MAXIMUM_SAVED_OBJECTS (SavedObjectList.size())
-#define saved_objects (&SavedObjectList[0])
+#define saved_objects (SavedObjectList.data())
 
 // extern struct map_annotation *map_annotations;
 // extern struct map_object *saved_objects;
@@ -1164,11 +1173,14 @@ struct shape_and_transfer_mode
 };
 
 void get_object_shape_and_transfer_mode(world_point3d *camera_location, short object_index, struct shape_and_transfer_mode *data);
+void get_object_shape_and_transfer_mode(world_point3d *camera_location, object_data* object, shape_and_transfer_mode *data);
 void set_object_shape_and_transfer_mode(short object_index, shape_descriptor shape, short transfer_mode);
-void animate_object(short object_index); /* assumes ¶t==1 tick */
+void animate_object(short object_index); /* assumes âˆ‚t==1 tick */
+void animate_object(object_data* data, int16_t object_index);
 bool randomize_object_sequence(short object_index, shape_descriptor shape);
 
-void play_object_sound(short object_index, short sound_code);
+world_location3d* get_object_sound_location(short object_index);
+void play_object_sound(short object_index, short sound_code, bool local_sound = false);
 void play_polygon_sound(short polygon_index, short sound_code);
 void _play_side_sound(short side_index, short sound_code, _fixed pitch);
 void play_world_sound(short polygon_index, world_point3d *origin, short sound_code);
@@ -1303,7 +1315,7 @@ uint8 *pack_polygon_data(uint8 *Stream, polygon_data* Objects, size_t Count);
 
 uint8 *unpack_map_annotation(uint8 *Stream, map_annotation* Objects, size_t Count);
 uint8 *pack_map_annotation(uint8 *Stream, map_annotation* Objects, size_t Count);
-uint8 *unpack_map_object(uint8 *Stream, map_object* Objects, size_t Count);
+uint8 *unpack_map_object(uint8 *Stream, map_object* Objects, size_t Count, int version);
 uint8 *pack_map_object(uint8 *Stream, map_object* Objects, size_t Count);
 uint8 *unpack_object_frequency_definition(uint8 *Stream, object_frequency_definition* Objects, size_t Count);
 uint8 *pack_object_frequency_definition(uint8 *Stream, object_frequency_definition* Objects, size_t Count);

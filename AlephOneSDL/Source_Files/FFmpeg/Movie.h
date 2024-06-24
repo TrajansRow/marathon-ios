@@ -25,19 +25,27 @@
  */
 
 #include "cseries.h"
+#include "OGL_FBO.h"
+#include <memory>
 #include <string.h>
 #include <vector>
-#include <SDL_thread.h>
+#include <SDL2/SDL_thread.h>
 
 class Movie
 {
 public:
-	static Movie *instance() { if (!m_instance) m_instance = new Movie(); return m_instance; }
+	static Movie *instance() { 
+		static Movie *m_instance = nullptr;
+		if (!m_instance
+				) m_instance = new Movie(); 
+		return m_instance; 
+	}
 	
 	void PromptForRecording();
 	void StartRecording(std::string path);
 	bool IsRecording();
 	void StopRecording();
+	long GetCurrentAudioTimeStamp();
 	
 	enum FrameType {
 	  FRAME_NORMAL,
@@ -47,7 +55,6 @@ public:
 	void AddFrame(FrameType ftype = FRAME_NORMAL);
 
 private:
-  static class Movie *m_instance;
   
   std::string moviefile;
   SDL_Rect view_rect;
@@ -55,6 +62,7 @@ private:
   
   std::vector<uint8> videobuf;
   std::vector<uint8> audiobuf;
+  int in_bps;
   
   struct libav_vars *av;
   
@@ -62,6 +70,10 @@ private:
   SDL_sem *encodeReady;
   SDL_sem *fillReady;
   bool stillEncoding;
+
+#ifdef HAVE_OPENGL
+  std::unique_ptr<FBO> frameBufferObject;
+#endif
   
   Movie();  
   bool Setup();
@@ -69,6 +81,7 @@ private:
   void EncodeThread();
   void EncodeVideo(bool last);
   void EncodeAudio(bool last);
+  void ThrowUserError(std::string error_msg);
 };
 	
 #endif

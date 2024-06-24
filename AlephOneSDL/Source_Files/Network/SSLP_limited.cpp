@@ -45,9 +45,9 @@
 #include	<stdlib.h>
 
 // We depend on SDL, SDL_net, and SDL_netx (my broadcast stuff that works with SDL_net)
-#include	<SDL.h>
-#include	<SDL_thread.h>
-#include	<SDL_endian.h>
+#include	<SDL2/SDL.h>
+#include	<SDL2/SDL_thread.h>
+#include	<SDL2/SDL_endian.h>
 #include	"SSLP_API.h"
 #include	"SSLP_Protocol.h"
 #include	"SDL_netx.h"
@@ -55,25 +55,7 @@
 // We use the A1 logging facilities
 #include	"Logging.h"
 
-//DCW
-#include "AlephOneHelper.h"
-#include <sys/socket.h>
-#include "SDLnetsys.h"
-struct UDP_channel {
-  int numbound;
-  IPaddress address[SDLNET_MAX_UDPADDRESSES];
-};
-struct _UDPsocket {
-  int ready;
-  SOCKET channel;
-  IPaddress address;
-  
-  struct UDP_channel binding[SDLNET_MAX_UDPCHANNELS];
-  
-  /* For debugging purposes */
-  int packetloss;
-};
-
+#include	"csmisc.h"
 
 // FILE-LOCAL CONSTANTS
 // flags for sBehaviorsDesired (tracks what should be going on)
@@ -184,7 +166,7 @@ SSLPint_FoundAnInstance(struct SSLP_ServiceInstance* inInstance) {
                 }
                 
                 // found a match - update timestamp and break the loop
-                theCurrentFoundInstance->mTimestamp = SDL_GetTicks();
+                theCurrentFoundInstance->mTimestamp = machine_tick_count();
                 break;
             }
         }
@@ -198,7 +180,7 @@ SSLPint_FoundAnInstance(struct SSLP_ServiceInstance* inInstance) {
         
         theCurrentFoundInstance = (struct SSLPint_FoundInstance*) malloc(sizeof(struct SSLPint_FoundInstance));
         theCurrentFoundInstance->mInstance	= theServiceInstance;
-        theCurrentFoundInstance->mTimestamp	= SDL_GetTicks();
+        theCurrentFoundInstance->mTimestamp	= machine_tick_count();
         theCurrentFoundInstance->mNext		= sFoundInstances;
         sFoundInstances				= theCurrentFoundInstance;
         
@@ -213,11 +195,11 @@ SSLPint_FoundAnInstance(struct SSLP_ServiceInstance* inInstance) {
 void
 SSLPint_RemoveTimedOutInstances() {
     logContext("removing stale SSLP service instances");
-
+    
     struct SSLPint_FoundInstance* theCurrentInstance = sFoundInstances;
     struct SSLPint_FoundInstance* thePreviousInstance = NULL;
     
-    Uint32 theCurrentTickCount = SDL_GetTicks();
+    Uint32 theCurrentTickCount = machine_tick_count();
     
     while(theCurrentInstance != NULL) {
         if(theCurrentTickCount - theCurrentInstance->mTimestamp > SSLPINT_INSTANCE_TIMEOUT) {
@@ -312,7 +294,7 @@ SSLPint_FlushAllFoundInstances() {
 static void
 SSLPint_ReceivedPacket() {
     logContext("processing a received SSLP packet");
-  
+
     if(sReceivingPacket == NULL) {
         logAnomaly("sReceivingPacket is NULL");
         return;
@@ -492,12 +474,7 @@ SSLPint_Enter() {
         if(!sSocketDescriptor)
             return sSocketDescriptor != NULL;
     }
-  
-    //DCW Set an appropriate network socket service type.
-    int st = NET_SERVICE_TYPE_VO;
-    setsockopt((int)(sSocketDescriptor->channel), SOL_SOCKET, SO_NET_SERVICE_TYPE, (void *)&st, sizeof(st));
-
-  
+    
     // Set up broadcast on that socket
     SDLNetx_EnableBroadcast(sSocketDescriptor);
     
@@ -781,14 +758,12 @@ SSLP_Pump() {
     
     static Uint32	theTimeLastWorked = 0;
     
-    Uint32		theCurrentTime = SDL_GetTicks();
+    Uint32		theCurrentTime = machine_tick_count();
     
     if(sBehaviorsDesired & (SSLPINT_LOCATING | SSLPINT_HINTING)) {
 
         // Do some work only once every five seconds
-        //if(theCurrentTime - theTimeLastWorked >= 5000) {
-        //DCW how about every second?
-      if(theCurrentTime - theTimeLastWorked >= 1000) {
+        if(theCurrentTime - theTimeLastWorked >= 5000) {
 
             // Do broadcasting work
             if(sBehaviorsDesired & SSLPINT_LOCATING) {
@@ -797,9 +772,8 @@ SSLP_Pump() {
             }
             
             // Do hinting work
-        if(sBehaviorsDesired & SSLPINT_HINTING) {
+            if(sBehaviorsDesired & SSLPINT_HINTING)
                 SDLNet_UDP_Send(sSocketDescriptor, -1, sHintPacket);
-        }
 
             theTimeLastWorked = theCurrentTime;
         }

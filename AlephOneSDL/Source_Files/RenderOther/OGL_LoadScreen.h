@@ -24,11 +24,7 @@
 */
 
 #include "cseries.h"
-
-#ifdef HAVE_OPENGL
 #include "OGL_Headers.h"
-#endif
-
 #include "OGL_Blitter.h"
 #include "ImageLoader.h"
 
@@ -72,7 +68,6 @@ OGL_LoadScreen() : x(0), y(0), w(0), h(0), use(false), useProgress(false), perce
 
 	short percent;
 
-	static OGL_LoadScreen *instance_;
 
 	GLuint texture_ref;
 };

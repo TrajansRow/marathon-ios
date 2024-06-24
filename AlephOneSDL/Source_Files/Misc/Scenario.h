@@ -29,7 +29,8 @@
 #include <string>
 #include <vector>
 
-using namespace std;
+using std::string;
+using std::vector;
 
 class Scenario
 {
@@ -47,17 +48,20 @@ public:
 	
 	bool IsCompatible(const string);
 	void AddCompatible(const string);
+
+	void SetAllowsClassicGameplay(bool allow) { m_allows_classic_gameplay = allow; }
+	bool AllowsClassicGameplay() { return m_allows_classic_gameplay; }
 	
 private:
-	Scenario() { }
+	Scenario() : m_allows_classic_gameplay{false} { }
 	
 	string m_name;
 	string m_version;
 	string m_id;
 	
 	vector<string> m_compatibleVersions;
-	
-	static Scenario *m_instance;
+
+	bool m_allows_classic_gameplay;
 };
 
 class InfoTree;

@@ -45,13 +45,10 @@
 #ifdef HAVE_OPENGL
 #include "OGL_Headers.h"
 #include "OGL_Render.h"
+#include "MatrixStack.hpp"
 #endif
 
 #include <math.h>
-
-#if defined(__WIN32__) || defined(__MINGW32__)
-#undef DrawText
-#endif
 
 extern bool MotionSensorActive;
 
@@ -65,8 +62,6 @@ static bool hud_pict_not_found = false;	// HUD backdrop picture not found, don't
 
 extern int LuaTexturePaletteSize();
 
-// DJB OpenGL SaveState code
-#include "SaveState.h"
 void OGL_DrawHUD(Rect &dest, short time_elapsed)
 {	
 	// Load static HUD picture if necessary
@@ -75,25 +70,24 @@ void OGL_DrawHUD(Rect &dest, short time_elapsed)
             hud_pict_not_found = true;
 	}
 
-  // DJB OpenGL don't push anything
-  // glPushAttrib(GL_ALL_ATTRIB_BITS);
-  
-  SaveState ss0 (GL_TEXTURE_2D);
-  SaveState ss1 (GL_CULL_FACE);
-  SaveState ss2 (GL_DEPTH_TEST);
-  SaveState ss3 (GL_ALPHA_TEST);
-  SaveState ss4 (GL_BLEND);
-  SaveState ss5 (GL_FOG);
-  
+	//glPushAttrib(GL_ALL_ATTRIB_BITS);
+    //bool isEnabled_GT2 = glIsEnabled (GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
+    bool isEnabled_GCF = glIsEnabled (GL_CULL_FACE);
+    bool isEnabled_GDT = glIsEnabled (GL_DEPTH_TEST);
+    //bool isEnabled_GAT = glIsEnabled (GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
+    bool isEnabled_GST = glIsEnabled (GL_STENCIL_TEST);
+    bool isEnabled_GB = glIsEnabled (GL_BLEND);
+    //bool isEnabled_GF = glIsEnabled (GL_FOG); //NOT SUPPORTED ANGLE ENUM
+    
 	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_ALPHA_TEST);
+	//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 	glDisable(GL_BLEND);
-	glDisable(GL_FOG);
-
-	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
-	glLoadIdentity();
-	
+	//glDisable(GL_FOG); //NOT SUPPORTED ANGLE ENUM
+    
+	MSI()->matrixMode(MS_MODELVIEW);
+	MSI()->pushMatrix();
+	MSI()->loadIdentity();
+    
 	// Draw static HUD picture
 	if (HUD_Blitter.Loaded() && !LuaTexturePaletteSize())
 	{
@@ -102,15 +96,15 @@ void OGL_DrawHUD(Rect &dest, short time_elapsed)
 	}
 	else
 	{
-		SglColor3ub(0, 0, 0); //DCW
+		SglColor3ub(0, 0, 0);
 		OGL_RenderRect(dest.left, dest.top, dest.right - dest.left, dest.bottom - dest.top);
 	}
 	
 	GLfloat x_scale = (dest.right - dest.left) / 640.0;
 	GLfloat y_scale = (dest.bottom - dest.top) / 160.0;
-	glMatrixMode(GL_MODELVIEW);
-	glTranslatef(dest.left, dest.top - (320.0 * y_scale), 0.0);
-	glScalef(x_scale, y_scale, 1.0);
+	MSI()->matrixMode(MS_MODELVIEW);
+	MSI()->translatef(dest.left, dest.top - (320.0 * y_scale), 0.0);
+	MSI()->scalef(x_scale, y_scale, 1.0);
 
 	// Add dynamic elements (redraw everything)
 	mark_weapon_display_as_dirty();
@@ -119,11 +113,18 @@ void OGL_DrawHUD(Rect &dest, short time_elapsed)
 	mark_oxygen_display_as_dirty();
 	mark_player_inventory_as_dirty(current_player_index, NONE);
 	HUD_OGL.update_everything(time_elapsed);
-	glMatrixMode(GL_MODELVIEW);
-	glPopMatrix();
+    
+	MSI()->matrixMode(MS_MODELVIEW);
+	MSI()->popMatrix();
 
-  // DJB OpenGL
-  // glPopAttrib();
+	//glPopAttrib();
+    //if ( isEnabled_GT2 ) { glEnable ( GL_TEXTURE_2D ) ; } else { glDisable ( GL_TEXTURE_2D ); } //NOT SUPPORTED ANGLE ENUM
+    if ( isEnabled_GCF ) { glEnable ( GL_CULL_FACE ) ; } else { glDisable ( GL_CULL_FACE ); }
+    if ( isEnabled_GDT ) { glEnable ( GL_DEPTH_TEST ) ; } else { glDisable ( GL_DEPTH_TEST ); }
+    //if ( isEnabled_GAT ) { glEnable ( GL_ALPHA_TEST ) ; } else { glDisable ( GL_ALPHA_TEST ); } //NOT SUPPORTED ANGLE ENUM
+    if ( isEnabled_GST ) { glEnable ( GL_STENCIL_TEST ) ; } else { glDisable ( GL_STENCIL_TEST ); }
+    if ( isEnabled_GB )  { glEnable ( GL_BLEND ) ; } else { glDisable ( GL_BLEND ); }
+    //if ( isEnabled_GF )  { glEnable ( GL_FOG ) ; } else { glDisable ( GL_FOG ); } //NOT SUPPORTED ANGLE ENUM
 }
 
 
@@ -165,8 +166,8 @@ void HUD_OGL_Class::DrawShape(shape_descriptor shape, screen_rectangle *dest, sc
 	GLfloat V_Offset = TMgr.V_Offset + TMgr.V_Scale * src->top / orig_height;
 
 	// Draw shape
-	SglColor3f(1.0, 1.0, 1.0); //DCW
-	glEnable(GL_TEXTURE_2D);
+	MSI()->color3f(1.0, 1.0, 1.0);
+	//glEnable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
 	glDisable(GL_BLEND);
 	TMgr.SetupTextureMatrix();
 	TMgr.RenderNormal();
@@ -198,8 +199,8 @@ void HUD_OGL_Class::DrawShapeAtXY(shape_descriptor shape, short x, short y, bool
 	GLfloat V_Offset = TMgr.V_Offset;
 
 	// Draw shape
-	SglColor3f(1.0, 1.0, 1.0); //DCW
-	glEnable(GL_TEXTURE_2D);
+	MSI()->color3f(1.0, 1.0, 1.0);
+	//glEnable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
 	if (transparency) {
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -207,12 +208,12 @@ void HUD_OGL_Class::DrawShapeAtXY(shape_descriptor shape, short x, short y, bool
 		glDisable(GL_BLEND);
 	TMgr.SetupTextureMatrix();
 	TMgr.RenderNormal();
-	
+    
 	OGL_RenderTexturedRect(x, y, width, height,
 						   U_Offset, V_Offset,
 						   U_Offset + U_Scale,
 						   V_Offset + V_Scale);
-
+    
 	TMgr.RestoreTextureMatrix();
 }
 
@@ -244,16 +245,11 @@ void HUD_OGL_Class::DrawTexture(shape_descriptor shape, short texture_type, shor
  *  Draw text
  */
 
-// WZ: Work around some Win32 oddness
-#ifdef DrawText
-#undef DrawText
-#endif
-
 void HUD_OGL_Class::DrawText(const char *text, screen_rectangle *dest, short flags, short font_id, short text_color)
 {
 	// Get color
 	const rgb_color &c = get_interface_color(text_color);
-	SglColor3us(c.red, c.green, c.blue); //DCW
+	SglColor3us(c.red, c.green, c.blue);
 
 	// Get font information
 	FontSpecifier &FontData = get_interface_font(font_id);
@@ -271,8 +267,8 @@ void HUD_OGL_Class::FillRect(screen_rectangle *r, short color_index)
 {
 	// Get color
 	const rgb_color &c = get_interface_color(color_index);
-	SglColor3us(c.red, c.green, c.blue); //DCW
-
+	SglColor3us(c.red, c.green, c.blue);
+    
 	// Draw rectangle
 	OGL_RenderRect(r->left, r->top, r->right - r->left, r->bottom - r->top);
 }
@@ -286,7 +282,7 @@ void HUD_OGL_Class::FrameRect(screen_rectangle *r, short color_index)
 {
 	// Get color
 	const rgb_color &c = get_interface_color(color_index);
-	SglColor3us(c.red, c.green, c.blue); //DCW
+	SglColor3us(c.red, c.green, c.blue);
 
 	// Draw rectangle
 	OGL_RenderFrame(r->left - 1, r->top - 1, r->right - r->left + 2, r->bottom - r->top + 2, 1);
@@ -309,13 +305,13 @@ void HUD_OGL_Class::SetClipPlane(int x, int y, int c_x, int c_y, int radius)
 	GLfloat normal_x = x / blip_dist, normal_y = y / blip_dist;
 	GLfloat tan_pt_x = c_x + normal_x * radius + 0.5, tan_pt_y = c_y + normal_y * radius + 0.5;
 
-	glEnable(GL_CLIP_PLANE0);
+    MSI()->enablePlane(0);
 
 	GLfloat eqn[4] = {
 		-normal_x, -normal_y, 0,
 		normal_x * tan_pt_x + normal_y * tan_pt_y
 	};
-	glClipPlanef(GL_CLIP_PLANE0, eqn);
+	MSI()->clipPlanef(0, eqn);
 }
 
 
@@ -325,7 +321,12 @@ void HUD_OGL_Class::SetClipPlane(int x, int y, int c_x, int c_y, int radius)
 
 void HUD_OGL_Class::DisableClipPlane(void)
 {
-	glDisable(GL_CLIP_PLANE0);
+    MSI()->disablePlane(0);
+}
+
+int HUD_OGL_Class::TextWidth(const char* text, short font_id)
+{
+	return get_interface_font(font_id).TextWidth(text);
 }
 
 #define MESSAGE_AREA_X_OFFSET -9

@@ -37,12 +37,8 @@ Jan 14, 2001 (Loren Petrich):
 
 
 #include "cseries.h"
-
 #include "sdl_fonts.h"
-
-#ifdef HAVE_OPENGL
 #include "OGL_Headers.h"
-#endif
 
 #include <set>
 
@@ -69,8 +65,6 @@ public:
 	short Ascent, Descent, Leading;
 	short Widths[256];
 	
-  bool fontImmutable; //Flag to indicate the iOS font substution hack was used, and this font should no longer update.
-  
 	font_info *Info;
 	
 	// Initialize: call this before calling anything else;
@@ -111,14 +105,13 @@ public:
 	// m_font_registry tracks all active fonts.
 	static void OGL_Register(FontSpecifier *F);
 	static void OGL_Deregister(FontSpecifier *F);
+    
+    // DJB OpenGL Caching Text information, but could use VBO in the future...
+    // No need to use a pad cache, it's always 1!
+    GLfloat WidthCache[256];
+    GLfloat TextureCache[256*8];
+    GLshort VertexCache[256*8];
 	
-  // DJB OpenGL Caching Text information, but could use VBO in the future...
-  // No need to use a pad cache, it's always 1!
-  GLfloat WidthCache[256];
-  GLfloat TextureCache[256*8];
-  GLshort VertexCache[256*8];
-
-  
 #endif
 
 	// Draw text without worrying about OpenGL vs. SDL mode.
@@ -143,8 +136,7 @@ public:
 	short TxtrWidth, TxtrHeight;
 	int GetTxtrSize() {return int(TxtrWidth)*int(TxtrHeight);}
 	GLuint TxtrID;
-	uint32 DispList;
-	static set<FontSpecifier*> *m_font_registry;
+	static std::set<FontSpecifier*> *m_font_registry;
 #endif
 };
 

@@ -23,34 +23,37 @@
 	Uniform header for all Aleph One OpenGL users
 */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#ifdef HAVE_OPENGL
+
 #ifdef __WIN32__
-
-#define GLEW_STATIC 1
-#include <GL/glew.h>
-
+#include <glad/glad.h>
 #else
 
+#ifdef __APPLE__
 #ifndef GL_GLEXT_PROTOTYPES
 #define GL_GLEXT_PROTOTYPES 1
 #endif
 
-#include "SDL_opengl.h"
+#include "SDL2/SDL_opengl.h"
 
-
-  //DCW
-#include <OpenGLES/ES1/gl.h>    
+	//DCW
+#include <OpenGLES/ES1/gl.h>
 #include <OpenGLES/ES2/gl.h>
 #include <OpenGLES/ES3/gl.h>
 typedef double GLdouble; //DCW Not defined in GLES
 typedef double GLclampd;  //DCW Not defined in GLES
-#include "SDL_opengl_glext.h" //DCW
-#include "SDL_opengles.h"
+#include "SDL2/SDL_opengl_glext.h" //DCW
+#include "SDL2/SDL_opengles.h"
+#endif
 
+#ifndef __APPLE__
+#include <SDL2/SDL_opengles2.h>
+#endif
 
-#if defined (__APPLE__) && defined(__MACH__)
-//#include <OpenGL/glu.h> //DCW Commenting out for iOS
-#else
-#include <GL/glu.h>
 #endif
 
 #endif

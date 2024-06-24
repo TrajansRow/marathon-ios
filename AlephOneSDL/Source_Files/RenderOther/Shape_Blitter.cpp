@@ -36,6 +36,19 @@ SHAPE_BLITTER.CPP
 #include "OGL_Headers.h"
 #endif
 
+extern bool shapes_file_is_m1();
+static bool shape_is_motion_blip(short collection, short frame_index)
+{
+	if (shapes_file_is_m1())
+	{
+		return (collection == 0 &&
+				((frame_index >= 23 && frame_index <= 34) ||
+				 (frame_index >= 46 && frame_index <= 51)));
+	}
+	return (collection == 0 &&
+			(frame_index >= 12 && frame_index <= 29));
+}
+
 
 Shape_Blitter::Shape_Blitter(short collection, short frame_index, short texture_type, short clut_index) : m_coll(BUILD_COLLECTION(collection, clut_index)), m_frame(frame_index), m_type(texture_type), m_surface(NULL), m_scaled_surface(NULL), tint_color_r(1.0), tint_color_g(1.0), tint_color_b(1.0), tint_color_a(1.0), rotation(0.0)
 {
@@ -91,11 +104,6 @@ int Shape_Blitter::UnscaledHeight()
 	return m_src.h;
 }
 
-void Shape_Blitter::OGL_Draw(const SDL_Rect& dst)
-{
-  Image_Rect idst = { static_cast<float>(dst.x), static_cast<float>(dst.y), static_cast<float>(dst.w), static_cast<float>(dst.h) };
-    OGL_Draw(idst);
-}
 void Shape_Blitter::OGL_Draw(const Image_Rect& dst)
 {
 #ifdef HAVE_OPENGL
@@ -144,7 +152,7 @@ void Shape_Blitter::OGL_Draw(const Image_Rect& dst)
 		Using_sRGB = true;
 	}
 	SglColor4f(tint_color_r, tint_color_g, tint_color_b, tint_color_a);
-	glEnable(GL_TEXTURE_2D);
+	//glEnable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	TMgr.SetupTextureMatrix();
@@ -153,11 +161,11 @@ void Shape_Blitter::OGL_Draw(const Image_Rect& dst)
     bool rotating = (rotation > 0.1 || rotation < -0.1);
 	if (rotating)
 	{
-		glMatrixMode(GL_MODELVIEW);
-		glPushMatrix();
-		glTranslatef((dst.x + dst.w/2.0), (dst.y + dst.h/2.0), 0.0);
-		glRotatef(rotation, 0.0, 0.0, 1.0);
-		glTranslatef(-(dst.x + dst.w/2.0), -(dst.y + dst.h/2.0), 0.0);
+		MSI()->matrixMode(MS_MODELVIEW);
+		MSI()->pushMatrix();
+		MSI()->translatef((dst.x + dst.w/2.0), (dst.y + dst.h/2.0), 0.0);
+		MSI()->rotatef(rotation, 0.0, 0.0, 1.0);
+		MSI()->translatef(-(dst.x + dst.w/2.0), -(dst.y + dst.h/2.0), 0.0);
 	}
 
     if (m_type == Shape_Texture_Interface)
@@ -218,31 +226,30 @@ void Shape_Blitter::OGL_Draw(const Image_Rect& dst)
         if (crop_rect.h < m_scaled_src.h)
             U_Scale *= crop_rect.h / static_cast<double>(m_scaled_src.h);
 
-      // DJB OpenGL  Change from triangle fan
-      GLfloat t[8] = {
-        U_Offset, V_Offset,
-        U_Offset + U_Scale, V_Offset,
-        U_Offset + U_Scale, V_Offset + V_Scale,
-        U_Offset, V_Offset + V_Scale
-      };
-      GLshort v[8] = {
-        static_cast<GLshort>(dst.x), static_cast<GLshort>(dst.y),
-        static_cast<GLshort>(dst.x + dst.w), static_cast<GLshort>(dst.y),
-        static_cast<GLshort>(dst.x + dst.w), static_cast<GLshort>(dst.y + dst.h),
-        static_cast<GLshort>(dst.x), static_cast<GLshort>(dst.y + dst.h)
-      };
-      glVertexPointer(2, GL_SHORT, 0, v);
-      glEnableClientState(GL_VERTEX_ARRAY);
-      glTexCoordPointer(2, GL_FLOAT, 0, t);
-      glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-      glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-
-      /*
-		GLfloat texcoords[8] = {
-			U_Offset, V_Offset,
-			U_Offset, V_Offset + V_Scale,
-			U_Offset + U_Scale, V_Offset + V_Scale,
-			U_Offset + U_Scale, V_Offset
+        // DJB OpenGL  Change from triangle fan
+        GLfloat t[8] = {
+          U_Offset, V_Offset,
+          U_Offset + U_Scale, V_Offset,
+          U_Offset + U_Scale, V_Offset + V_Scale,
+          U_Offset, V_Offset + V_Scale
+        };
+        GLshort v[8] = {
+          static_cast<GLshort>(dst.x), static_cast<GLshort>(dst.y),
+          static_cast<GLshort>(dst.x + dst.w), static_cast<GLshort>(dst.y),
+          static_cast<GLshort>(dst.x + dst.w), static_cast<GLshort>(dst.y + dst.h),
+          static_cast<GLshort>(dst.x), static_cast<GLshort>(dst.y + dst.h)
+        };
+        //glVertexPointer(2, GL_SHORT, 0, v);
+        //glEnableClientState(GL_VERTEX_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
+        //glTexCoordPointer(2, GL_FLOAT, 0, t);
+        //glEnableClientState(GL_TEXTURE_COORD_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        
+		/*GLfloat texcoords[8] = {
+			GLfloat(U_Offset),           GLfloat(V_Offset),
+			GLfloat(U_Offset),           GLfloat(V_Offset + V_Scale),
+			GLfloat(U_Offset + U_Scale), GLfloat(V_Offset + V_Scale),
+			GLfloat(U_Offset + U_Scale), GLfloat(V_Offset)
 		};
 		GLfloat vertices[8] = {
 			dst.x, dst.y,
@@ -256,7 +263,7 @@ void Shape_Blitter::OGL_Draw(const Image_Rect& dst)
 	}
     
     if (rotating)
-        glPopMatrix();
+        MSI()->popMatrix();
     
 	if (TMgr.IsGlowMapped()) TMgr.RenderGlowing();
 	TMgr.RestoreTextureMatrix();
@@ -296,12 +303,6 @@ SDL_Surface *flip_surface(SDL_Surface *s, int width, int height)
 	return s2;
 }	
 
-void Shape_Blitter::SDL_Draw(SDL_Surface *dst_surface, const SDL_Rect& dst)
-{
-  Image_Rect idst = { static_cast<float>(dst.x), static_cast<float>(dst.y), static_cast<float>(dst.w), static_cast<float>(dst.h) };
-    SDL_Draw(dst_surface, idst);
-}
-
 void Shape_Blitter::SDL_Draw(SDL_Surface *dst_surface, const Image_Rect& dst)
 {
     if (!dst_surface)
@@ -322,7 +323,7 @@ void Shape_Blitter::SDL_Draw(SDL_Surface *dst_surface, const Image_Rect& dst)
             free(pixelsOut);
             pixelsOut = NULL;
         }
-        else if (m_coll == 0 && m_frame >= 12 && m_frame <= 29)
+        else if (shape_is_motion_blip(m_coll, m_frame))
         {
             // fix transparency on motion sensor blips
             SDL_SetColorKey(tmp, SDL_TRUE, 0);
@@ -330,7 +331,10 @@ void Shape_Blitter::SDL_Draw(SDL_Surface *dst_surface, const Image_Rect& dst)
             SDL_FreeSurface(tmp);
         }
         else
-            m_surface = tmp;
+		{
+			m_surface = SDL_ConvertSurfaceFormat(tmp, SDL_PIXELFORMAT_BGRA8888, 0);
+			SDL_FreeSurface(tmp);
+		}
     }
     if (!m_surface)
         return;
@@ -368,8 +372,8 @@ void Shape_Blitter::SDL_Draw(SDL_Surface *dst_surface, const Image_Rect& dst)
     if (!m_scaled_surface)
         return;
     
-  SDL_Rect r = { static_cast<int>(crop_rect.x), static_cast<int>(crop_rect.y), static_cast<int>(crop_rect.w), static_cast<int>(crop_rect.h) };
-  SDL_Rect sdst = { static_cast<int>(dst.x), static_cast<int>(dst.y), static_cast<int>(dst.w), static_cast<int>(dst.h) };
+	SDL_Rect r = { int(crop_rect.x), int(crop_rect.y), int(crop_rect.w), int(crop_rect.h) };
+	SDL_Rect sdst = { int(dst.x), int(dst.y), int(dst.w), int(dst.h) };
 	SDL_BlitSurface(m_scaled_surface, &r, dst_surface, &sdst);
 }
 

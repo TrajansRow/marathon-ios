@@ -81,6 +81,7 @@ Apr 10, 2003 (Woody Zenfell):
 #include "game_wad.h" // get_map_file
 
 #include <map>
+#include <functional>
 
 // For LAN netgame location services
 #include	<sstream>
@@ -95,8 +96,6 @@ Apr 10, 2003 (Woody Zenfell):
 #include "screen.h"
 #include "SoundManager.h"
 #include "progress.h"
-
-#include "AlephOneHelper.h"
 
 
 extern void NetRetargetJoinAttempts(const IPaddress* inAddress);
@@ -192,20 +191,21 @@ bool network_gather(bool inResumingGame)
 	game_info myGameInfo;
 	player_info myPlayerInfo;
 	bool advertiseOnMetaserver = false;
+	bool outUpnpPortForward = false;
 
 	show_cursor(); // JTP: Hidden one way or another
-	if (network_game_setup(&myPlayerInfo, &myGameInfo, inResumingGame, advertiseOnMetaserver))
+	if (network_game_setup(&myPlayerInfo, &myGameInfo, inResumingGame, advertiseOnMetaserver, outUpnpPortForward))
 	{
 		myPlayerInfo.desired_color= myPlayerInfo.color;
-		memcpy(myPlayerInfo.long_serial_number, serial_preferences->long_serial_number, LONG_SERIAL_NUMBER_LENGTH);
+		memset(myPlayerInfo.long_serial_number, 0, LONG_SERIAL_NUMBER_LENGTH);
 		
-		auto_ptr<GameAvailableMetaserverAnnouncer> metaserverAnnouncer;
+		std::unique_ptr<GameAvailableMetaserverAnnouncer> metaserverAnnouncer;
 		if(NetEnter())
 		{
 			bool gather_dialog_result;
 		
 			if(NetGather(&myGameInfo, sizeof(game_info), (void*) &myPlayerInfo, 
-				sizeof(myPlayerInfo), inResumingGame))
+				sizeof(myPlayerInfo), inResumingGame, outUpnpPortForward))
 			{
 				GathererAvailableAnnouncer announcer;
 				
@@ -309,16 +309,16 @@ bool GatherDialog::GatherNetworkGameByRunning ()
 	chat_choice_labels.push_back ("with Internet players");
 	m_chatChoiceWidget->set_labels (chat_choice_labels);
 
-	m_cancelWidget->set_callback(boost::bind(&GatherDialog::Stop, this, false));
-	m_startWidget->set_callback(boost::bind(&GatherDialog::StartGameHit, this));
-	m_ungatheredWidget->SetItemSelectedCallback(boost::bind(&GatherDialog::gathered_player, this, _1));
+	m_cancelWidget->set_callback(std::bind(&GatherDialog::Stop, this, false));
+	m_startWidget->set_callback(std::bind(&GatherDialog::StartGameHit, this));
+	m_ungatheredWidget->SetItemSelectedCallback(std::bind(&GatherDialog::gathered_player, this, std::placeholders::_1));
 
 	m_startWidget->deactivate ();
 	
 	NetSetGatherCallbacks(this);
 	
-	m_chatChoiceWidget->set_callback(boost::bind(&GatherDialog::chatChoiceHit, this));
-	m_chatEntryWidget->set_callback(boost::bind(&GatherDialog::chatTextEntered, this, _1));
+	m_chatChoiceWidget->set_callback(std::bind(&GatherDialog::chatChoiceHit, this));
+	m_chatEntryWidget->set_callback(std::bind(&GatherDialog::chatTextEntered, this, std::placeholders::_1));
 	
 	gPregameChatHistory.clear ();
 	NetSetChatCallbacks(this);
@@ -360,7 +360,7 @@ void GatherDialog::idle ()
 	}
 	
 	if (m_autogatherWidget->get_value ()) {
-		map<int, prospective_joiner_info>::iterator it;
+		std::map<int, prospective_joiner_info>::iterator it;
 		it = m_ungathered_players.begin ();
 		while (it != m_ungathered_players.end () && NetGetNumberOfPlayers() < MAXIMUM_NUMBER_OF_PLAYERS) {
 			gathered_player ((it++)->second);
@@ -372,7 +372,7 @@ void GatherDialog::update_ungathered_widget ()
 {
 	vector<prospective_joiner_info> temp;
 
-	for (map<int, prospective_joiner_info>::iterator it = m_ungathered_players.begin (); it != m_ungathered_players.end (); ++it)
+	for (std::map<int, prospective_joiner_info>::iterator it = m_ungathered_players.begin (); it != m_ungathered_players.end (); ++it)
 		temp.push_back ((*it).second);
 	
 	m_ungatheredWidget->SetItems (temp);
@@ -405,7 +405,7 @@ bool GatherDialog::gathered_player (const prospective_joiner_info& player)
 
 void GatherDialog::StartGameHit ()
 {
-	for (map<int, prospective_joiner_info>::iterator it = m_ungathered_players.begin (); it != m_ungathered_players.end (); ++it)
+	for (std::map<int, prospective_joiner_info>::iterator it = m_ungathered_players.begin (); it != m_ungathered_players.end (); ++it)
 		NetHandleUngatheredPlayer ((*it).second);
 	
 	Stop (true);
@@ -413,19 +413,9 @@ void GatherDialog::StartGameHit ()
 
 void GatherDialog::JoinSucceeded(const prospective_joiner_info* player)
 {
-  if (NetGetNumberOfPlayers () > 1) {
+	if (NetGetNumberOfPlayers () > 1)
 		m_startWidget->activate ();
-  }
 	
-  if(shouldAutoBot()) {
-    if (NetGetNumberOfPlayers () <= 2) {
-      m_chatEntryWidget->set_text("You are the only human here! Wait for some real players, then type GO to start a game.");
-    } else {
-      m_chatEntryWidget->set_text("Yo Dawg! Wait here for more players, or type GO to start a game.");
-    }
-    sendChat();
-  }
-  
 	m_pigWidget->redraw ();
 
 	if (gMetaserverClient->isConnected())
@@ -436,7 +426,7 @@ void GatherDialog::JoinSucceeded(const prospective_joiner_info* player)
 
 void GatherDialog::JoiningPlayerDropped(const prospective_joiner_info* player)
 {
-	map<int, prospective_joiner_info>::iterator it = m_ungathered_players.find (player->stream_id);
+	std::map<int, prospective_joiner_info>::iterator it = m_ungathered_players.find (player->stream_id);
 	if (it != m_ungathered_players.end ())
 		m_ungathered_players.erase (it);
 	
@@ -497,12 +487,6 @@ void GatherDialog::ReceivedMessageFromPlayer(
 	e.message = message;
 
 	gPregameChatHistory.append(e);
-
-  if( shouldAutoBot() && (e.message.compare("go") == 0 || e.message.compare("Go") == 0 || e.message.compare ("GO") == 0) ){
-    doOkOnNextDialog(1);
-    printf("GOT A GO!\n");
-  }
-  
 }
 
 /****************************************************
@@ -586,15 +570,15 @@ const int JoinDialog::JoinNetworkGameByRunning ()
 	m_colourWidget->set_labels (kTeamColorsStringSetID);
 	m_teamWidget->set_labels (kTeamColorsStringSetID);
 	
-	m_cancelWidget->set_callback(boost::bind(&JoinDialog::Stop, this));
-	m_joinWidget->set_callback(boost::bind(&JoinDialog::attemptJoin, this));
-	m_joinMetaserverWidget->set_callback(boost::bind(&JoinDialog::getJoinAddressFromMetaserver, this));
+	m_cancelWidget->set_callback(std::bind(&JoinDialog::Stop, this));
+	m_joinWidget->set_callback(std::bind(&JoinDialog::attemptJoin, this));
+	m_joinMetaserverWidget->set_callback(std::bind(&JoinDialog::getJoinAddressFromMetaserver, this));
 	
 	m_chatChoiceWidget->set_value (kPregameChat);
 	m_chatChoiceWidget->deactivate ();
 	m_chatEntryWidget->deactivate ();
-	m_chatChoiceWidget->set_callback(boost::bind(&JoinDialog::chatChoiceHit, this));
-	m_chatEntryWidget->set_callback(boost::bind(&JoinDialog::chatTextEntered, this, _1));
+	m_chatChoiceWidget->set_callback(std::bind(&JoinDialog::chatChoiceHit, this));
+	m_chatEntryWidget->set_callback(std::bind(&JoinDialog::chatTextEntered, this, std::placeholders::_1));
 	
 	getcstr(temporary, strJOIN_DIALOG_MESSAGES, _join_dialog_welcome_string);
 	m_messagesWidget->set_text(temporary);
@@ -605,13 +589,7 @@ const int JoinDialog::JoinNetworkGameByRunning ()
 	binders.insert<bool> (m_joinByAddressWidget, &joinByAddressPref);
 	
 	CStringPref namePref (player_preferences->name, MAX_NET_PLAYER_NAME_LENGTH);
-  
-  //DCW if we get a generic mobile name from the system, replace it with something random.
-  if(strcmp(player_preferences->name, "mobile") == 0){
-    namePref.bind_import(randomName31());
-  }
-  
-  binders.insert<std::string> (m_nameWidget, &namePref);
+	binders.insert<std::string> (m_nameWidget, &namePref);
 	Int16Pref colourPref (player_preferences->color);
 	binders.insert<int> (m_colourWidget, &colourPref);
 	Int16Pref teamPref (player_preferences->team);
@@ -741,8 +719,8 @@ void JoinDialog::gathererSearch ()
 					m_teamWidget->activate ();
 				}
 				m_colourWidget->activate ();
-				m_colourWidget->set_callback(boost::bind(&JoinDialog::changeColours, this));
-				m_teamWidget->set_callback(boost::bind(&JoinDialog::changeColours, this));
+				m_colourWidget->set_callback(std::bind(&JoinDialog::changeColours, this));
+				m_teamWidget->set_callback(std::bind(&JoinDialog::changeColours, this));
 			}
 			m_pigWidget->redraw ();
 			join_result = kNetworkJoinFailedJoined;
@@ -800,7 +778,7 @@ void JoinDialog::getJoinAddressFromMetaserver ()
 		char message[1024];
 		if (e.code() == MetaserverClient::LoginDeniedException::BadUserOrPassword)
 		{
-			strncpy(message, "Login denied: bad MeatServer username or password. Please check your preferences.", 1024);
+			strncpy(message, "Login denied: bad username or password.", 1024);
 		}
 		else if (e.code() == MetaserverClient::LoginDeniedException::UserAlreadyLoggedIn)
 		{
@@ -877,9 +855,10 @@ bool network_game_setup(
 	player_info *player_information,
 	game_info *game_information,
 	bool ResumingGame,
-	bool& outAdvertiseGameOnMetaserver)
+	bool& outAdvertiseGameOnMetaserver,
+	bool& outUpnpPortForward)
 {
-	if (SetupNetgameDialog::Create ()->SetupNetworkGameByRunning (player_information, game_information, ResumingGame, outAdvertiseGameOnMetaserver)) {
+	if (SetupNetgameDialog::Create ()->SetupNetworkGameByRunning (player_information, game_information, ResumingGame, outAdvertiseGameOnMetaserver, outUpnpPortForward)) {
 		write_preferences ();
 		return true;
 	} else {
@@ -1048,9 +1027,6 @@ SetupNetgameDialog::~SetupNetgameDialog ()
 	delete m_useScriptWidget;
 	delete m_scriptWidget;
 	
-	delete m_allowMicWidget;
-  delete m_detectDesyncWidget;
-  
 	delete m_liveCarnageWidget;
 	delete m_motionSensorWidget;
 	
@@ -1069,7 +1045,8 @@ bool SetupNetgameDialog::SetupNetworkGameByRunning (
 	player_info *player_information,
 	game_info *game_information,
 	bool resuming_game,
-	bool& outAdvertiseGameOnMetaserver)
+	bool& outAdvertiseGameOnMetaserver,
+	bool& outUpnpPortForward)
 {
 	int32 entry_flags;
 
@@ -1142,12 +1119,6 @@ bool SetupNetgameDialog::SetupNetworkGameByRunning (
 	BinderSet binders;
 	
 	CStringPref namePref (player_preferences->name, MAX_NET_PLAYER_NAME_LENGTH);
-  
-  //DCW if we get a generic mobile name from the system, replace it with something random.
-  if(strcmp(player_preferences->name, "mobile") == 0){
-    namePref.bind_import(randomName31());
-  }
-  
 	binders.insert<std::string> (m_nameWidget, &namePref);
 	Int16Pref colourPref (player_preferences->color);
 	binders.insert<int> (m_colourWidget, &colourPref);
@@ -1185,12 +1156,6 @@ bool SetupNetgameDialog::SetupNetworkGameByRunning (
 	BoolPref useMetaserverPref (active_network_preferences->advertise_on_metaserver);
 	binders.insert<bool> (m_useMetaserverWidget, &useMetaserverPref);
 	
-	BoolPref allowMicPref (active_network_preferences->allow_microphone);
-	binders.insert<bool> (m_allowMicWidget, &allowMicPref);
-  
-  BoolPref detectDesyncPref (active_network_preferences->detect_desync);
-  binders.insert<bool> (m_detectDesyncWidget, &detectDesyncPref);
-	
 	BitPref liveCarnagePref (active_network_preferences->game_options, _live_network_stats);
 	binders.insert<bool> (m_liveCarnageWidget, &liveCarnagePref);
 	BitPref motionSensorPref (active_network_preferences->game_options, _motion_sensor_does_not_work);
@@ -1213,21 +1178,23 @@ bool SetupNetgameDialog::SetupNetworkGameByRunning (
 	binders.insert<bool> (m_useScriptWidget, &useScriptPref);
 	FilePref scriptPref (active_network_preferences->netscript_file);
 	binders.insert<FileSpecifier> (m_scriptWidget, &scriptPref);
-	
+
+#ifdef HAVE_MINIUPNPC
 	BoolPref useUpnpPref (active_network_preferences->attempt_upnp);
 	binders.insert<bool> (m_useUpnpWidget, &useUpnpPref);
+#endif
 
 	LatencyTolerancePref latencyTolerancePref (hub_get_minimum_send_period());
 	binders.insert<int> (m_latencyToleranceWidget, &latencyTolerancePref);
 
 	binders.migrate_all_second_to_first ();
 	
-	m_cancelWidget->set_callback (boost::bind (&SetupNetgameDialog::Stop, this, false));
-	m_okWidget->set_callback (boost::bind (&SetupNetgameDialog::okHit, this));
-	m_limitTypeWidget->set_callback (boost::bind (&SetupNetgameDialog::limitTypeHit, this));
-	m_allowTeamsWidget->set_callback (boost::bind (&SetupNetgameDialog::teamsHit, this));
-	m_gameTypeWidget->set_callback (boost::bind (&SetupNetgameDialog::gameTypeHit, this));
-	m_mapWidget->set_callback (boost::bind (&SetupNetgameDialog::chooseMapHit, this));
+	m_cancelWidget->set_callback (std::bind (&SetupNetgameDialog::Stop, this, false));
+	m_okWidget->set_callback (std::bind (&SetupNetgameDialog::okHit, this));
+	m_limitTypeWidget->set_callback (std::bind (&SetupNetgameDialog::limitTypeHit, this));
+	m_allowTeamsWidget->set_callback (std::bind (&SetupNetgameDialog::teamsHit, this));
+	m_gameTypeWidget->set_callback (std::bind (&SetupNetgameDialog::gameTypeHit, this));
+	m_mapWidget->set_callback (std::bind (&SetupNetgameDialog::chooseMapHit, this));
 
 	setupForGameType ();
 
@@ -1279,7 +1246,7 @@ bool SetupNetgameDialog::SetupNetworkGameByRunning (
 		strncpy (game_information->level_name, entry.level_name, MAX_LEVEL_NAME_LENGTH+1);
 		game_information->parent_checksum = read_wad_file_checksum(get_map_file());
 		game_information->difficulty_level = active_network_preferences->difficulty_level;
-		game_information->allow_mic = active_network_preferences->allow_microphone;
+		game_information->allow_mic = false;
 
 		int updates_per_packet = 1;
 		int update_latency = 0;
@@ -1329,6 +1296,7 @@ bool SetupNetgameDialog::SetupNetworkGameByRunning (
 		game_information->cheat_flags = active_network_preferences->cheat_flags;
 
 		outAdvertiseGameOnMetaserver = active_network_preferences->advertise_on_metaserver;
+		outUpnpPortForward = active_network_preferences->attempt_upnp;
 
 		//if(shouldUseNetscript)
 		//{
@@ -1336,7 +1304,7 @@ bool SetupNetgameDialog::SetupNetworkGameByRunning (
 			// but that means prefs reading/writing have to be reworked instead
 		//	strncpy(network_preferences->netscript_file, theNetscriptFile.GetPath(), sizeof(network_preferences->netscript_file));
 		//}
-    
+		
 		return true;
 
 	} else // dialog was cancelled
@@ -1483,9 +1451,6 @@ bool SetupNetgameDialog::informationIsAcceptable ()
 		if (game_limit_type == duration_time_limit)
 		{
 			information_is_acceptable = m_timeLimitWidget->get_value () >= 1;
-      #if defined(A1DEBUG)
-      information_is_acceptable = TRUE; //Anything goes in Debug mode!
-      #endif
 		}
 		
 	if (information_is_acceptable)
@@ -2376,13 +2341,11 @@ send_text_fake(w_text_entry* te) {
 }
 #endif // NETWORK_TWO_WAY_CHAT
 
-#include "AlephOneHelper.h"
-
 // Here's the main entry point for thgametypee postgame carnage report.
 void display_net_game_stats(void)
 {
-  switchToSDLMenu(); //DCW
-  
+//printf("display_net_game_stats\n");
+
 	if (gMetaserverClient) 
 	{
 		gMetaserverClient->announceGameDeleted();
@@ -2445,10 +2408,7 @@ void display_net_game_stats(void)
     }
     
     d.set_widget_placer(placer);
-  
-  if( !shouldAutoBot()) {
     d.run();
-  }
 }
 
 class SdlGatherDialog : public GatherDialog
@@ -2467,9 +2427,8 @@ public:
 	
 		horizontal_placer *autogather_placer = new horizontal_placer(get_theme_space(ITEM_WIDGET), true);
 		w_toggle* autogather_w = new w_toggle(false);
-//		autogather_placer->dual_add(autogather_w->label("Auto-Gather"), m_dialog);
-    autogather_placer->dual_add(autogather_w->label(LANIP("Local IP: ", "           Auto-Gather:")), m_dialog);
-    autogather_placer->dual_add(autogather_w, m_dialog);
+		autogather_placer->dual_add(autogather_w->label("Auto-Gather"), m_dialog);
+		autogather_placer->dual_add(autogather_w, m_dialog);
 
 		placer->add(autogather_placer, true);
 		placer->add(new w_spacer(), true);
@@ -2497,7 +2456,7 @@ public:
 
 		w_chat_entry* chatentry_w = new w_chat_entry(240);
 		chatentry_w->enable_mac_roman_input();
-    
+
 		horizontal_placer *say_placer = new horizontal_placer;
 		say_placer->dual_add(chatentry_w->label("Say:"), m_dialog);
 		say_placer->add_flags(placeable::kFill);
@@ -2525,7 +2484,7 @@ public:
 	
 	virtual bool Run ()
 	{
-		m_dialog.set_processing_function (boost::bind(&SdlGatherDialog::idle, this));
+		m_dialog.set_processing_function (std::bind(&SdlGatherDialog::idle, this));
 		return (m_dialog.run() == 0);
 	}
 	
@@ -2541,10 +2500,10 @@ private:
 	dialog m_dialog;
 };
 
-auto_ptr<GatherDialog>
+std::unique_ptr<GatherDialog>
 GatherDialog::Create()
 {
-	return auto_ptr<GatherDialog>(new SdlGatherDialog);
+	return std::unique_ptr<GatherDialog>(new SdlGatherDialog);
 }
 
 extern struct color_table *build_8bit_system_color_table(void);
@@ -2620,7 +2579,7 @@ public:
 
 		w_players_in_game2* players_w = new w_players_in_game2(false);
 		postjoin_placer->dual_add(players_w, m_dialog);
-    
+
 		horizontal_placer *chat_choice_placer = new horizontal_placer;
 
 		w_select_popup* chat_choice_w = new w_select_popup();
@@ -2635,7 +2594,7 @@ public:
 		chatentry_w = new w_chat_entry(240);
 		chatentry_w->enable_mac_roman_input();
 
-    horizontal_placer *say_placer = new horizontal_placer;
+		horizontal_placer *say_placer = new horizontal_placer;
 		say_placer->dual_add(chatentry_w->label("Say:"), m_dialog);
 		say_placer->add_flags(placeable::kFill);
 		say_placer->dual_add(chatentry_w, m_dialog);
@@ -2680,7 +2639,7 @@ public:
 
 	virtual void Run ()
 	{
-		m_dialog.set_processing_function (boost::bind(&SdlJoinDialog::gathererSearch, this));
+		m_dialog.set_processing_function (std::bind(&SdlJoinDialog::gathererSearch, this));
 		m_dialog.run();
 	}
 	
@@ -2713,10 +2672,10 @@ private:
 	dialog m_dialog;
 };
 
-auto_ptr<JoinDialog>
+std::unique_ptr<JoinDialog>
 JoinDialog::Create()
 {
-	return auto_ptr<JoinDialog>(new SdlJoinDialog);
+	return std::unique_ptr<JoinDialog>(new SdlJoinDialog);
 }
 
 class SdlSetupNetgameDialog : public SetupNetgameDialog
@@ -2753,28 +2712,21 @@ public:
 		right_placer->dual_add(new w_static_text("Network"), m_dialog);
 		table_placer *network_table = new table_placer(2, get_theme_space(ITEM_WIDGET));
 		network_table->col_flags(1, placeable::kAlignLeft);
-    
+
 		w_toggle *advertise_on_metaserver_w = new w_toggle (sAdvertiseGameOnMetaserver);
+		network_table->dual_add(advertise_on_metaserver_w, m_dialog);
+		network_table->dual_add(advertise_on_metaserver_w->label("Advertise Game on Internet"), m_dialog);
 
-    if(shouldAutoBot()) {
-      network_table->dual_add(advertise_on_metaserver_w, m_dialog);
-      network_table->dual_add(advertise_on_metaserver_w->label("Advertise Game on Internet"), m_dialog);
-    }
-
+#ifdef HAVE_MINIUPNPC
 		w_toggle *use_upnp_w = new w_toggle (true);
-#ifndef MAC_APP_STORE
+#else
+		w_toggle *use_upnp_w = new w_toggle(false);
+#endif
 		network_table->dual_add(use_upnp_w, m_dialog);
 		network_table->dual_add(use_upnp_w->label("Configure UPnP Router"), m_dialog);
+#ifndef HAVE_MINIUPNPC
+		use_upnp_w->set_enabled(false);
 #endif
-
-		w_toggle* realtime_audio_w = new w_toggle(network_preferences->allow_microphone);
-		network_table->dual_add(realtime_audio_w, m_dialog);
-		network_table->dual_add(realtime_audio_w->label("Allow Microphone"), m_dialog);
-    
-    w_toggle* detect_desync_w = new w_toggle(network_preferences->detect_desync);
-    network_table->dual_add(detect_desync_w, m_dialog);
-    network_table->dual_add(detect_desync_w->label("Detect Out-Of-Sync Players"), m_dialog);
-
 
 		w_select_popup *latency_tolerance_w = new w_select_popup();
 		horizontal_placer *latency_placer = new horizontal_placer(get_theme_space(ITEM_WIDGET));
@@ -2954,9 +2906,6 @@ public:
 		m_useScriptWidget = new ToggleWidget (use_netscript_w);
 		m_scriptWidget = new FileChooserWidget (choose_script_w);
 	
-		m_allowMicWidget = new ToggleWidget (realtime_audio_w);
-    m_detectDesyncWidget = new ToggleWidget (detect_desync_w);
-
 		m_liveCarnageWidget = new ToggleWidget (live_w);
 		m_motionSensorWidget = new ToggleWidget (sensor_w);
 	
@@ -2973,7 +2922,7 @@ public:
 	
 	virtual bool Run ()
 	{		
-		return (m_dialog.run () == 0 );
+		return (m_dialog.run () == 0);
 	}
 
 	virtual void Stop (bool result)
@@ -2998,10 +2947,10 @@ private:
 	dialog m_dialog;
 };
 
-auto_ptr<SetupNetgameDialog>
+std::unique_ptr<SetupNetgameDialog>
 SetupNetgameDialog::Create ()
 {
-	return auto_ptr<SetupNetgameDialog>(new SdlSetupNetgameDialog);
+	return std::unique_ptr<SetupNetgameDialog>(new SdlSetupNetgameDialog);
 }
 
 // This should really be done better, I guess, but most people will never see it long enough to read it.
@@ -3150,7 +3099,7 @@ bool network_gather(void) {
 	game_information.initial_random_seed= network_game_info->initial_random_seed;
 	game_information.difficulty_level= network_game_info->difficulty_level;
 
-      display_net_game_stats_helper();//display_net_game_stats();
+    display_net_game_stats();
     } // if setup box was OK'd
     return false;
 }

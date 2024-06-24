@@ -55,7 +55,6 @@
 #include "WindowedNthElementFinder.h"
 #include "CircularByteBuffer.h"
 #include "InfoTree.h"
-#include "SDL_timer.h" // SDL_Delay()
 
 #include <vector>
 #include <map>
@@ -63,13 +62,22 @@
 #include <deque>
 #include <numeric>
 #include <cmath>
-#include <fstream>
-#include <iomanip>
 
 #include "crc.h"
 #include "player.h" // for masking out action flags triggers :(
-#include "shell.h" //only for doing screen_printf
-#include "preferences.h"
+
+#define DEBUG_TIMING_ADJUSTMENTS
+
+#ifdef DEBUG_TIMING_ADJUSTMENTS
+#include "FileHandler.h"
+#include <ctime>
+#include <sstream>
+#include <iomanip>
+#include <boost/iostreams/stream.hpp>
+static OpenedFile dout_file;
+static boost::iostreams::stream<opened_file_device> dout;
+static bool debug_timing_adjustments = false;
+#endif
 
 // Synchronization:
 // hub_received_network_packet() is not reentrant
@@ -167,19 +175,6 @@ struct HubPreferences {
 
 static HubPreferences sHubPreferences;
 
-  //The number of ticks to wait for position sum verfication. The player gets a desync strike if position is not verified upon wraparound.
-#define numPositionSnapshots 100
-
-struct positionSumSnapshot {
-  int32 positionSum[8];
-};
-static positionSumSnapshot positionRecords[numPositionSnapshots];
-static int currentSnapshotIndex;
-static bool playerIsOutOfSync[8];
-static int32 positionOfInterest[8];
-static int32 desyncCountdown[8];
-static int32 desyncStrikes[8];
-
 int32& hub_get_minimum_send_period() { return sHubPreferences.mMinimumSendPeriod; }
 
 void hub_set_minimum_send_period(int32 new_minimum) { sHubPreferences.mMinimumSendPeriod = new_minimum; }
@@ -248,7 +243,7 @@ struct NetworkPlayer_hub {
 
 	// latency stuff
 	int32 mLatencyTicks; // sum of the latency ticks from the last second
-	deque<int32> mLatencyBuffer;
+	std::deque<int32> mLatencyBuffer;
 
 	NetworkStats mStats;
 };
@@ -348,9 +343,6 @@ static void hub_check_for_completion();
 static void player_acknowledged_up_to_tick(size_t inPlayerIndex, int32 inSmallestUnacknowledgedTick);
 static bool player_provided_flags_from_tick_to_tick(size_t inPlayerIndex, int32 inFirstNewTick, int32 inSmallestUnreceivedTick);
 static void hub_received_game_data_packet_v1(AIStream& ps, int inSenderIndex);
-static void hub_received_position_sync_packet(AIStream& ps, int inSenderIndex);
-static void reset_position_sums();
-static void playerReportedPositionSum(int32 inSenderIndex, int32 positionSum);
 static void hub_received_identification_packet(AIStream& ps, NetAddrBlock address);
 static void hub_received_ping_request(AIStream& ps, NetAddrBlock address);
 static void hub_received_ping_response(AIStream& ps, NetAddrBlock address);
@@ -430,16 +422,6 @@ check_send_packet_to_spoke()
 #define INT32_MAX 0x7fffffff
 #endif
 
-#define DEBUG_TIMING_ADJUSTMENTS
-
-#ifdef DEBUG_TIMING_ADJUSTMENTS
-#include "FileHandler.h"
-#include <ctime>
-#include <sstream>
-std::ofstream dout;
-bool debug_timing_adjustments = false;
-#endif
-
 void
 hub_initialize(int32 inStartingTick, size_t inNumPlayers, const NetAddrBlock* const* inPlayerAddresses, size_t inLocalPlayerIndex)
 {
@@ -466,10 +448,14 @@ hub_initialize(int32 inStartingTick, size_t inNumPlayers, const NetAddrBlock* co
 		ss << buffer << "_" << inNumPlayers << "P.txt";
 
 		fs.AddPart(ss.str());
-		dout.open(fs.GetPath());
-		dout << "Players: " << inNumPlayers << std::endl;
-		dout << "Latency Tolerance: " << sHubPreferences.mMinimumSendPeriod << std::endl;
-		debug_timing_adjustments = true;
+		
+		if (fs.OpenForWritingText(dout_file))
+		{
+			dout.open(dout_file);
+			dout << "Players: " << inNumPlayers << std::endl;
+			dout << "Latency Tolerance: " << sHubPreferences.mMinimumSendPeriod << std::endl;
+			debug_timing_adjustments = true;
+		}
 	}
 	else
 	{
@@ -510,8 +496,6 @@ hub_initialize(int32 inStartingTick, size_t inNumPlayers, const NetAddrBlock* co
 	sOutgoingLossyByteStreamDescriptors.reset();
 	sOutgoingLossyByteStreamData.reset();
 
-  reset_position_sums();
-  
         for(size_t i = 0; i < inNumPlayers; i++)
         {
                 NetworkPlayer_hub& thePlayer = sNetworkPlayers[i];
@@ -598,7 +582,8 @@ hub_cleanup(bool inGraceful, int32 inSmallestPostGameTick)
 			while(sHubActive)
 			{
 // Here we try to isolate the "Classic" Mac OS (we can only sleep on the others)
-				SDL_Delay(10);
+				// TODO: replace with a cond?
+				yield();
 			}
 		}
 		else
@@ -633,6 +618,7 @@ hub_cleanup(bool inGraceful, int32 inSmallestPostGameTick)
 		if (debug_timing_adjustments)
 		{
 			dout.close();
+			dout_file.Close();
 		}
 #endif
 	}
@@ -701,9 +687,9 @@ hub_received_network_packet(DDPPacketBufferPtr inPacket)
 			return;
 		}
 		
-    switch(thePacketMagic)
-    {
-      case kSpokeToHubGameDataPacketV1Magic:
+                switch(thePacketMagic)
+                {
+                        case kSpokeToHubGameDataPacketV1Magic:
 			{
 				// Find sender
 				AddressToPlayerIndexType::iterator theEntry = sAddressToPlayerIndex.find(inPacket->sourceAddress);
@@ -728,32 +714,17 @@ hub_received_network_packet(DDPPacketBufferPtr inPacket)
 				hub_received_identification_packet(ps, inPacket->sourceAddress);
 			break;
 
-      case kPingRequestPacket:
-        hub_received_ping_request(ps, inPacket->sourceAddress);
-        break;
+					case kPingRequestPacket:
+						hub_received_ping_request(ps, inPacket->sourceAddress);
+						break;
 						
-      case kPingResponsePacket:
-        hub_received_ping_response(ps, inPacket->sourceAddress);
-      break;
-        
-      case kSpokeToHubPositionSyncSum:
-      {
-        // Find sender
-        AddressToPlayerIndexType::iterator theEntry = sAddressToPlayerIndex.find(inPacket->sourceAddress);
-        if(theEntry == sAddressToPlayerIndex.end())
-          return;
-        
-        int theSenderIndex = theEntry->second;
-        if (getNetworkPlayer(theSenderIndex).mConnected)
-        {
-          hub_received_position_sync_packet(ps, theSenderIndex);
-        }
-      }
-      break;
+					case kPingResponsePacket:
+						hub_received_ping_response(ps, inPacket->sourceAddress);
+						break;
 						
-      default:
+                        default:
 			break;
-    }
+                }
 	}
         catch (...)
 	{
@@ -978,21 +949,21 @@ hub_received_game_data_packet_v1(AIStream& ps, int inSenderIndex)
 				dout << "S";
 				for (int i = 0; i < 20; ++i)
 				{
-					dout << setw(3) 
+					dout << std::setw(3) 
 					     << thePlayer.mNthElementFinder.nth_smallest_element(i)
 					     << " ";
 				}
 				dout << "M";
 				for (int i = kDefaultInGameWindowSize / 2 - 10; i < kDefaultInGameWindowSize / 2 + 10; ++i)
 				{
-					dout << setw(3)
+					dout << std::setw(3)
 					     << thePlayer.mNthElementFinder.nth_smallest_element(i)
 					     << " ";
 				}
 				dout << "L";
 				for (int i = 19; i >= 0; --i)
 				{
-					dout << setw(3)
+					dout << std::setw(3)
 					     << thePlayer.mNthElementFinder.nth_largest_element(i)
 					     << " ";
 				}
@@ -1014,89 +985,6 @@ hub_received_game_data_packet_v1(AIStream& ps, int inSenderIndex)
         }
 } // hub_received_game_data_packet_v1()
 
-static void
-hub_received_position_sync_packet(AIStream& ps, int inSenderIndex)
-{
-  int32 positionSum;
-  ps >> positionSum;
-  
-  playerReportedPositionSum(inSenderIndex, positionSum);
-}
-
-static void
-reset_position_sums()
-{
-  for( int p = 0; p < 8; ++p ) {
-    playerIsOutOfSync[p] = false;
-    positionOfInterest[p] = 0;
-    desyncCountdown[p] = 0;
-    desyncStrikes[p]=0;
-    for(int i = 0; i < numPositionSnapshots; ++i )
-    {
-      positionRecords[i].positionSum[p] = 0;
-    }
-    currentSnapshotIndex=0;
-  }
-}
-
-static void
-playerReportedPositionSum(int32 inSenderIndex, int32 positionSum)
-{
-  if ( !network_preferences->detect_desync )
-    return;
-  
-    //If we currently don't have a position of interest, create one.
-  if ( positionOfInterest[inSenderIndex] == 0 ) {
-    positionOfInterest[inSenderIndex]=positionSum;
-    desyncCountdown[inSenderIndex] = numPositionSnapshots + 3;
-  }
-}
-
-void capture_position_sums_and_check_for_dsync()
-{
-  if ( !network_preferences->detect_desync )
-    return;
-  
-  if ( currentSnapshotIndex >= (numPositionSnapshots-1) ) {
-    currentSnapshotIndex=0;
-  } else {
-    currentSnapshotIndex++;
-  }
-  for( int p = 0; p < sNetworkPlayers.size(); ++p ) {
-    
-      //If a player has a position of interest, check to see if that is in the buffer before overwriting. If the countdown expires, the player is out-of-sync.
-      //There is a small chance that the real position sum is zero, and will be wrongly ignored. Who cares?
-    if ( positionOfInterest[p] != 0 ) {
-      if (positionRecords[currentSnapshotIndex].positionSum[p] == positionOfInterest[p] ) {
-          //We verified a position of interest; now clear it and carry on.
-        positionOfInterest[p] = 0;
-        desyncCountdown[p] = 0;
-        logDumpNMT("Player %d verified their location\n", p);
-        desyncStrikes[p]=0;
-      } else {
-        desyncCountdown[p]--;
-        if( desyncCountdown[p] <= 0 ) {
-          logDumpNMT("Player %d got a desync strike for position %d!\n", p, positionOfInterest[p]);
-          
-            //The countdown for this player has expired, and we have not found the reported position of interest. The player is now gets a strike, which might make them out of sync.
-          positionOfInterest[p] = 0;
-          desyncCountdown[p]=0;
-          desyncStrikes[p]++;
-          
-          if(desyncStrikes[p] >= 3) {
-            playerIsOutOfSync[p]=true;
-            screen_printf("%s seems to have gone out of sync!", reinterpret_cast<player_info*>(NetGetPlayerData(p))->name);
-          }
-        }
-      }
-    }
-    
-    player_data *player= get_player_data(p);
-
-    positionRecords[currentSnapshotIndex].positionSum[p] = player->location.x + player->location.y + player->location.z;
-  }
-
-}
 
 static void
 player_acknowledged_up_to_tick(size_t inPlayerIndex, int32 inSmallestUnacknowledgedTick)
@@ -1436,7 +1324,7 @@ hub_tick()
 		}
 		
 	}
-    
+			
 	// if we're getting behind, make up flags
 	
 	if (sHubPreferences.mBandwidthReduction && sPlayerDataDisposition.getReadTick() >= sSmallestRealGameTick)

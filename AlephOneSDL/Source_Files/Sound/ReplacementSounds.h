@@ -34,7 +34,7 @@ class ExternalSoundHeader : public SoundInfo
 public:
 	ExternalSoundHeader() : SoundInfo() { }
 	~ExternalSoundHeader() { }
-	boost::shared_ptr<SoundData> LoadExternal(FileSpecifier& File);
+	std::shared_ptr<SoundData> LoadExternal(FileSpecifier& File);
 };
 
 struct SoundOptions
@@ -47,17 +47,17 @@ class SoundReplacements
 {
 public:
 	static inline SoundReplacements* instance() { 
+		static SoundReplacements *m_instance = nullptr;
 		if (!m_instance) m_instance = new SoundReplacements;
 		return m_instance;
 	}
 
 	SoundOptions *GetSoundOptions(short Index, short Slot);
-	void Reset() { m_hash.clear(); }
+	void Reset();
 	void Add(const SoundOptions& Data, short Index, short Slot);
 
 private:
 	SoundReplacements() { }
-	static SoundReplacements *m_instance;
 
 	typedef std::pair<short, short> key;
 

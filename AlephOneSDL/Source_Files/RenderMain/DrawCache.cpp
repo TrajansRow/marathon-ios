@@ -10,39 +10,47 @@
 #include "OGL_Headers.h"
 #include "OGL_Shader.h"
 #include "MatrixStack.hpp"
+#include "cseries.h"
 #include "screen.h"
+#include "OGL_Model_Def.h"
 
 #include "map.h"
 #include "projectiles.h"
 #include "effects.h"
 
-extern bool shapes_file_is_m1();
-
-    //Caches for texture attributes as set by the texture manager.
-    //These get cleared once drawn or fed into a buffer.
-GLfloat scaleX, offsetX, scaleY, offsetY, bloomScale, bloomShift, flare, selfLuminosity, pulsate, wobble, depth, glow;
-
-
-DrawBuffer drawBuffers[NUM_DRAW_BUFFERS];
-DrawBuffer immediateBuffer; //Used to briefly hold attributes for a single geometry and draw call.
-
-int numLightsInScene;
-GLfloat lightPositions[LIGHTS_MAX * 4]; //Format: x, y, z (location), w (size in world units)
-GLfloat lightColors[LIGHTS_MAX * 4]; //Format: r, g, b, intensity?
-    
-    //The actual data fed into the shader.
-    //Same format as above, but position list must be terminated with a {0,0,0,0} light.
-GLfloat activeLightPositions[(ACTIVE_LIGHTS_MAX+1) * 4];
-GLfloat activeLightColors[ACTIVE_LIGHTS_MAX * 4];
+#include "Logging.h"
 
 bool lastTextureIsLandscape;
+
+	//Main list of dynamic lights
+	//Some lights (like spot lights) take two slots, so actual number of lights may be as few as half of this.
+int numLightsInScene;
+dynamicLight dynamicLights[LIGHTS_MAX];
+int	lightAreaIndices[(LIGHTS_MAX+1) * 4]; //Sparse array holding indices to the start of geometry in the lightAreas buffer.
+int nextAvailableLightAreaIndex;	//Index of the next available area light slot.
+
+	//The actual data fed into the shader. See format for these in the header.
+GLfloat activePointLights[MAX_POINT_LIGHT_ELEMENTS];
+GLfloat activeSpotLights[MAX_SPOT_LIGHT_ELEMENTS];
+GLfloat activeAreaLights[MAX_AREA_LIGHT_ELEMENTS];
+
+enum //One ENUM for each buffer for easy reference.
+{
+	TEXCOORDARRAY_VBO,
+	VERTEXARRAY_VBO,
+	NORMALARRAY_VBO,
+	COLORS_VBO,
+	TEXCOORDS4_VBO,
+	NUM_VBOS
+};
+GLuint vboIDs[NUM_VBOS]; //One buffer ID for each buffer. Can't use one for indices because we need to make extensive use of offsets, which I'm not sure ES 2.0 can do.
 
 DrawCache* DrawCache::m_pInstance = NULL;
 
 DrawCache* DrawCache::Instance()
 {
-  if (!m_pInstance)
-    m_pInstance = new DrawCache;
+	if (!m_pInstance)
+		m_pInstance = new DrawCache;
   
     return m_pInstance;
 }
@@ -51,20 +59,68 @@ DrawCache* DC() {
     return DrawCache::Instance();
 }
 
-void DrawCache::drawAll() {
-    //printf ("Drawing all buffers\n");
-    for(int i = 0; i < NUM_DRAW_BUFFERS; ++i) {
-        drawAndResetBuffer(i);
-    }
+void DrawCache::growGeometryList() {
+	if(current_geometry_list_size == 0) {
+		//There can be visual glitches (that only happen for one frame per game launch) if these ever grow during rendering, so start them high-ish.
+		//This is due to the instant draw/flush operation, which changes the active texture (and other state) from what the geometry being cached should have.
+		//That issue is probably fixable if we want, by caching before the flush operations.
+		current_geometry_list_size = 65536;
+	} else {
+		logWarning("Growing geometry list from %d to %d. A brief visual glitch is possible.\n", current_geometry_list_size, current_geometry_list_size*2);
+		drawAll();
+		free(geometry);
+		current_geometry_list_size *= 2;
+	}
+	
+	geometry = (geometryProperties*)malloc(sizeof(geometryProperties) * current_geometry_list_size);
+	geometryFilled = 0;
+}
+
+void DrawCache::growIndexList() {
+	if(current_index_list_size == 0) {
+		current_index_list_size = 131072;
+	} else {
+		logWarning("Growing index list from %d to %d. A brief visual glitch is possible.\n", current_index_list_size, current_index_list_size*2);
+		drawAll();
+		free(indices);
+		current_index_list_size *= 2;
+	}
+	
+	indices = (GLuint*)malloc(sizeof(GLuint) * current_index_list_size);
+	indicesFilled = 0;
+}
+
+void DrawCache::growVertexLists() {
+	if(current_vertex_list_size == 0) {
+		current_vertex_list_size = 65536;
+	} else {
+		logWarning("Growing vertex list from %d to %d. A brief visual glitch is possible.\n", current_vertex_list_size, current_vertex_list_size*2);
+		drawAll();
+		free(vertexArray);
+		free(texcoordArray);
+		free(normalArray);
+		free(colors);
+		free(texCoords4);
+		current_vertex_list_size *= 2;
+	}
+	
+	vertexArray = (GLfloat*)malloc(sizeof(GLfloat) * current_vertex_list_size * 3);
+	texcoordArray = (GLfloat*)malloc(sizeof(GLfloat) * current_vertex_list_size * 2);
+	normalArray = (GLfloat*)malloc(sizeof(GLfloat) * current_vertex_list_size * 3);
+	colors = (GLfloat*)malloc(sizeof(GLfloat) * current_vertex_list_size * 4);
+	texCoords4 = (GLfloat*)malloc(sizeof(GLfloat) * current_vertex_list_size * 4);
+
+	verticesFilled = 0;
 }
 
 void DrawCache::startGatheringLights() {
     numLightsInScene = 0;
+	nextAvailableLightAreaIndex = 0;
     gatheringLights = 1;
 }
 
 void DrawCache::addDefaultLight(GLfloat x, GLfloat y, GLfloat z, short objectType, short permutationType) {
-    
+	
     if (objectType == _object_is_projectile)
     {
        switch (permutationType)
@@ -74,7 +130,7 @@ void DrawCache::addDefaultLight(GLfloat x, GLfloat y, GLfloat z, short objectTyp
                 case _projectile_flamethrower_burst:
                 case _projectile_alien_weapon:
                 case _projectile_lava_yeti:
-                    addLight(x, y, z, 1000, 1, .8, 0, 1 );
+                    addPointLight(x, y, z, 1000, 1, .8, 0, 0 );
                     break;
 
                 case _projectile_minor_defender:
@@ -82,18 +138,18 @@ void DrawCache::addDefaultLight(GLfloat x, GLfloat y, GLfloat z, short objectTyp
                 case _projectile_minor_hummer:
                 case _projectile_major_hummer:
                 case _projectile_durandal_hummer:
-                    addLight(x, y, z, 1000, 0, 1, .1, 1 );
+					addPointLight(x, y, z, 1000, 0, 1, .1, 0 );
                     break;
 
                 case _projectile_rocket:
                 case _projectile_juggernaut_rocket:
                 case _projectile_juggernaut_missile:
-                    addLight(x, y, z, 4000, 1, 1, .7, 1 );
+					addPointLight(x, y, z, 4000, 1, 1, .7, 0 );
                     break;
                     
                 case _projectile_staff:
                 case _projectile_staff_bolt:
-                    addLight(x, y, z, 1000, .5, 1, rand() / double(RAND_MAX), 1 );
+					addPointLight(x, y, z, 1000, .5, 1, rand() / double(RAND_MAX), 0 );
                     break;
                 
                 case _projectile_minor_cyborg_ball:
@@ -103,45 +159,29 @@ void DrawCache::addDefaultLight(GLfloat x, GLfloat y, GLfloat z, short objectTyp
                 case _projectile_hunter:
                 case _projectile_armageddon_sphere:
                 case _projectile_armageddon_electricity:
-                    addLight(x, y, z, 2000, 0, 1, 1, 1 );
+                    addPointLight(x, y, z, 2000, 0, 1, 1, 0 );
                     break;
                 
                 case _projectile_fusion_bolt_minor:
-                    addLight(x, y, z, 2000, .8, .7, 1, 1 );
+                    addPointLight(x, y, z, 2000, .8, .7, 1, 0 );
                     break;
                 
                 case _projectile_minor_fusion_dispersal:
                 case _projectile_major_fusion_dispersal:
                 case _projectile_overloaded_fusion_dispersal:
                 case _projectile_fusion_bolt_major:
-                    addLight(x, y, z, 3000, .8, rand() / double(RAND_MAX), 1, 1 );
+                    addPointLight(x, y, z, 3000, .8, rand() / double(RAND_MAX), 1, 0 );
                     break;
             
                 default:
                     break;
             }
-            
-            //Handle any differences in M1 default projectile lights
-        if (shapes_file_is_m1()) {
-          switch (permutationType)
-           {
-               case _projectile_fist: //Major Fusion Bolt
-                  addLight(x, y, z, 3000, .8, rand() / double(RAND_MAX), 1, 1 );
-                   break;
-               case _projectile_staff_bolt: //flamethrower
-                  addLight(x, y, z, 1000, 1, .8, 0, 1 );
-                  break;
-               default:
-                   break;
-           }
-        }
-      
     } else if(objectType == _object_is_effect) {
             switch (permutationType)
             {
                 case _effect_rocket_explosion:
                 case _effect_grenade_explosion:
-                    addLight(x, y, z, 2000, 1, .9, 0, 1 );
+                    addPointLight(x, y, z, 2000, 1, .9, 0, 0 );
                     break;
                     
                 case _effect_alien_lamp_breaking:
@@ -151,57 +191,57 @@ void DrawCache::addDefaultLight(GLfloat x, GLfloat y, GLfloat z, short objectTyp
                 case _effect_rocket_contrail:
                 case _effect_grenade_contrail:
                 case _effect_juggernaut_missile_contrail:
-                    addLight(x, y, z, 1000, .8, .8, .8, 1 );
+                    addPointLight(x, y, z, 1000, .8, .8, .8, 0 );
                     break;
 
                 case _effect_alien_weapon_ricochet:
                 case _effect_flamethrower_burst:
-                    addLight(x, y, z, 1000, .8, .7, 0, 1 );
+                    addPointLight(x, y, z, 1000, .8, .7, 0, 0 );
                     break;
 
                 case _effect_compiler_bolt_minor_detonation:
                 case _effect_compiler_bolt_major_detonation:
                 case _effect_compiler_bolt_major_contrail:
-                    addLight(x, y, z, 1000, 0, .7, .7, 1 );
+                    addPointLight(x, y, z, 1000, 0, .7, .7, 0 );
                     break;
 
                 case _effect_hunter_projectile_detonation:
-                    addLight(x, y, z, 1000, 0, 1, .8, 1 );
+                    addPointLight(x, y, z, 1000, 0, 1, .8, 0 );
                     break;
 
                 case _effect_minor_fusion_detonation:
                 case _effect_major_fusion_detonation:
-                    addLight(x, y, z, 2000, 1, 1, 1, 1 );
+                    addPointLight(x, y, z, 2000, 1, 1, 1, 0 );
                     break;
 
                 case _effect_major_fusion_contrail:
-                    addLight(x, y, z, 500, .7, .8, 1, 1 );
+                    addPointLight(x, y, z, 500, .7, .8, 1, 0 );
                     break;
 
                 case _effect_minor_defender_detonation:
                 case _effect_major_defender_detonation:
-                    addLight(x, y, z, 1000, .5, .5, .5, 1 );
+                    addPointLight(x, y, z, 1000, .5, .5, .5, 0 );
                     break;
 
 
                 case _effect_minor_hummer_projectile_detonation:
                 case _effect_major_hummer_projectile_detonation:
                 case _effect_durandal_hummer_projectile_detonation:
-                    addLight(x, y, z, 2000, 0, 1, .1, 1 );
+                    addPointLight(x, y, z, 2000, 0, 1, .1, 0 );
                     break;
 
                 case _effect_cyborg_projectile_detonation:
-                    addLight(x, y, z, 2000, .1, .8, 1, 1 );
+                    addPointLight(x, y, z, 2000, .1, .8, 1, 0 );
                     break;
 
                 case _effect_minor_fusion_dispersal:
                 case _effect_major_fusion_dispersal:
                 case _effect_overloaded_fusion_dispersal:
-                    addLight(x, y, z, 4000, .8, 1, 1, 1 );
+                    addPointLight(x, y, z, 4000, .8, 1, 1, 0 );
                     break;
 
                 case _effect_lava_yeti_projectile_detonation:
-                    addLight(x, y, z, 2000, 1, 0, 0, 1 );
+                    addPointLight(x, y, z, 2000, 1, 0, 0, 0 );
                     break;
 
                 default:
@@ -211,401 +251,662 @@ void DrawCache::addDefaultLight(GLfloat x, GLfloat y, GLfloat z, short objectTyp
     
 }
 
-void DrawCache::addLight(GLfloat x, GLfloat y, GLfloat z, GLfloat size, GLfloat red, GLfloat green, GLfloat blue, GLfloat intensity ) {
-    if(!gatheringLights) return;
-    
+bool DrawCache::addPointLight(GLfloat x, GLfloat y, GLfloat z, GLfloat size, GLfloat red, GLfloat green, GLfloat blue, bool negative) {
+    if(!gatheringLights) return 0;
+    	
+	if (size < 1) { size = 1; } //A size of zero signals the shader to stop processing, so disallow that input.
+	
     if(numLightsInScene < LIGHTS_MAX) {
-        lightPositions[numLightsInScene*4 + 0] = x;
-        lightPositions[numLightsInScene*4 + 1] = y;
-        lightPositions[numLightsInScene*4 + 2] = z;
-        lightPositions[numLightsInScene*4 + 3] = size; //Size in world units. 0 means no light. 1000ish would be typical
-        
-        lightColors[numLightsInScene*4 + 0] = red; //Red
-        lightColors[numLightsInScene*4 + 1] = green; //Green
-        lightColors[numLightsInScene*4 + 2] = blue; //Blue
-        lightColors[numLightsInScene*4 + 3] = intensity; //Intensity
+		
+		dynamicLights[numLightsInScene].type = POINT_LIGHT;
+		
+		dynamicLights[numLightsInScene].position[0] = x;
+		dynamicLights[numLightsInScene].position[1] = y;
+		dynamicLights[numLightsInScene].position[2] = z;
+		
+		dynamicLights[numLightsInScene].color[0] = red;
+		dynamicLights[numLightsInScene].color[1] = green;
+		dynamicLights[numLightsInScene].color[2] = blue;
+		
+		dynamicLights[numLightsInScene].size = size;
+		
+		dynamicLights[numLightsInScene].AABB[BB_LOW_X] = x-size;
+		dynamicLights[numLightsInScene].AABB[BB_HIGH_X] = x+size;
+		dynamicLights[numLightsInScene].AABB[BB_LOW_Y] = y-size;
+		dynamicLights[numLightsInScene].AABB[BB_HIGH_Y] = y+size;
+		dynamicLights[numLightsInScene].AABB[BB_LOW_Z] = z-size;
+		dynamicLights[numLightsInScene].AABB[BB_HIGH_Z] = z+size;
+		
+		dynamicLights[numLightsInScene].negative = negative;
 
         numLightsInScene++;
+		return 1;
     }
+	
+	return 0;
 }
+
+bool DrawCache::addSpotLight(GLfloat x, GLfloat y, GLfloat z, GLfloat size,  GLfloat dirX, GLfloat dirY, GLfloat dirZ, GLfloat outerAngle, GLfloat innerAngle,  GLfloat red, GLfloat green, GLfloat blue, bool negative) {
+	if(!gatheringLights) return 0;
+	
+	if (size < 1) { size = 1; } //A size of zero signals the shader to stop processing, so disallow that input.
+	
+	if(numLightsInScene < LIGHTS_MAX) {
+		int baseIndex = numLightsInScene*4;
+		
+		dynamicLights[numLightsInScene].type = SPOT_LIGHT;
+		
+		dynamicLights[numLightsInScene].position[0] = x;
+		dynamicLights[numLightsInScene].position[1] = y;
+		dynamicLights[numLightsInScene].position[2] = z;
+		
+		dynamicLights[numLightsInScene].direction[0] = dirX;
+		dynamicLights[numLightsInScene].direction[1] = dirY;
+		dynamicLights[numLightsInScene].direction[2] = dirZ;
+		
+		dynamicLights[numLightsInScene].innerAngle = innerAngle;
+		dynamicLights[numLightsInScene].outerAngle = outerAngle;
+		
+		dynamicLights[numLightsInScene].color[0] = red;
+		dynamicLights[numLightsInScene].color[1] = green;
+		dynamicLights[numLightsInScene].color[2] = blue;
+		
+		dynamicLights[numLightsInScene].size = size;
+		
+		dynamicLights[numLightsInScene].AABB[BB_LOW_X] = x-size;
+		dynamicLights[numLightsInScene].AABB[BB_HIGH_X] = x+size;
+		dynamicLights[numLightsInScene].AABB[BB_LOW_Y] = y-size;
+		dynamicLights[numLightsInScene].AABB[BB_HIGH_Y] = y+size;
+		dynamicLights[numLightsInScene].AABB[BB_LOW_Z] = z-size;
+		dynamicLights[numLightsInScene].AABB[BB_HIGH_Z] = z+size;
+
+		dynamicLights[numLightsInScene].negative = negative;
+
+		numLightsInScene ++;
+		return 1;
+	}
+	return 0;
+}
+
+bool DrawCache::addAreaLightFan(GLfloat *vertex_array, int vertex_count, GLfloat size,  GLfloat dirX, GLfloat dirY, GLfloat dirZ, GLfloat outerAngle, GLfloat innerAngle,  GLfloat red, GLfloat green, GLfloat blue, bool negative) {
+	if(!gatheringLights) return 0;
+	
+		//Allowing a single-vertex area would be silly, but I think we can have a 2 vertex "line" light.
+	if (vertex_count < 2)
+		return 0;
+	
+	//Verify that there are enough elements available to hold all of the vertices.
+	if(nextAvailableLightAreaIndex + (vertex_count * 4) >= AREA_LIGHT_VERTICES_MAX * 4)
+		return 0;
+	
+	int baseIndex = numLightsInScene*4; //Capture base now, because addSpotlight will increment numLightsInScene.
+	
+	//An area light starts as a spotlight, except that it also has an index to a vertices. (The location fed in is meaningless)
+	/*if( addSpotLight(vertex_array[0], vertex_array[1], vertex_array[2], size,  dirX, dirY, dirZ, outerAngle, innerAngle,  red, green, blue, negative) )
+	{
+		lightColors[baseIndex + 3] = negative ? AREA_LIGHT_NEGATIVE : AREA_LIGHT; //Set light type/mode
+		lightAreaIndices[baseIndex] = nextAvailableLightAreaIndex; //Establish relation between this light and the slots in the area vertex array.
+		
+		int i, n = 0;
+		for(i = nextAvailableLightAreaIndex; i < vertex_count*4; i += 4) {
+			lightAreas[i + 0] = vertex_array[n + 0];
+			lightAreas[i + 1] = vertex_array[n + 1];
+			lightAreas[i + 2] = vertex_array[n + 2];
+			n++;
+			lightAreas[i + 3] = n == vertex_count ? 0 : 1; //Set whether this is the end of the list or not.
+		}
+		nextAvailableLightAreaIndex = i;
+		
+		return 1;
+	}*/
+	return 0;
+}
+
+
 
 void DrawCache::finishGatheringLights() {
     gatheringLights = 0;
 }
 
-bool DrawCache::isPolygonOnScreen(int vertex_count, GLfloat *vertex_array) {
-    if(vertex_count < 1) {return 0;}
-    
-    GLfloat vertexOnScreen[3] = {vertex_array[0], vertex_array[1], vertex_array[2]};
-    MatrixStack::Instance()->transformVertex(vertexOnScreen[0], vertexOnScreen[1], vertexOnScreen[2]);
-    
-    float xOnScreen = vertexOnScreen[0];
-    float yOnScreen = vertexOnScreen[1];
-
-    float left_x = xOnScreen;
-    float right_x = xOnScreen;
-    float top_y = yOnScreen;
-    float bottom_y = yOnScreen;
-    
-        //Build out a bounding box in screen coordinates that contains all of the vertices.
-    for (int i = 1; i < vertex_count; ++i) {
-        vertexOnScreen[0] = vertex_array[i*3 + 0];
-        vertexOnScreen[1] = vertex_array[i*3 + 1];
-        vertexOnScreen[2] = vertex_array[i*3 + 2];
-        MatrixStack::Instance()->transformVertex(vertexOnScreen[0], vertexOnScreen[1], vertexOnScreen[2]);
-        
-        xOnScreen = vertexOnScreen[0];
-        yOnScreen = vertexOnScreen[1];
-        
-        if( xOnScreen < left_x) { left_x = xOnScreen; }
-        if( xOnScreen > right_x) { right_x = xOnScreen; }
-        if( yOnScreen < bottom_y) { bottom_y = yOnScreen; }
-        if( yOnScreen > top_y) { top_y = yOnScreen; }
-    }
-    
-    //Convert to normalized device coordinates
-    right_x /= MainScreenPixelWidth()/2;
-    left_x /= MainScreenPixelWidth()/2;
-    top_y /= MainScreenPixelHeight()/2;
-    bottom_y /= MainScreenPixelHeight()/2;
-    
-    //TODO: This function won't work until we figure out what NDC looks like for non-3d perspective.
-    
-    
-        //Is this centered on screen?
-    /*if(left_x < 0 && right_x > 0 && bottom_y < 0 && top_y > 0) {
-        printf("Centered l %f, r %f, t %f, b %f\n", left_x, right_x, top_y, bottom_y);
-    }*/
-    
-    return 1;
-    
-}
-
-int DrawCache::getBufferFor(Shader* shader, GLuint texID, GLuint texID1, int vertex_count, bool isBlended) {
-
-    int firstEmptyBuffer = -1;
-    int i = 0;
-    
-    //Blended textures can only get buffered in the very last buffer filled, up until now. Otherwise they might get drawn out of order ( over the top of non-blended textures (as in Where are Monsters in Dreams)). Start the iterator i at the last occupied buffer.
-    if (isBlended) {
-        for(; i < NUM_DRAW_BUFFERS - 1; ++i) {
-            if(drawBuffers[i+1].verticesFilled == 0) {
-                break;
-            }
-        }
-    }
-    
-    //Search for a matching buffer, or the next empty one.
-    for(; i < NUM_DRAW_BUFFERS; ++i) {
-        if(drawBuffers[i].verticesFilled == 0 && firstEmptyBuffer < 0 ) {firstEmptyBuffer=i;}
-        
-        if(drawBuffers[i].shader == shader && drawBuffers[i].textureID == texID && (texID1 == 0 || texID1 == drawBuffers[i].textureID1)) {
-            
-                //If we convert the fan into triangles, about how many vertices will we need?
-            int neededVertices = vertex_count * 3;
-            
-                //If this buffer is full, draw and reset it, then return the index.
-            if (drawBuffers[i].verticesFilled + neededVertices >= DRAW_BUFFER_MAX) {
-                drawAndResetBuffer(i);
-                drawBuffersFilledToMax ++;
-                //printf ("Reset full buffer\n");
-            }
-            return i;
-            
-        }
-        
-    }
-    
-        //If there are no matching buffers, return the last empty one found.
-    if( firstEmptyBuffer >= 0 ) {
-        return firstEmptyBuffer;
-    }
-    
-    //If we get here, all buffers are used and we need to flush and return any index (zero is fine).
-    //sprintf ("All buffers full.\n");
-    allBuffersUsed++;
-    
-    drawAll();
-    return 0;
+void DrawCache::growToFit(int triangleCount, int vertexCount) {
+	//Guarantee that the geometry list is large enough for at least one more item.
+	while(geometryFilled >= current_geometry_list_size - 1) {
+		growGeometryList();
+	}
+	
+	//Guarantee that the index list is large enough. Assume each triangle needs three indices.
+	while( indicesFilled + (triangleCount * 3) >= current_index_list_size - 1) {
+		growIndexList();
+	}
+	
+	//Guarantee the vertex lists are large enough.
+	while( verticesFilled + vertexCount >= current_vertex_list_size - 1) {
+		growVertexLists();
+	}
 }
 
 //Requires 3 GLFloats in vertex_array per vertex, and 2 GLfloats per texcoord
 //tex4 is a 4-dimensional array, which is surface normal vector + sign.
 //Normalized is assumed to be GL_FALSE and Stride must be 0.
-void DrawCache::drawSurfaceBuffered(int vertex_count, GLfloat *vertex_array, GLfloat *texcoord_array, GLfloat *tex4) {
-    
-    GLint whichUnit, whichTextureID, whichTextureID1;
-    GLboolean isBlended;
-    glGetIntegerv(GL_ACTIVE_TEXTURE, &whichUnit); //Store active texture so we can reset it later.
-    glActiveTexture(GL_TEXTURE0);
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &whichTextureID);
-    glActiveTexture(GL_TEXTURE1);
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &whichTextureID1);
-    glActiveTexture(whichUnit);
-    glGetBooleanv(GL_BLEND, &isBlended);
-  
-    bufferRequests ++;
-    
-    //int b = getBufferFor(lastEnabledShader(), lastActiveTexture, vertex_count);
-    int b = getBufferFor(lastEnabledShader(), whichTextureID, whichTextureID1, vertex_count, isBlended);
-    
-        //Capture volatile state data.
-    GLfloat *color = MSI()->color();
-    GLfloat clipPlane0[4], clipPlane1[4], clipPlane5[4];
-    drawBuffers[b].shader = lastEnabledShader();
-    //drawBuffers[b].textureID = lastActiveTexture;
-    
-    
-    drawBuffers[b].textureID = whichTextureID; //There should always be a texture0
-    drawBuffers[b].textureID1 = whichTextureID1;
-    if(whichTextureID1) {
-        drawBuffers[b].hasTexture1 = 1;
-    }
-    
-    drawBuffers[b].landscapeTexture = lastTextureIsLandscape;
-    MSI()->getFloatv(MS_TEXTURE, drawBuffers[b].textureMatrix);
-    MSI()->getPlanev(0, clipPlane0);
-    MSI()->getPlanev(1, clipPlane1);
-    MSI()->getPlanev(5, clipPlane5);
-    
-    //Transparent surfaces always require a flush
-    if(color[3] < 1) {
-        drawAll();
-    }
-    
+void DrawCache::addTriangleFan(int vertex_count, GLfloat *vertex_array, GLfloat *texcoord_array, GLfloat *tex4) {
+	
+	int numTriangles = vertex_count - 2; //The first 3 vertices make a triangle, and each subsequent vertex adds another.
+	growToFit(numTriangles, vertex_count); //Make room for the incoming triangle fan. Do this first, because it might change geometryFilled should a draw be triggered.
+	
+	int g = geometryFilled; //Convenience index.
+	captureState(g); //Capture volatile state data for this geometry.
+	
         //The incoming data is a triangle fan: 0,1,2,3,4,5
-        //We need to create indices that convert into triangles: 0,1,2, 0,2,3, 0,3,4, 0,3,5
-    int numTriangles = vertex_count - 2; //The first 3 vertices make a triangle, and each subsequent vertex adds another.
+        //We need to create indices that convert the fan into triangles: 0,1,2, 0,2,3, 0,3,4, etc
+		//Note that indicesFilled is always a multiple of three (because they describe triangles), but verticesFilled is the total number of input vertices.
+	geometry[g].numIndices = numTriangles * 3;
     for(int i = 0; i < numTriangles; ++i) {
-        drawBuffers[b].indices[drawBuffers[b].numIndices] = drawBuffers[b].verticesFilled;
-        drawBuffers[b].indices[drawBuffers[b].numIndices + 1] = drawBuffers[b].verticesFilled + i + 1;
-        drawBuffers[b].indices[drawBuffers[b].numIndices + 2] = drawBuffers[b].verticesFilled + i + 2;
-        drawBuffers[b].numIndices += 3;
+        indices[indicesFilled] = verticesFilled;
+        indices[indicesFilled + 1] = verticesFilled + i + 1;
+        indices[indicesFilled + 2] = verticesFilled + i + 2;
+		indicesFilled += 3;
     }
-    
-        //Prime BB with the first vertex.
-    if(drawBuffers[b].verticesFilled == 0) {
-        drawBuffers[b].bb_high_x=vertex_array[0];
-        drawBuffers[b].bb_low_x=vertex_array[0];
-        drawBuffers[b].bb_high_y=vertex_array[1];
-        drawBuffers[b].bb_low_y=vertex_array[1];
-        drawBuffers[b].bb_high_z=vertex_array[2];
-        drawBuffers[b].bb_low_z=vertex_array[2];
 
-    }
-    
     //Fill 2-element components.
     int n = 0;
-    for(int i = drawBuffers[b].verticesFilled*2; i < (drawBuffers[b].verticesFilled*2 + (vertex_count * 2)); i += 2) {
-        drawBuffers[b].texcoordArray[i] = texcoord_array[n]; drawBuffers[b].texcoordArray[i+1] = texcoord_array[n+1];
+    for(int i = verticesFilled*2; i < (verticesFilled*2 + (vertex_count * 2)); i += 2) {
+        texcoordArray[i] = texcoord_array[n];
+		texcoordArray[i+1] = texcoord_array[n+1];
         n+=2;
     }
     
-    //Fill the 3-element components.
+    //Fill the 3-element components, and make sure the bounding box will enclose all vertices.
     n = 0;
     GLfloat *normal_array = MSI()->normals();
-    for(int i = drawBuffers[b].verticesFilled*3; i < (drawBuffers[b].verticesFilled*3 + (vertex_count * 3)); i += 3) {
-        drawBuffers[b].vertexArray[i] = vertex_array[n]; drawBuffers[b].vertexArray[i+1] = vertex_array[n+1]; drawBuffers[b].vertexArray[i+2] = vertex_array[n+2];
-        
-        //Grow bounding box
-        if(vertex_array[n] >= drawBuffers[b].bb_high_x) drawBuffers[b].bb_high_x = vertex_array[n];
-        if(vertex_array[n] <= drawBuffers[b].bb_low_x) drawBuffers[b].bb_low_x = vertex_array[n];
-        if(vertex_array[n+1] >= drawBuffers[b].bb_high_y) drawBuffers[b].bb_high_y = vertex_array[n+1];
-        if(vertex_array[n+1] <= drawBuffers[b].bb_low_y) drawBuffers[b].bb_low_y = vertex_array[n+1];
-        if(vertex_array[n+2] >= drawBuffers[b].bb_high_z) drawBuffers[b].bb_high_z = vertex_array[n+2];
-        if(vertex_array[n+2] <= drawBuffers[b].bb_low_z) drawBuffers[b].bb_low_z = vertex_array[n+2];
-        
-        drawBuffers[b].normalArray[i] = normal_array[n]; drawBuffers[b].normalArray[i+1] = normal_array[n+1]; drawBuffers[b].normalArray[i+2] = normal_array[n+2];
+	primeBoundingBox(g, vertex_array[0], vertex_array[1], vertex_array[2]);
+	
+    for(int i = verticesFilled*3; i < (verticesFilled*3 + (vertex_count*3)); i += 3) {
+        vertexArray[i] = vertex_array[n]; vertexArray[i+1] = vertex_array[n+1]; vertexArray[i+2] = vertex_array[n+2];
+		normalArray[i] = normal_array[n]; normalArray[i+1] = normal_array[n+1]; normalArray[i+2] = normal_array[n+2];
+		
+		growBoundingBox(g, vertex_array[n], vertex_array[n+1], vertex_array[n+2]);
         n+=3;
     }
     
-    //Fill the 4-element components
-    for(int i = drawBuffers[b].verticesFilled*4; i < (drawBuffers[b].verticesFilled*4 + (vertex_count * 4)); i += 4) {
-        drawBuffers[b].color[i] = color[0]; drawBuffers[b].color[i+1] = color[1]; drawBuffers[b].color[i+2] = color[2]; drawBuffers[b].color[i+3] = color[3];
-        drawBuffers[b].texCoords4[i] = tex4[0]; drawBuffers[b].texCoords4[i+1] = tex4[1]; drawBuffers[b].texCoords4[i+2] = tex4[2]; drawBuffers[b].texCoords4[i+3] = tex4[3];
-        drawBuffers[b].clipPlane0[i] = clipPlane0[0]; drawBuffers[b].clipPlane0[i+1] = clipPlane0[1]; drawBuffers[b].clipPlane0[i+2] = clipPlane0[2]; drawBuffers[b].clipPlane0[i+3] = clipPlane0[3];
-        drawBuffers[b].clipPlane1[i] = clipPlane1[0]; drawBuffers[b].clipPlane1[i+1] = clipPlane1[1]; drawBuffers[b].clipPlane1[i+2] = clipPlane1[2]; drawBuffers[b].clipPlane1[i+3] = clipPlane1[3];
-        drawBuffers[b].clipPlane5[i] = clipPlane5[0]; drawBuffers[b].clipPlane5[i+1] = clipPlane5[1]; drawBuffers[b].clipPlane5[i+2] = clipPlane5[2]; drawBuffers[b].clipPlane5[i+3] = clipPlane5[3];
-    
-        drawBuffers[b].vSxOxSyOy[i] = scaleX; drawBuffers[b].vSxOxSyOy[i+1] = offsetX; drawBuffers[b].vSxOxSyOy[i+2] = scaleY; drawBuffers[b].vSxOxSyOy[i+3] = offsetY;
-        drawBuffers[b].vBsBtFlSl[i] = bloomScale; drawBuffers[b].vBsBtFlSl[i+1] = bloomShift; drawBuffers[b].vBsBtFlSl[i+2] = flare; drawBuffers[b].vBsBtFlSl[i+3] = selfLuminosity;
-        drawBuffers[b].vPuWoDeGl[i] = pulsate; drawBuffers[b].vPuWoDeGl[i+1] = wobble; drawBuffers[b].vPuWoDeGl[i+2] = depth; drawBuffers[b].vPuWoDeGl[i+3] = glow;
-    }
-    //printf("Added vertices %i to %i with texture %i\n", vertex_count, drawBuffers[b].verticesFilled, drawBuffers[b].textureID);
-    clearTextureAttributeCaches();
-    drawBuffers[b].verticesFilled += vertex_count;
-    
-    //For debugging, it helps to draw right away. Slower, though.
-    //Normally this should be commented out.
-    //drawAndResetBuffer(b);
+	//Fill the 4-element components
+	for(int i = verticesFilled*4; i < (verticesFilled*4 + (vertex_count * 4)); i += 4) {
+		colors[i] = geometry[g].primaryColor[0]; colors[i+1] = geometry[g].primaryColor[1]; colors[i+2] = geometry[g].primaryColor[2]; colors[i+3] = geometry[g].primaryColor[3];
+		
+		if(tex4) {
+			texCoords4[i] = tex4[0]; texCoords4[i+1] = tex4[1]; texCoords4[i+2] = tex4[2]; texCoords4[i+3] = tex4[3];
+		} else {
+			texCoords4[i] = 0; texCoords4[i+1] = 0; texCoords4[i+2] = 0; texCoords4[i+3] = 1; //not sure if 0s or 1s are better here, or maybe 0,0,0,1...
+		}
+	}
+
+	clearTextureAttributeCaches();
+	
+    verticesFilled += vertex_count;
+	geometryFilled ++;
 }
 
 
-void DrawCache::drawAndResetBuffer(int index) {
+void DrawCache::addModel(rectangle_definition& RenderRectangle)
+{
+	// TODO: support glEnable(GL_CULL_FACE);
+	// TODO: support glFrontFace
+	
+	OGL_ModelData *ModelPtr = RenderRectangle.ModelPtr;
+	int index_count = ModelPtr->Model.NumVI();
+	GLushort *index_array = ModelPtr->Model.VIBase();
+	GLfloat *vertex_array = ModelPtr->Model.PosBase();
+	GLfloat *texcoord_array = ModelPtr->Model.TCBase();
+	GLfloat *normals = ModelPtr->Model.NormBase();
+	GLfloat *tangents = ModelPtr->Model.TangentBase();
+	
+	//Is there a better way to figure out how big vertex_array is?
+	int max_index = 0;
+	for (int i = 0; i < index_count; i++) {
+		if( index_array[i] > max_index )
+			max_index = index_array[i];
+	}
+	int vertex_count = max_index + 1;
+	int numTriangles = index_count/3;
+	
+	growToFit(numTriangles, vertex_count);
+	
+	int g = geometryFilled; //Convenience index.
+	captureState(g); //Capture volatile state data for this geometry.
+	
+		//Since these are triangles, the number of triangles must always be index_count/3.
+		//Can't memcopy the indices though because we need a short to int conversion. :(
+	geometry[g].numIndices = index_count;
+	for(int i = 0; i < index_count; ++i) {
+		indices[indicesFilled] = index_array[i] + verticesFilled;
+		indicesFilled ++;
+	}
+	
+	//TODO: use something like memcopy for the arrays.
 
-    if (drawBuffers[index].shader == NULL || drawBuffers[index].verticesFilled == 0 || drawBuffers[index].numIndices == 0) {
-        return;
-    }
-    //printf("Drawing buffer of size %i\n", drawBuffers[index].verticesFilled );
-    Shader *originalShader = lastEnabledShader();
-    
-    //drawBuffers[index].shader->enable();
-    drawBuffers[index].shader->enableAndSetStandardUniforms();
-    drawBuffers[index].shader->setMatrix4(Shader::U_MS_TextureMatrix, drawBuffers[index].textureMatrix);
+	//Fill 2-element components.
+	int n = 0;
+	for(int i = verticesFilled*2; i < (verticesFilled*2 + (vertex_count * 2)); i += 2) {
+		texcoordArray[i] = texcoord_array[n];
+		texcoordArray[i+1] = texcoord_array[n+1];
+		n+=2;
+	}
+	
+	//Fill the 3-element components, and make sure the bounding box will enclose all vertices.
+	n = 0;
+	for(int i = verticesFilled*3; i < (verticesFilled*3 + (vertex_count*3)); i += 3) {
+		vertexArray[i] = vertex_array[n]; vertexArray[i+1] = vertex_array[n+1]; vertexArray[i+2] = vertex_array[n+2];
+		normalArray[i] =  0-normals[n]; normalArray[i+1] =  0-normals[n+1]; normalArray[i+2] =  0-normals[n+2];
+		n+=3;
+	}
+	
+	//Fill the 4-element components
+	for(int i = verticesFilled*4; i < (verticesFilled*4 + (vertex_count * 4)); i += 4) {
+		colors[i] = geometry[g].primaryColor[0]; colors[i+1] = geometry[g].primaryColor[1]; colors[i+2] = geometry[g].primaryColor[2]; colors[i+3] = geometry[g].primaryColor[3];
+		
+		if(tangents) {
+			texCoords4[i] = tangents[0]; texCoords4[i+1] = tangents[1]; texCoords4[i+2] = tangents[2]; texCoords4[i+3] = tangents[3];
+			//printf("Sign: %f\n", normals[3]);
+		} else {
+			texCoords4[i] = 0; texCoords4[i+1] = 0; texCoords4[i+2] = 0; texCoords4[i+3] = 1; //not sure if 0s or 1s are better here, or maybe 0,0,0,1...
+		}
+	}
 
-    
-    GLint whichUnit;
-    glGetIntegerv(GL_ACTIVE_TEXTURE, &whichUnit);
-    
-    if( drawBuffers[index].hasTexture1 ) {
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, drawBuffers[index].textureID1);
-    } else {
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, drawBuffers[index].textureID);
-    
-    glActiveTexture(whichUnit);
-    
-    
-    if(drawBuffers[index].landscapeTexture) {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); //DCW added for landscape. Repeat horizontally
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT); //DCW added for landscape. Mirror vertically.
+		//The model should already have a bounding box, but for lighting we must transform the supplied box into a world location and then create a new axis-aligned box which contains it.
+	//Create and apply the world space transform.
+	const world_point3d& pos = RenderRectangle.Position;
+	GLfloat HorizScale = RenderRectangle.Scale*RenderRectangle.HorizScale;
+	GLfloat lowerCorner[3], upperCorner[3];
+	MSI()->pushMatrix();
+		MSI()->loadIdentity();
+		MSI()->translatef(pos.x, pos.y, pos.z);
+		MSI()->rotatef((360.0/FULL_CIRCLE)*RenderRectangle.Azimuth,0,0,1);
+		MSI()->scalef(HorizScale,HorizScale,RenderRectangle.Scale);
+		lowerCorner[0] = ModelPtr->Model.BoundingBox[0][0]; lowerCorner[1] = ModelPtr->Model.BoundingBox[0][1]; lowerCorner[2] = ModelPtr->Model.BoundingBox[0][2];
+		upperCorner[0] = ModelPtr->Model.BoundingBox[1][0]; upperCorner[1] = ModelPtr->Model.BoundingBox[1][1]; upperCorner[2] = ModelPtr->Model.BoundingBox[1][2];
+		MSI()->transformVertex(lowerCorner[0], lowerCorner[1], lowerCorner[2]);
+		MSI()->transformVertex(upperCorner[0], upperCorner[1], upperCorner[2]);
+	MSI()->popMatrix();
+	primeBoundingBox(g, lowerCorner[0], lowerCorner[1], lowerCorner[2]);
+	growBoundingBox(g, upperCorner[0], upperCorner[1], upperCorner[2]);
+	
+	clearTextureAttributeCaches();
+	
+	verticesFilled += vertex_count;
+	geometryFilled++;
+}
 
-    } else {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); //DCW this is probably better for non-landscapes
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); //DCW this is probably better for non-landscapes
-    }
+	//Captures current volatile state information into geometry[g]
+void DrawCache::captureState(int g)
+{
+	GLint initialUnit;
+	glGetIntegerv(GL_ACTIVE_TEXTURE, &initialUnit); //Store active texture so we can reset it later.
+	glActiveTexture(GL_TEXTURE0);
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &(geometry[g].textureID0));
+	glActiveTexture(GL_TEXTURE1);
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &(geometry[g].textureID1));
+	glActiveTexture(initialUnit);
+	
+	geometry[g].shader = lastEnabledShader();
+	geometry[g].landscapeTexture = lastTextureIsLandscape;
+	GLfloat *activeColor = MSI()->color();
+	MatrixStack::Instance()->getFloatv(MS_MODELVIEW, geometry[g].modelMatrix);
+	MatrixStack::Instance()->getFloatv(MS_PROJECTION, geometry[g].projectionMatrix);
+	MatrixStack::Instance()->getFloatvInverse(MS_MODELVIEW, geometry[g].modelMatrixInverse);
+	MatrixStack::Instance()->getFloatvModelviewProjection(geometry[g].modelProjection);
+	MSI()->getFloatv(MS_TEXTURE, geometry[g].textureMatrix);
+	MSI()->getPlanev(0, geometry[g].clipPlane0);
+	MSI()->getPlanev(1, geometry[g].clipPlane1);
+	MSI()->getPlanev(5, geometry[g].clipPlane5);
+	glGetIntegerv(GL_DEPTH_FUNC, &(geometry[g].depthFunction));
+	glGetIntegerv(GL_DEPTH_TEST, &(geometry[g].depthTest));
+	glGetBooleanv(GL_BLEND, &(geometry[g].isBlended));
+	geometry[g].scaleX = scaleX;
+	geometry[g].offsetX = offsetX;
+	geometry[g].scaleY = scaleY;
+	geometry[g].offsetY = offsetY;
+	geometry[g].bloomScale = bloomScale;
+	geometry[g].bloomShift = bloomShift;
+	geometry[g].flare = flare;
+	geometry[g].selfLuminosity = selfLuminosity;
+	geometry[g].pulsate = pulsate;
+	geometry[g].wobble = wobble;
+	geometry[g].depth = depth;
+	geometry[g].glow = glow;
+	
+	geometry[g].primaryColor[0] = MSI()->color()[0];
+	geometry[g].primaryColor[1] = MSI()->color()[1];
+	geometry[g].primaryColor[2] = MSI()->color()[2];
+	geometry[g].primaryColor[3] = MSI()->color()[3];
+}
 
-    glVertexAttribPointer(Shader::ATTRIB_TEXCOORDS, 2, GL_FLOAT, 0, 0, drawBuffers[index].texcoordArray);
-    glEnableVertexAttribArray(Shader::ATTRIB_TEXCOORDS);
-    
-    glVertexAttribPointer(Shader::ATTRIB_VERTEX, 3, GL_FLOAT, GL_FALSE, 0, drawBuffers[index].vertexArray);
-    glEnableVertexAttribArray(Shader::ATTRIB_VERTEX);
-    
-    glVertexAttribPointer(Shader::ATTRIB_NORMAL, 3, GL_FLOAT, GL_FALSE, 0, drawBuffers[index].normalArray);
-    glEnableVertexAttribArray(Shader::ATTRIB_NORMAL);
-    
-        
-    glVertexAttribPointer(Shader::ATTRIB_COLOR, 4, GL_FLOAT, GL_FALSE, 0, drawBuffers[index].color);
-    glEnableVertexAttribArray(Shader::ATTRIB_COLOR);
-    
-    glVertexAttribPointer(Shader::ATTRIB_TEXCOORDS4, 4, GL_FLOAT, GL_FALSE, 0, drawBuffers[index].texCoords4);
-    glEnableVertexAttribArray(Shader::ATTRIB_TEXCOORDS4);
-    
-    //I think we only need 0, 1, and 5 for normal walls.
-    glVertexAttribPointer(Shader::ATTRIB_CLIPPLANE0, 4, GL_FLOAT, GL_FALSE, 0, drawBuffers[index].clipPlane0);
-    glEnableVertexAttribArray(Shader::ATTRIB_CLIPPLANE0);
-    glVertexAttribPointer(Shader::ATTRIB_CLIPPLANE1, 4, GL_FLOAT, GL_FALSE, 0, drawBuffers[index].clipPlane1);
-    glEnableVertexAttribArray(Shader::ATTRIB_CLIPPLANE1);
-    glVertexAttribPointer(Shader::ATTRIB_CLIPPLANE5, 4, GL_FLOAT, GL_FALSE, 0, drawBuffers[index].clipPlane5);
-    glEnableVertexAttribArray(Shader::ATTRIB_CLIPPLANE5);
-  
-    glVertexAttribPointer(Shader::ATTRIB_SxOxSyOy, 4, GL_FLOAT, GL_FALSE, 0, drawBuffers[index].vSxOxSyOy);
-    glEnableVertexAttribArray(Shader::ATTRIB_SxOxSyOy);
-    glVertexAttribPointer(Shader::ATTRIB_BsBtFlSl, 4, GL_FLOAT, GL_FALSE, 0, drawBuffers[index].vBsBtFlSl);
-    glEnableVertexAttribArray(Shader::ATTRIB_BsBtFlSl);
-    glVertexAttribPointer(Shader::ATTRIB_PuWoDeGl, 4, GL_FLOAT, GL_FALSE, 0, drawBuffers[index].vPuWoDeGl);
-    glEnableVertexAttribArray(Shader::ATTRIB_PuWoDeGl);
-    
-    
-    glEnable(GL_BLEND); //We might always want to blend.
-    
-    //Attach Lights
-    int lightsAttached = 0;
-    for(int n = 0; n < ACTIVE_LIGHTS_MAX*4; n++) {
-        activeLightPositions[n]=0;
-        activeLightColors[n]=0;
-    }
-    GLfloat x,y,z,size, red,green,blue,intensity;
-    if (!gatheringLights && !drawBuffers[index].landscapeTexture) {
-        for(int i = 0; i < numLightsInScene; i++) {
-            x = lightPositions[i*4];
-            y = lightPositions[i*4 + 1];
-            z = lightPositions[i*4 + 2];
-            size = lightPositions[i*4 + 3];
-            red = lightColors[i*4];
-            green = lightColors[i*4 + 1];
-            blue = lightColors[i*4 + 2];
-            intensity = lightColors[i*4 + 3];
-            
-                //Is the light inside the bounding box (plus the light size)?
-            if(x >= (drawBuffers[index].bb_low_x-size) &&
-               x <= (drawBuffers[index].bb_high_x+size) &&
-               y >= (drawBuffers[index].bb_low_y-size) &&
-               y <= (drawBuffers[index].bb_high_y+size) &&
-               z >= (drawBuffers[index].bb_low_z-size) &&
-               z <= (drawBuffers[index].bb_high_z+size) ) {
-            
-                //The vertex needs to be in eyespace
-                MSI()->transformVertexToEyespace(x, y, z);
-                
-                //We can only attach up to ACTIVE_LIGHTS_MAX lights.
-                if(lightsAttached < ACTIVE_LIGHTS_MAX){
-                    activeLightPositions[lightsAttached*4] = x;
-                    activeLightPositions[lightsAttached*4 +1] = y;
-                    activeLightPositions[lightsAttached*4 +2] = z;
-                    activeLightPositions[lightsAttached*4 +3] = size;
+void DrawCache::primeBoundingBox(int g, GLfloat x, GLfloat y, GLfloat z) {
+	geometry[g].AABB[BB_HIGH_X]=x;
+	geometry[g].AABB[BB_LOW_X]=x;
+	geometry[g].AABB[BB_HIGH_Y]=y;
+	geometry[g].AABB[BB_LOW_Y]=y;
+	geometry[g].AABB[BB_HIGH_Z]=z;
+	geometry[g].AABB[BB_LOW_Z]=z;
+}
 
-                    activeLightColors[lightsAttached*4] = red;
-                    activeLightColors[lightsAttached*4 +1] = green;
-                    activeLightColors[lightsAttached*4 +2] = blue;
-                    activeLightColors[lightsAttached*4 +3] = intensity;
-                    
-                    lightsAttached++;
-                }
-                
-            }
-            
-        }
-        
-        //Terminate active light list.
-        /*activeLightPositions[lightsAttached*4] = 0;
-        activeLightPositions[lightsAttached*4 +1] = 0;
-        activeLightPositions[lightsAttached*4 +2] = 0;
-        activeLightPositions[lightsAttached*4 +3] = 0;*/
-    }
-    
-    if (lightsAttached > 40)
-    {
-      //printf("There are a lot of lights here: %d\n", lightsAttached);
-    }
-  
-    drawBuffers[index].shader->setVec4v(Shader::U_LightColors, ACTIVE_LIGHTS_MAX, activeLightColors);
-    drawBuffers[index].shader->setVec4v(Shader::U_LightPositions, ACTIVE_LIGHTS_MAX, activeLightPositions);
-    drawBuffers[index].shader->setFloat(Shader::U_UseUniformFeatures, 0); //Choose to use the packed features per-vertex.
-    
-    glDrawElements(GL_TRIANGLES, drawBuffers[index].numIndices, GL_UNSIGNED_INT, drawBuffers[index].indices);
-    
-    drawCallsMade++;
-    
-    //Reset lights in the shader so later draws don't see them accidentially.
-    lightsAttached = 0;
-    for(int n = 0; n < ACTIVE_LIGHTS_MAX*4; n++) {
-        activeLightPositions[n]=0;
-        activeLightColors[n]=0;
-    }
-    drawBuffers[index].shader->setVec4v(Shader::U_LightPositions, ACTIVE_LIGHTS_MAX, activeLightPositions);
-    drawBuffers[index].shader->setVec4v(Shader::U_LightColors, ACTIVE_LIGHTS_MAX, activeLightColors);
+void DrawCache::growBoundingBox(int g, GLfloat x, GLfloat y, GLfloat z){
+	if(x >= geometry[g].AABB[BB_HIGH_X]) geometry[g].AABB[BB_HIGH_X] = x;
+	if(x <= geometry[g].AABB[BB_LOW_X]) geometry[g].AABB[BB_LOW_X] = x;
+	if(y >= geometry[g].AABB[BB_HIGH_Y]) geometry[g].AABB[BB_HIGH_Y] = y;
+	if(y <= geometry[g].AABB[BB_LOW_Y]) geometry[g].AABB[BB_LOW_Y] = y;
+	if(z >= geometry[g].AABB[BB_HIGH_Z]) geometry[g].AABB[BB_HIGH_Z] = z;
+	if(z <= geometry[g].AABB[BB_LOW_Z]) geometry[g].AABB[BB_LOW_Z] = z;
+}
 
 
+void DrawCache::drawAll() {
+	glGenBuffers(NUM_VBOS, vboIDs);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, vboIDs[TEXCOORDARRAY_VBO]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * verticesFilled * 2, texcoordArray, GL_STATIC_DRAW);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, vboIDs[VERTEXARRAY_VBO]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * verticesFilled * 3, vertexArray, GL_STATIC_DRAW);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, vboIDs[NORMALARRAY_VBO]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * verticesFilled * 3, normalArray, GL_STATIC_DRAW);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, vboIDs[COLORS_VBO]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * verticesFilled * 4, colors, GL_STATIC_DRAW);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, vboIDs[TEXCOORDS4_VBO]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * verticesFilled * 4, texCoords4, GL_STATIC_DRAW);
+	
+	int currentIndex = 0;
+	
+	Shader *originalShader = lastEnabledShader();
+	
+	//Step through each geometry object and draw what we can.
+	for(int g = 0; g < geometryFilled; g++) {
+		if (verticesFilled == 0 || indicesFilled == 0) {
+			break;
+		}
+		if(geometry[g].shader){
+			geometry[g].shader->enable();
+			geometry[g].shader->setMatrix4(Shader::U_ModelViewMatrix, geometry[g].modelMatrix);
+			geometry[g].shader->setMatrix4(Shader::U_ModelViewProjectionMatrix, geometry[g].modelProjection);
+			geometry[g].shader->setMatrix4(Shader::U_ModelViewMatrixInverse, geometry[g].modelMatrixInverse);
+			geometry[g].shader->setMatrix4(Shader::U_TextureMatrix, geometry[g].textureMatrix);
+			geometry[g].shader->setVec4(Shader::U_FogColor, MatrixStack::Instance()->fog());
+			geometry[g].shader->setVec4(Shader::U_FogStart, MatrixStack::Instance()->fogStart());
+			geometry[g].shader->setVec4(Shader::U_FogStart, MatrixStack::Instance()->fogEnd());
+			geometry[g].shader->setVec4(Shader::U_ClipPlane0, geometry[g].clipPlane0);
+			geometry[g].shader->setVec4(Shader::U_ClipPlane1, geometry[g].clipPlane1);
+			geometry[g].shader->setVec4(Shader::U_ClipPlane5, geometry[g].clipPlane5);
+			geometry[g].shader->setVec4(Shader::U_FogColor, MatrixStack::Instance()->fog());
+			geometry[g].shader->setVec4(Shader::U_FogStart, MatrixStack::Instance()->fogStart());
+			geometry[g].shader->setVec4(Shader::U_FogStart, MatrixStack::Instance()->fogEnd());
+			
+			geometry[g].shader->setFloat(Shader::U_ScaleX, geometry[g].scaleX);
+			geometry[g].shader->setFloat(Shader::U_ScaleY, geometry[g].scaleY);
+			geometry[g].shader->setFloat(Shader::U_OffsetX, geometry[g].offsetX);
+			geometry[g].shader->setFloat(Shader::U_OffsetY, geometry[g].offsetY);
+			geometry[g].shader->setFloat(Shader::U_BloomScale, geometry[g].bloomScale);
+			geometry[g].shader->setFloat(Shader::U_BloomShift, geometry[g].bloomShift);
+			geometry[g].shader->setFloat(Shader::U_Flare, geometry[g].flare);
+			geometry[g].shader->setFloat(Shader::U_SelfLuminosity, selfLuminosity);
+			geometry[g].shader->setFloat(Shader::U_Pulsate, geometry[g].pulsate);
+			geometry[g].shader->setFloat(Shader::U_Wobble, geometry[g].wobble);
+			geometry[g].shader->setFloat(Shader::U_Depth, geometry[g].depth);
+			geometry[g].shader->setFloat(Shader::U_Glow, glow);
+			geometry[g].shader->setFloat(Shader::U_StrictDepthMode, strictDepthMode);
+			
+			//U_TransferFadeOut //TODO: needs to be captured.
+			//U_Visibility //TODO: needs to be captured.
+			
+			glBindBuffer(GL_ARRAY_BUFFER, vboIDs[TEXCOORDARRAY_VBO]);
+			glEnableVertexAttribArray(Shader::ATTRIB_TEXCOORDS);
+			glVertexAttribPointer(Shader::ATTRIB_TEXCOORDS, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 2, 0);
+			
+			glBindBuffer(GL_ARRAY_BUFFER, vboIDs[VERTEXARRAY_VBO]);
+			glEnableVertexAttribArray(Shader::ATTRIB_VERTEX);
+			glVertexAttribPointer(Shader::ATTRIB_VERTEX, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 3, 0);
+			
+			glBindBuffer(GL_ARRAY_BUFFER, vboIDs[NORMALARRAY_VBO]);
+			glEnableVertexAttribArray(Shader::ATTRIB_NORMAL);
+			glVertexAttribPointer(Shader::ATTRIB_NORMAL, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 3, 0);
+			
+			glBindBuffer(GL_ARRAY_BUFFER, vboIDs[COLORS_VBO]);
+			glEnableVertexAttribArray(Shader::ATTRIB_COLOR);
+			glVertexAttribPointer(Shader::ATTRIB_COLOR, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 4, 0);
+			
+			glBindBuffer(GL_ARRAY_BUFFER, vboIDs[TEXCOORDS4_VBO]);
+			glEnableVertexAttribArray(Shader::ATTRIB_TEXCOORDS4);
+			glVertexAttribPointer(Shader::ATTRIB_TEXCOORDS4, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 4, 0);
+			
+			/*glEnable(GL_CULL_FACE);
+			glFrontFace(GL_CW);*/
+			
+			if( geometry[g].textureID1 ) {
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_2D, geometry[g].textureID1);
+			} else {
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_2D, 0);
+			}
+			
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, geometry[g].textureID0);
+						
+			if(geometry[g].landscapeTexture) {
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); //DCW added for landscape. Repeat horizontally
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT); //DCW added for landscape. Mirror vertically.
+				
+			} else {
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); //DCW this is probably better for non-landscapes
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); //DCW this is probably better for non-landscapes
+			}
+			
+			if(geometry[g].isBlended) {
+				glEnable(GL_BLEND);
+				glDepthMask(GL_FALSE); //Blended (transparent) surfaces should not update the depth buffer.
+			} else {
+				glDisable(GL_BLEND);
+				glDepthMask(GL_TRUE);
+			}
+			if(geometry[g].depthTest) {
+				glEnable(GL_DEPTH_TEST);
+			} else {
+				glDisable(GL_DEPTH_TEST);
+			}
+			glDepthFunc(geometry[g].depthFunction);
+			
+			//Attach Lights
+			setAttachedLightsForGeometry(g);
+			geometry[g].shader->setFloatv(Shader::U_PointLights, MAX_POINT_LIGHT_ELEMENTS, activePointLights);
+			geometry[g].shader->setFloatv(Shader::U_SpotLights, MAX_SPOT_LIGHT_ELEMENTS, activeSpotLights);
+			geometry[g].shader->setFloatv(Shader::U_AreaLights, MAX_AREA_LIGHT_ELEMENTS, activeAreaLights);
+			
+			glDrawElements(GL_TRIANGLES, geometry[g].numIndices, GL_UNSIGNED_INT, indices + currentIndex);
+			
+			currentIndex += geometry[g].numIndices;
+		}
+	}
+	
         //Reset what we care about.
-    drawBuffers[index].verticesFilled = 0;
-    drawBuffers[index].numIndices = 0;
-    drawBuffers[index].shader = NULL;
-    drawBuffers[index].textureID = 0;
-    drawBuffers[index].hasTexture1 = 0;
-    drawBuffers[index].textureID1 = 0;
-    
+    verticesFilled = 0;
+	indicesFilled = 0;
+	geometryFilled = 0;
+	lastTextureIsLandscape = 0;
+	
+	Shader::disable();
+	glDeleteBuffers(NUM_VBOS, vboIDs);
+	
     if(originalShader) {
-        originalShader->enable(); //We need to restore whatever shader was active, so we don't pollute outside state.
+        originalShader->enable(); //We need to restore whatever shader was active, to avoid polluting outside state.
     }
+	glDepthMask(GL_TRUE);
+}
+
+void DrawCache::setAttachedLightsForGeometry(int g) {
+
+		//Blank out the buffers, so we don't have garbage data in the unfilled portion.
+	clearAttachedLights();
+	
+		//Early exit, if lights do not apply.
+	if(gatheringLights || geometry[g].landscapeTexture) {
+		return;
+	}
+	
+	int pointLightsAttached = 0;
+	int spotLightsAttached = 0;
+	int nextAreaLightIndex = 0;
+	
+	//Iterate through every light in the entire world, and add it to it's respective shader data buffer (if there is room in the buffer, and if the geometry and light bounding boxes intersect).
+	for(int l = 0; l < numLightsInScene; l++) {
+		//Format of point light data: position, color, size (7 elements per light).
+		if(dynamicLights[l].type == POINT_LIGHT && (pointLightsAttached+1) * POINT_LIGHT_DATA_SIZE < MAX_POINT_LIGHT_ELEMENTS && lightAndGeometryIntersect(dynamicLights[l], geometry[g])) {
+			int pi = pointLightsAttached * POINT_LIGHT_DATA_SIZE; //Index into active array
+			activePointLights[pi + 0] = dynamicLights[l].position[0];
+			activePointLights[pi + 1] = dynamicLights[l].position[1];
+			activePointLights[pi + 2] = dynamicLights[l].position[2];
+			
+			//Light positions must now be in eye space
+			MSI()->transformVertexToEyespace(activePointLights[pi + 0],activePointLights[pi + 1],activePointLights[pi + 2]);
+			
+			activePointLights[pi + 3] = dynamicLights[l].color[0];
+			activePointLights[pi + 4] = dynamicLights[l].color[1];
+			activePointLights[pi + 5] = dynamicLights[l].color[2];
+			
+			activePointLights[pi + 6] = dynamicLights[l].size;
+			
+			pointLightsAttached ++;
+		}
+		
+		//Format of spot light data: position, direction, innerAngleRadiansCos, outerAngleRadiansCos, color, size (12 elements per light).
+		if(dynamicLights[l].type == SPOT_LIGHT && (spotLightsAttached+1) * SPOT_LIGHT_DATA_SIZE < MAX_SPOT_LIGHT_ELEMENTS && lightAndGeometryIntersect(dynamicLights[l], geometry[g])) {
+			int si = spotLightsAttached * SPOT_LIGHT_DATA_SIZE; //Index into active array
+			activeSpotLights[si + 0] = dynamicLights[l].position[0];
+			activeSpotLights[si + 1] = dynamicLights[l].position[1];
+			activeSpotLights[si + 2] = dynamicLights[l].position[2];
+			MSI()->transformVertexToEyespace(activeSpotLights[si + 0],activeSpotLights[si + 1],activeSpotLights[si + 2]); //Light positions must now be in eye space
+			
+			activeSpotLights[si + 3] = dynamicLights[l].direction[0];
+			activeSpotLights[si + 4] = dynamicLights[l].direction[1];
+			activeSpotLights[si + 5] = dynamicLights[l].direction[2];
+			MSI()->transformVectorToEyespace(activeSpotLights[si + 3], activeSpotLights[si + 4], activeSpotLights[si + 5]); //Direction vector, also needs to be in eyespace.
+			
+			activeSpotLights[si + 6] = cos(dynamicLights[l].innerAngle * 0.0174533); //Convert to cos(radians)
+			activeSpotLights[si + 7] = cos(dynamicLights[l].outerAngle * 0.0174533); //Convert to cos(radians)
+			
+			activeSpotLights[si + 8] = dynamicLights[l].color[0];
+			activeSpotLights[si + 9] = dynamicLights[l].color[1];
+			activeSpotLights[si + 10] = dynamicLights[l].color[2];
+			
+			activeSpotLights[si + 11] = dynamicLights[l].size;
+			
+			spotLightsAttached ++;
+		}
+	}
+		/*
+		x = lightPositions[l*4 + 0];
+		y = lightPositions[l*4 + 1];
+		z = lightPositions[l*4 + 2];
+		size = lightPositions[l*4 + 3];
+		
+		red = lightColors[l*4];
+		green = lightColors[l*4 + 1];
+		blue = lightColors[l*4 + 2];
+		mode = lightColors[l*4 + 3];
+		
+		//Is this a spot light
+		if(mode >= SPOT_LIGHT_PACK_MIN && mode <= SPOT_LIGHT_PACK_MAX) {
+			dirX = lightPositions[l*4 + 4];
+			dirY = lightPositions[l*4 + 5];
+			dirZ = lightPositions[l*4 + 6];
+			outerLimitCos = cos(lightColors[l*4 + 4] * 0.0174533); //Convert to cos(radians)
+			innerLimitCos = cos(lightColors[l*4 + 5] * 0.0174533); //Convert to cos(radians)
+		}
+		
+		//Is the light inside the bounding box (plus the light size)?
+		if( size > 0
+		   && x >= (geometry[g].AABB[BB_LOW_X]-size)
+		   && x <= (geometry[g].AABB[BB_HIGH_X]+size)
+		   && y >= (geometry[g].AABB[BB_LOW_Y]-size)
+		   && y <= (geometry[g].AABB[BB_HIGH_Y]+size)
+		   && z >= (geometry[g].AABB[BB_LOW_Z]-size)
+		   && z <= (geometry[g].AABB[BB_HIGH_Z]+size)
+		   ) {
+			
+			//We can only attach up to ACTIVE_LIGHTS_MAX lights.
+			if(lightsAttached < ACTIVE_LIGHTS_MAX){
+				
+				//Light positions must now be in eye space
+				MSI()->transformVertexToEyespace(x,y,z);
+				
+				activeLightPositions[lightsAttached*4 +0] = x;
+				activeLightPositions[lightsAttached*4 +1] = y;
+				activeLightPositions[lightsAttached*4 +2] = z;
+				activeLightPositions[lightsAttached*4 +3] = size;
+				
+				activeLightColors[lightsAttached*4 +0] = red;
+				activeLightColors[lightsAttached*4 +1] = green;
+				activeLightColors[lightsAttached*4 +2] = blue;
+				activeLightColors[lightsAttached*4 +3] = mode;
+				
+				//Spot lights also take up the second slot.
+				if(mode >= SPOT_LIGHT_PACK_MIN && mode <= SPOT_LIGHT_PACK_MAX) {
+					//CONSIDER THAT 3D models have their own MVP matrix, which is usually different than the active one in MSI.
+					MSI()->transformVectorToEyespace(dirX, dirY, dirZ); //Direction vector, if any, also needs to be in eyespace.
+					
+					activeLightPositions[lightsAttached*4 +4] = dirX;
+					activeLightPositions[lightsAttached*4 +5] = dirY;
+					activeLightPositions[lightsAttached*4 +6] = dirZ;
+					
+					activeLightColors[lightsAttached*4 +4] = outerLimitCos;
+					activeLightColors[lightsAttached*4 +5] = innerLimitCos;
+					lightsAttached++;
+					l++; //Skip over processing of this slot on next loop, since it's not a whole light.
+				}
+				
+				lightsAttached++;
+			}
+			
+		}
+		
+	}
+	*/
+}
+
+void DrawCache::clearAttachedLights() {
+	for(int i = 0; i < MAX_POINT_LIGHT_ELEMENTS; i++) {
+		activePointLights[i]=0;
+	}
+	
+	for(int i = 0; i < MAX_SPOT_LIGHT_ELEMENTS; i++) {
+		activeSpotLights[i]=0;
+	}
+	
+	for(int i = 0; i < MAX_AREA_LIGHT_ELEMENTS; i++) {
+		activeAreaLights[i]=0;
+	}
+}
+
+bool DrawCache::lightAndGeometryIntersect(dynamicLight l, geometryProperties g) {
+	
+	float x = l.position[0];
+	float y = l.position[1];
+	float z = l.position[2];
+	
+	if( l.size > 0
+		   && x >= (g.AABB[BB_LOW_X]	-l.size)
+		   && x <= (g.AABB[BB_HIGH_X]	+l.size)
+		   && y >= (g.AABB[BB_LOW_Y]	-l.size)
+		   && y <= (g.AABB[BB_HIGH_Y]	+l.size)
+		   && z >= (g.AABB[BB_LOW_Z]	-l.size)
+		   && z <= (g.AABB[BB_HIGH_Z]	+l.size)
+	   ) {
+		return TRUE;
+	}
+	
+	return FALSE;
 }
 
 void DrawCache::cacheLandscapeTextureStatus(bool isLand) {lastTextureIsLandscape = isLand;}
-
 void DrawCache::cacheScaleX(GLfloat v) {scaleX = v;}
 void DrawCache::cacheOffsetX(GLfloat v) {offsetX = v;}
 void DrawCache::cacheScaleY(GLfloat v) {scaleY = v;}
@@ -618,6 +919,7 @@ void DrawCache::cachePulsate(GLfloat v) {pulsate = v;}
 void DrawCache::cacheWobble(GLfloat v) {wobble = v;}
 void DrawCache::cacheDepth(GLfloat v) {depth = v;}
 void DrawCache::cacheGlow(GLfloat v) {glow = v;}
+void DrawCache::cacheStrictDepthMode(GLfloat v) {strictDepthMode = v;}
 
 void DrawCache::clearTextureAttributeCaches() {
     scaleX = 0;
@@ -627,23 +929,10 @@ void DrawCache::clearTextureAttributeCaches() {
     bloomScale = 0;
     bloomShift = 0;
     flare = 0;
-    selfLuminosity = 0;
+    selfLuminosity = 0.5; //Default is not 0
     pulsate = 0;
     wobble = 0;
     depth = 0;
     glow = 0;
-}
-
-void DrawCache::resetStats() {
-
-    float bufferEfficiency = 0;
-    if (drawCallsMade > 0) {
-        bufferEfficiency = (float)bufferRequests / (float)drawCallsMade;
-    }
-    //printf("Drawbuffer Efficiency: %f (%i total draw calls). DrawBuffers filled to max: %i. Flushes caused by buffer depletion: %i\n", bufferEfficiency, drawCallsMade, drawBuffersFilledToMax, allBuffersUsed);
-
-    bufferRequests = 0;
-    drawCallsMade = 0;
-    drawBuffersFilledToMax = 0;
-    allBuffersUsed = 0;
+	strictDepthMode = 0;
 }

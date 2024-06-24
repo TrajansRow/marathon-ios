@@ -32,11 +32,12 @@ Image_Blitter::Image_Blitter() : m_surface(NULL), m_disp_surface(NULL), m_scaled
 
 bool Image_Blitter::Load(const ImageDescriptor& image)
 {
-#ifdef ALEPHONE_LITTLE_ENDIAN
-	SDL_Surface *s = SDL_CreateRGBSurfaceFrom(const_cast<uint32 *>(image.GetBuffer()), image.GetWidth(), image.GetHeight(), 32, image.GetWidth() * 4, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
-#else
-	SDL_Surface *s = SDL_CreateRGBSurfaceFrom(const_cast<uint32 *>(image.GetBuffer()), image.GetWidth(), image.GetHeight(), 32, image.GetWidth() * 4, 0xff000000, 0x00ff0000, 0x0000ff00, 0x000000ff);
-#endif
+	SDL_Surface *s = nullptr;
+	if (PlatformIsLittleEndian()) {
+		s = SDL_CreateRGBSurfaceFrom(const_cast<uint32 *>(image.GetBuffer()), image.GetWidth(), image.GetHeight(), 32, image.GetWidth() * 4, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
+	} else {
+		s = SDL_CreateRGBSurfaceFrom(const_cast<uint32 *>(image.GetBuffer()), image.GetWidth(), image.GetHeight(), 32, image.GetWidth() * 4, 0xff000000, 0x00ff0000, 0x0000ff00, 0x000000ff);
+	}
 	if (!s)
 		return false;
 	bool ret = Load(*s);
@@ -49,10 +50,9 @@ bool Image_Blitter::Load(int picture_resource)
     bool ret = false;
     LoadedResource PictRsrc;
     if (get_picture_resource_from_images(picture_resource, PictRsrc)) {
-        SDL_Surface *hud_pict = picture_to_surface(PictRsrc);
+        auto hud_pict = picture_to_surface(PictRsrc);
         if (hud_pict) {
             ret = Load(*hud_pict);
-            SDL_FreeSurface(hud_pict);
         }
     }
     return ret;
@@ -80,11 +80,11 @@ bool Image_Blitter::Load(const SDL_Surface& s, const SDL_Rect& src)
 	crop_rect.w = m_src.w;
 	crop_rect.h = m_src.h;
 	
-#ifdef ALEPHONE_LITTLE_ENDIAN
-	m_surface = SDL_CreateRGBSurface(SDL_SWSURFACE, m_src.w, m_src.h, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
-#else
-	m_surface = SDL_CreateRGBSurface(SDL_SWSURFACE, m_src.w, m_src.h, 32, 0xff000000, 0x00ff0000, 0x0000ff00, 0x000000ff);
-#endif
+	if (PlatformIsLittleEndian()) {
+		m_surface = SDL_CreateRGBSurface(SDL_SWSURFACE, m_src.w, m_src.h, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
+	} else {
+		m_surface = SDL_CreateRGBSurface(SDL_SWSURFACE, m_src.w, m_src.h, 32, 0xff000000, 0x00ff0000, 0x0000ff00, 0x000000ff);
+	}
 	if (!m_surface)
 		return false;
 	
@@ -152,19 +152,6 @@ int Image_Blitter::UnscaledHeight()
 	return m_src.h;
 }
 
-void Image_Blitter::Draw(SDL_Surface *dst_surface, const SDL_Rect& dst)
-{
-  Image_Rect idst = { static_cast<float>(dst.x), static_cast<float>(dst.y), static_cast<float>(dst.w), static_cast<float>(dst.h) };
-    Draw(dst_surface, idst);
-}
-
-void Image_Blitter::Draw(SDL_Surface *dst_surface, const SDL_Rect& dst, const SDL_Rect& src)
-{
-  Image_Rect idst = { static_cast<float>(dst.x), static_cast<float>(dst.y), static_cast<float>(dst.w), static_cast<float>(dst.h) };
-  Image_Rect isrc = { static_cast<float>(src.x), static_cast<float>(src.y), static_cast<float>(src.w), static_cast<float>(src.h) };
-    Draw(dst_surface, idst, isrc);
-}
-
 void Image_Blitter::Draw(SDL_Surface *dst_surface, const Image_Rect& dst, const Image_Rect& src)
 {
 	if (!Loaded())
@@ -196,8 +183,8 @@ void Image_Blitter::Draw(SDL_Surface *dst_surface, const Image_Rect& dst, const 
 	if (!src_surface)
 		return;
   
-  SDL_Rect ssrc = { static_cast<int>(src.x), static_cast<int>(src.y), static_cast<int>(src.w), static_cast<int>(src.h) };
-  SDL_Rect sdst = { static_cast<int>(dst.x), static_cast<int>(dst.y), static_cast<int>(dst.w), static_cast<int>(dst.h) };
+	SDL_Rect ssrc = { int(src.x), int(src.y), int(src.w), int(src.h) };
+	SDL_Rect sdst = { int(dst.x), int(dst.y), int(dst.w), int(dst.h) };
 	SDL_BlitSurface(src_surface, &ssrc, dst_surface, &sdst);
 }
 

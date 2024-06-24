@@ -33,8 +33,6 @@
 #include "cseries.h"
 #include "FileHandler.h"
 
-using namespace std;
-
 // Need an object to hold the read-in image.
 class ImageDescriptor
 {
@@ -50,9 +48,7 @@ class ImageDescriptor
 	int MipMapCount;
 	
 public:
-  // DJB OpenGL support for Compressed textures
-  int ContentLength;
-  
+	
 	bool IsPresent() const {return (Pixels != NULL); }
 	bool IsPremultiplied() const { return (IsPresent() ? PremultipliedAlpha : false); }
 
@@ -72,10 +68,7 @@ public:
 	double GetUScale() const { return UScale; }
 
 	// Pixel accessors
-	uint32& GetPixel(int Horiz, int Vert) {
-    assert ( Format != PVRTC4 );
-    return Pixels[Width*(Vert%Height) + (Horiz%Width)];
-  }
+	uint32& GetPixel(int Horiz, int Vert) {return Pixels[Width*(Vert%Height) + (Horiz%Width)];}
 	uint32 *GetPixelBasePtr() {return Pixels;}
 	const uint32 *GetBuffer() const { return Pixels; }
 	uint32 *GetBuffer() { return Pixels; }
@@ -114,8 +107,6 @@ ImageDescriptor(): Width(0), Height(0), VScale(1.0), UScale(1.0), Pixels(NULL), 
 		DXTC1,
 		DXTC3,
 		DXTC5,
-    PVRTC2,
-    PVRTC4,
 		Unknown
 	};
 
@@ -129,7 +120,6 @@ private:
 	bool LoadDDSFromFile(FileSpecifier& File, int flags, int actual_width = 0, int actual_height = 0, int maxSize = 0);
 	bool LoadMipMapFromFile(OpenedFile &File, int flags, int level, DDSURFACEDESC2 &ddsd, int skip);
 	bool SkipMipMapFromFile(OpenedFile &File, int flags, int level, DDSURFACEDESC2 &ddsd);
-  bool LoadPVTCFromFile ( FileSpecifier& File ); //DCW
 
 	ImageFormat Format;
 };

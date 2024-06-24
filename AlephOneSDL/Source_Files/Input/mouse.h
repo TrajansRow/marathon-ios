@@ -27,27 +27,21 @@ Tuesday, January 17, 1995 2:53:17 PM  (Jason')
         semi-hacky scheme in SDL to let mouse buttons simulate keypresses
 */
 
-#include "cstypes.h"
+#include "world.h"
 
 void enter_mouse(short type);
-void test_mouse(short type, uint32 *action_flags, _fixed *delta_yaw, _fixed *delta_pitch, _fixed *delta_velocity);
+fixed_yaw_pitch pull_mouselook_delta();
 void exit_mouse(short type);
 void mouse_idle(short type);
 void recenter_mouse(void);
-
-//DCW
-float lostMousePrecisionX();
-float lostMousePrecisionY();
-double cosine_table_calculated(double i);
-double sine_table_calculated(double i);
-bool shouldSmoothMouselook();
 
 // ZZZ: stuff of various hackiness levels to pretend mouse buttons are keys
 void mouse_buttons_become_keypresses(Uint8* ioKeyMap);
 void mouse_scroll(bool up);
 void mouse_moved(int delta_x, int delta_y);
 
-#define NUM_SDL_MOUSE_BUTTONS 8   // since SDL_GetMouseState() returns 8 bits
+#define NUM_SDL_REAL_MOUSE_BUTTONS 5
+#define NUM_SDL_MOUSE_BUTTONS 7   		  // two scroll-wheel buttons
 #define AO_SCANCODE_BASE_MOUSE_BUTTON 400 // this is button 1's pseudo-keysym
 #define AO_SCANCODE_MOUSESCROLL_UP 405    // stored as mouse button 6
 #define AO_SCANCODE_MOUSESCROLL_DOWN 406  // stored as mouse button 7

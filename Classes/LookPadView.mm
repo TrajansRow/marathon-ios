@@ -9,12 +9,12 @@
 #import "AlephOneHelper.h"
 #import "GameViewController.h"
 extern "C" {
-#include "SDL_keyboard_c.h"
-#include "SDL_keyboard.h"
-#include "SDL_stdinc.h"
-#include "SDL_mouse_c.h"
-#include "SDL_mouse.h"
-#include "SDL_events.h"
+//Still needed for iOS 6-19-24?#include "SDL2/SDL_keyboard_c.h"
+#include "SDL2/SDL_keyboard.h"
+#include "SDL2/SDL_stdinc.h"
+//Still needed for iOS 6-19-24?#include "SDL_mouse_c.h"
+#include "SDL2/SDL_mouse.h"
+#include "SDL2/SDL_events.h"
 }
 #include "cseries.h"
 #include <string.h>
@@ -40,7 +40,7 @@ extern "C" {
 	motionManager = [[CMMotionManager alloc] init];
 	
   // Kill a warning
-  (void)all_key_definitions;
+	//Still needed for iOS 6-19-24?(void)all_key_definitions;
 
   // Initialization code
 	key_definition *key = standard_key_definitions;
@@ -59,7 +59,7 @@ extern "C" {
     }
   }
 	
-  SDL_MouseInit();
+	//Still needed for iOS 6-19-24?SDL_MouseInit();
   [self unPauseGyro];
 	specialGyroModeActive = 0;
 	[self startGyro];

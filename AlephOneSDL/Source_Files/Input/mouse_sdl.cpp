@@ -36,25 +36,13 @@
 #include "preferences.h"
 #include "screen.h"
 
-#include "interface.h"
-
-#ifdef __APPLE__
-#include "mouse_cocoa.h"
-#endif
-
-#include "AlephOneHelper.h"
-
 // Global variables
 static bool mouse_active = false;
 static uint8 button_mask = 0;		// Mask of enabled buttons
-static _fixed snapshot_delta_yaw, snapshot_delta_pitch;
+static fixed_yaw_pitch mouselook_delta = {0, 0};
 static _fixed snapshot_delta_scrollwheel;
 static int snapshot_delta_x, snapshot_delta_y;
 
-//DCW
-static float lost_x, lost_y; //Stores the unrepresented mouselook precision.
-static float lost_x_at_last_sample, lost_y_at_last_sample; //Stores the unrepresented mouse presion values as of sample time, which can be used by the renderer. Capturing this value eliminates jitter in multiplayer.
-static bool smooth_mouselook;
 
 /*
  *  Initialize in-game mouse handling
@@ -63,25 +51,15 @@ static bool smooth_mouselook;
 void enter_mouse(short type)
 {
 	if (type != _keyboard_or_game_pad) {
-#ifdef __APPLE__
-      //DCW no mouse on ios
-    //if (input_preferences->raw_mouse_input)
-			//OSX_Mouse_Init();
-#endif
-    
-    //DCW clear mouse deltas.
-    float dx, dy;
-    slurpMouseDelta(&dx, &dy);
-    
+		MainScreenCenterMouse();
+		
 		SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_WARP, input_preferences->raw_mouse_input ? "0" : "1");
 		SDL_SetRelativeMouseMode(SDL_TRUE);
 		mouse_active = true;
-		snapshot_delta_yaw = snapshot_delta_pitch = 0;
+		mouselook_delta = {0, 0};
 		snapshot_delta_scrollwheel = 0;
 		snapshot_delta_x = snapshot_delta_y = 0;
-    lost_x = lost_y = 0;
 		button_mask = 0;	// Disable all buttons (so a shot won't be fired if we enter the game with a mouse button down from clicking a GUI widget)
-		recenter_mouse();
 	}
 }
 
@@ -95,10 +73,6 @@ void exit_mouse(short type)
 	if (type != _keyboard_or_game_pad) {
 		SDL_SetRelativeMouseMode(SDL_FALSE);
 		mouse_active = false;
-#ifdef __APPLE__
-      // DCW no mouse on ios
-		//OSX_Mouse_Shutdown();
-#endif
 	}
 }
 
@@ -126,154 +100,52 @@ static inline float MIX(float start, float end, float factor)
 void mouse_idle(short type)
 {
 	if (mouse_active) {
-    
-  //DCW Not present on ios
-/*#ifdef __APPLE__
-		// In raw mode, get unaccelerated deltas from HID system
-		if (input_preferences->raw_mouse_input)
-			OSX_Mouse_GetMouseMovement(&snapshot_delta_x, &snapshot_delta_y);
-#endif*/
-    
-    
+		static uint32 last_tick_count = 0;
+		uint32 tick_count = machine_tick_count();
+		int32 ticks_elapsed = tick_count - last_tick_count;
+
+		if (ticks_elapsed < 1)
+			return;
+
 		// Calculate axis deltas
 		float dx = snapshot_delta_x;
 		float dy = -snapshot_delta_y;
 		snapshot_delta_x = 0;
 		snapshot_delta_y = 0;
-    
-    slurpMouseDelta(&dx, &dy);
-    if(dx>0 || dy>0)
-    {
-      snapshot_delta_x = 0;
-      snapshot_delta_y = 0;
-    }
-    
-    
-    if( shouldAutoBot()) {
-      setSmartFirePrimary(1); //Autobot always shoots!
-      
-      if(isMonsterCentered() || isMonsterOnLeft() || isMonsterOnRight()) {
-        if(isMonsterOnLeft()){
-          dx += 3;
-        } else if(isMonsterOnRight()){
-          dx -= 3;
-        }
-      } else {
-        dx += 20; //Just spin in place if we don't see anyone
-      }
-      
-    }
-    
+		
 		// Mouse inversion
 		if (TEST_FLAG(input_preferences->modifiers, _inputmod_invert_mouse))
 			dy = -dy;
 		
-		// scale input by sensitivity
-		const float sensitivityScale = 1.f / (66.f * FIXED_ONE);
-		float sx = sensitivityScale * input_preferences->sens_horizontal;
-		float sy = sensitivityScale * input_preferences->sens_vertical;
+		// Delta sensitivities
+		const float angle_per_scaled_delta = 128/66.f; // assuming _mouse_accel_none
+		float sx = angle_per_scaled_delta * (input_preferences->sens_horizontal / float{FIXED_ONE});
+		float sy = angle_per_scaled_delta * (input_preferences->sens_vertical / float{FIXED_ONE}) * (input_preferences->classic_vertical_aim ? 0.25f : 1.f);
 		switch (input_preferences->mouse_accel_type)
 		{
 			case _mouse_accel_classic:
-				sx *= MIX(1.f, fabs(dx * sx) * 4.f, input_preferences->mouse_accel_scale);
-				sy *= MIX(1.f, fabs(dy * sy) * 4.f, input_preferences->mouse_accel_scale);
+				sx *= MIX(1.f, (1/32.f) * fabs(dx * sx), input_preferences->mouse_accel_scale);
+				sy *= MIX(1.f, (1/(input_preferences->classic_vertical_aim ? 8.f : 32.f)) * fabs(dy * sy), input_preferences->mouse_accel_scale);
 				break;
 			case _mouse_accel_none:
 			default:
 				break;
 		}
-		dx *= sx;
-		dy *= sy;
-    
-      //Add post-sensitivity lost precision, in case we can use it this time around.
-    dx += lost_x;
-    dy += lost_y;
-    
-		// 1 dx unit = 1 * 2^ABSOLUTE_YAW_BITS * (360 deg / 2^ANGULAR_BITS)
-		//           = 90 deg
-		//
-		// 1 dy unit = 1 * 2^ABSOLUTE_PITCH_BITS * (360 deg / 2^ANGULAR_BITS)
-		//           = 22.5 deg
 		
-		// Largest dx for which both -dx and +dx can be represented in 1 action flags bitset
-		float dxLimit = 0.5f - 1.f / (1<<ABSOLUTE_YAW_BITS);  // 0.4921875 dx units (~44.30 deg)
+		// Angular deltas
+		const fixed_angle dyaw = static_cast<fixed_angle>(sx * dx * FIXED_ONE);
+		const fixed_angle dpitch = static_cast<fixed_angle>(sy * dy * FIXED_ONE);
 		
-		// Largest dy for which both -dy and +dy can be represented in 1 action flags bitset
-		float dyLimit = 0.5f - 1.f / (1<<ABSOLUTE_PITCH_BITS);  // 0.46875 dy units (~10.55 deg)
-		
-		dxLimit = MIN(dxLimit, input_preferences->mouse_max_speed);
-		dyLimit = MIN(dyLimit, input_preferences->mouse_max_speed);
-		
-		dx = PIN(dx, -dxLimit, dxLimit);
-		dy = PIN(dy, -dyLimit, dyLimit);
-		
-		snapshot_delta_yaw   = static_cast<_fixed>(dx * FIXED_ONE);
-		snapshot_delta_pitch = static_cast<_fixed>(dy * FIXED_ONE);
-    
-    //DCW what the fuck is the point of keeping the lower 9 or whatever bits in there? They just get thrown out later anyway...
-    //Lets bitshift off the unused bits, so we can add in that lost precision the next time around.
-    snapshot_delta_yaw >>= (FIXED_FRACTIONAL_BITS-ABSOLUTE_YAW_BITS);
-    snapshot_delta_yaw <<= (FIXED_FRACTIONAL_BITS-ABSOLUTE_YAW_BITS);
-    snapshot_delta_pitch >>= (FIXED_FRACTIONAL_BITS-ABSOLUTE_PITCH_BITS);
-    snapshot_delta_pitch <<= (FIXED_FRACTIONAL_BITS-ABSOLUTE_PITCH_BITS);
-
-    //DCW Lets track how much precision we lost, so we can stuff it back into the input next time this function is called.
-    lost_x = (dx * (float)FIXED_ONE) - (float)snapshot_delta_yaw;
-    lost_y = (dy * (float)FIXED_ONE) - (float)snapshot_delta_pitch;
-    lost_x /= (float)FIXED_ONE;
-    lost_y /= (float)FIXED_ONE;
-    
-    //Discard lost_y if it would put the view beyond the pitch limits.
-    _fixed minimumAbsolutePitch, maximumAbsolutePitch;
-    get_absolute_pitch_range(&minimumAbsolutePitch, &maximumAbsolutePitch);
-    if((local_player->variables.elevation == minimumAbsolutePitch && dy < 0.0) || (local_player->variables.elevation == maximumAbsolutePitch && dy > 0.0)) { lost_y=0.0; }
-    
-    smooth_mouselook = smoothMouselookPreference() && player_controlling_game() && !PLAYER_IS_DEAD(local_player);
- 	}
-}
-
-//DCW
-//Returns the currently not-represented mouse precision as a fraction of a yaw and pitch unit.
-//This might be useful to render the view with more precise yaw or pitch.
-float lostMousePrecisionX() { return ( (float)shouldSmoothMouselook() * ((lost_x_at_last_sample*(float)FIXED_ONE)/512.0) - 0.5); }
-float lostMousePrecisionY() { return ( (float)shouldSmoothMouselook() * ((lost_y_at_last_sample*(float)FIXED_ONE)/2048.0) - 0.5); }
-
-double cosine_table_calculated(double i) {
-  double two_pi= 8.0*atan(1.0);
-  double theta= two_pi*(double)i/(double)NUMBER_OF_ANGLES;
-  
-  return ((double)TRIG_MAGNITUDE*cos(theta)+0.5);
-}
-double sine_table_calculated(double i) {
-  double two_pi= 8.0*atan(1.0);
-  double theta= two_pi*(double)i/(double)NUMBER_OF_ANGLES;
-  
-  return ((double)TRIG_MAGNITUDE*sin(theta)+0.5);
-}
-bool shouldSmoothMouselook(){
-  return smooth_mouselook;
-}
-
-
-/*
- *  Return mouse state
- */
-
-void test_mouse(short type, uint32 *flags, _fixed *delta_yaw, _fixed *delta_pitch, _fixed *delta_velocity)
-{
-	if (mouse_active) {
-    //printf ("Sampled mouse: %d\n", snapshot_delta_yaw);
-		*delta_yaw = snapshot_delta_yaw;
-		*delta_pitch = snapshot_delta_pitch;
-		*delta_velocity = 0;  // Mouse-driven player velocity is unimplemented
-    lost_x_at_last_sample = lost_x;
-    lost_y_at_last_sample = lost_y;
-		snapshot_delta_yaw = snapshot_delta_pitch = 0;
-	} else {
-		*delta_yaw = 0;
-		*delta_pitch = 0;
-		*delta_velocity = 0;
+		// Push mouselook delta
+		mouselook_delta = {dyaw, dpitch};
 	}
+}
+
+fixed_yaw_pitch pull_mouselook_delta()
+{
+	auto delta = mouselook_delta;
+	mouselook_delta = {0, 0};
+	return delta;
 }
 
 
@@ -284,7 +156,7 @@ mouse_buttons_become_keypresses(Uint8* ioKeyMap)
 		uint8 orig_buttons = buttons;
 		buttons &= button_mask;				// Mask out disabled buttons
 
-        for(int i = 0; i < NUM_SDL_MOUSE_BUTTONS; i++) {
+        for(int i = 0; i < NUM_SDL_REAL_MOUSE_BUTTONS; i++) {
             ioKeyMap[AO_SCANCODE_BASE_MOUSE_BUTTON + i] =
                 (buttons & SDL_BUTTON(i+1)) ? SDL_PRESSED : SDL_RELEASED;
         }

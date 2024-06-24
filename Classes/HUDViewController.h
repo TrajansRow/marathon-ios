@@ -8,7 +8,7 @@
 
 #import <UIKit/UIKit.h>
 
-#include "SDL_keyboard.h"
+#include "SDL2/SDL_keyboard.h"
 #import "LookPadView.h" //DCW
 
 

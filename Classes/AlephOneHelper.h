@@ -6,7 +6,7 @@
 //  Copyright 2010 __MyCompanyName__. All rights reserved.
 //
 
-#include "SDL.h"
+#include "SDL2/SDL.h"
 
 #ifdef __IPAD__
 // #define iWidth 1024

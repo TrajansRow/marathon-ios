@@ -28,7 +28,7 @@
 #include "CommunicationsChannel.h"
 #include <string>
 #include <memory>
-#include <SDL_thread.h>
+#include <SDL2/SDL_thread.h>
 
 class NonblockingConnect
 {
@@ -60,7 +60,7 @@ public:
 
 private:
 	void connect();
-	std::auto_ptr<CommunicationsChannel> m_channel;
+	std::unique_ptr<CommunicationsChannel> m_channel;
 	Status m_status;
 
 	std::string m_address;
@@ -78,7 +78,13 @@ private:
 class ConnectPool
 {
 public:
-	static ConnectPool *instance() { if (!m_instance) m_instance = new ConnectPool(); return m_instance; }
+	static ConnectPool *instance() { 
+		static ConnectPool *m_instance = nullptr;
+		if (!m_instance) {
+			m_instance = new ConnectPool(); 
+		}
+		return m_instance; 
+	}
 	NonblockingConnect* connect(const std::string& address, uint16 port);
 	NonblockingConnect* connect(const IPaddress& ip);
 	void abandon(NonblockingConnect*);
@@ -91,7 +97,6 @@ private:
 	// second is false if we are in use!
 	std::pair<NonblockingConnect *, bool> m_pool[kPoolSize];
 
-	static ConnectPool* m_instance;
 };
 
 #endif

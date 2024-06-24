@@ -77,29 +77,29 @@ enum {
 	_sw_driver_opengl,
 };
 
+enum {
+	_ephemera_off,
+	_ephemera_low,
+	_ephemera_medium,
+	_ephemera_high,
+	_ephemera_ultra
+};
+
 struct graphics_preferences_data
 {
 	struct screen_mode_data screen_mode;
 	// LP change: added OpenGL support
 	OGL_ConfigureData OGL_Configure;
 
-	bool double_corpse_limit;
-
 	int16 software_alpha_blending;
 	int16 software_sdl_driver;
-
-	bool hog_the_cpu;
+	int16 fps_target; // should be a multiple of 30; 0 = unlimited
 
 	int16 movie_export_video_quality;
+	int32 movie_export_video_bitrate; // 0 is automatic
     int16 movie_export_audio_quality;
-};
 
-struct serial_number_data
-{
-	bool network_only;
-	byte long_serial_number[10];
-	unsigned char user_name[256];
-	unsigned char tokenized_serial_number[256];
+	int16 ephemera_quality;
 };
 
 enum {
@@ -112,7 +112,6 @@ enum {
 
 struct network_preferences_data
 {
-	bool allow_microphone;
 	bool game_is_untimed;
 	int16 type; // look in network_dialogs.c for _ethernet, etc...
 	int16 game_type;
@@ -126,7 +125,6 @@ struct network_preferences_data
 	char join_address[256];
 	uint16 game_port;	// TCP and UDP port number used for game traffic (not player-location traffic)
 	uint16 game_protocol; // _network_game_protocol_star, etc.
-	bool use_speex_encoder;
 	bool use_netscript;
 	char netscript_file[256];
 	uint16 cheat_flags;
@@ -146,7 +144,14 @@ struct network_preferences_data
 	bool mute_metaserver_guests;
 	bool join_metaserver_by_default;
 	bool allow_stats;
-  bool detect_desync;
+};
+
+enum SoloProfileType {
+	_solo_profile_aleph_one,
+	_solo_profile_unused,		// hope springs eternal
+	_solo_profile_marathon_2,
+	_solo_profile_marathon_infinity,
+	NUMBER_OF_SOLO_PROFILE_TYPES
 };
 
 struct player_preferences_data
@@ -160,6 +165,8 @@ struct player_preferences_data
 	bool crosshairs_active;
 	struct ChaseCamData ChaseCam;
 	struct CrosshairData Crosshairs;
+
+	int solo_profile;
 };
 
 // LP addition: input-modifier flags
@@ -171,7 +178,8 @@ enum {
 	_inputmod_dont_switch_to_new_weapon = 0x0004,
 	_inputmod_invert_mouse = 0x0008,
 	_inputmod_use_button_sounds = 0x0010,
-	_inputmod_dont_auto_recenter = 0x0020   // ZZZ addition
+	_inputmod_dont_auto_recenter = 0x0020,   // ZZZ addition
+	_inputmod_run_key_toggle = 0x0040,
 };
 
 // shell keys
@@ -190,19 +198,13 @@ enum {
 };
 
 enum {
-	_joystick_strafe,
-	_joystick_velocity,
-	_joystick_yaw,
-	_joystick_pitch,
-	NUMBER_OF_JOYSTICK_MAPPINGS
-};
-
-enum {
 	_mouse_accel_none,
 	_mouse_accel_classic,
+	_mouse_accel_symmetric,
 	NUMBER_OF_MOUSE_ACCEL_TYPES
 };
 
+static constexpr int NUMBER_OF_HOTKEYS = 12;
 
 typedef std::map<int, std::set<SDL_Scancode> > key_binding_map;
 
@@ -217,19 +219,24 @@ struct input_preferences_data
 	int16 mouse_accel_type;
 	float mouse_accel_scale;
 	bool raw_mouse_input;
-	float mouse_max_speed;
+	bool extra_mouse_precision;
+	bool classic_vertical_aim;
 	
-	bool use_joystick;
-	int16 joystick_axis_mappings[NUMBER_OF_JOYSTICK_MAPPINGS];
-	float joystick_axis_sensitivities[NUMBER_OF_JOYSTICK_MAPPINGS];
+	// Limit absolute-mode {yaw, pitch} deltas per tick to +/- {32, 8} instead of {63, 15}
+	bool classic_aim_speed_limits;
+	
+	bool controller_analog;
+	bool controller_aim_inverted;
+	_fixed controller_sensitivity;
 
 	// if an axis reading is taken below this number in absolute
 	// value, then we clip it to 0.  this lets people use
 	// inaccurate zero points.
-	int16 joystick_axis_bounds[NUMBER_OF_JOYSTICK_MAPPINGS];
+	int16 controller_deadzone;
 	
 	key_binding_map key_bindings;
 	key_binding_map shell_key_bindings;
+	key_binding_map hotkey_bindings;
 };
 
 #define MAXIMUM_PATCHES_PER_ENVIRONMENT (32)
@@ -260,18 +267,23 @@ struct environment_preferences_data
 	bool use_replay_net_lua;
 	bool hide_extensions;
 
-	FilmProfileType film_profile;
+	FilmProfileType film_profile; // for legacy films
 
 	// Marathon 1 resources from the application itself
 	char resources_file[256];
 
 	// how many auto-named save files to keep around (0 is unlimited)
 	uint32 maximum_quick_saves;
+
+#ifdef HAVE_NFD
+	bool use_native_file_dialogs;
+#endif
+
+	bool auto_play_demos;
 };
 
 /* New preferences.. (this sorta defeats the purpose of this system, but not really) */
 extern struct graphics_preferences_data *graphics_preferences;
-extern struct serial_number_data *serial_preferences;
 extern struct network_preferences_data *network_preferences;
 extern struct player_preferences_data *player_preferences;
 extern struct input_preferences_data *input_preferences;
@@ -284,6 +296,10 @@ void initialize_preferences(void);
 void read_preferences();
 void handle_preferences(void);
 void write_preferences(void);
+
+static inline int16 get_fps_target() {
+	return graphics_preferences->fps_target;
+}
 
 void transition_preferences(const DirectorySpecifier& legacy_prefs_dir);
 

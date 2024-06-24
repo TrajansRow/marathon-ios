@@ -57,14 +57,14 @@ May 16, 2002 (Woody Zenfell):
 */
 
 /*
-running backwards shouldn’t mean doom in a fistfight
+running backwards shouldn‚Äôt mean doom in a fistfight
 
 //who decides on the physics model, anyway?  static_world-> or player->
 //falling through gridlines and crapping on elevators has to do with variables->flags being wrong after the player dies
 //absolute (or nearly-absolute) positioning information for yaw, pitch and velocity
 //the physics model is too soft (more noticable at high frame rates)
 //we can continually boot ourselves out of nearly-orthogonal walls by tiny amounts, resulting in a slide
-//it’s fairly obvious that players can still end up in walls
+//it‚Äôs fairly obvious that players can still end up in walls
 //the recenter key should work faster
 */
 
@@ -78,6 +78,7 @@ running backwards shouldn’t mean doom in a fistfight
 #include "player.h"
 #include "interface.h"
 #include "monsters.h"
+#include "preferences.h"
 
 #define DONT_REPEAT_DEFINITIONS
 #include "monster_definitions.h"
@@ -89,6 +90,8 @@ running backwards shouldn’t mean doom in a fistfight
 #include "Packing.h"
 
 #include <string.h>
+#include <cstdlib>
+#include <algorithm>
 
 /* ---------- constants */
 
@@ -125,11 +128,15 @@ static bool saved_divergence_warning;
 #endif
 
 static struct physics_constants physics_models[NUMBER_OF_PHYSICS_MODELS];
+static fixed_yaw_pitch vir_aim_delta = {0, 0};
 
 /* every other field in the player structure should be valid when this call is made */
 void initialize_player_physics_variables(
 	short player_index)
 {
+	if (player_index == local_player_index)
+		resync_virtual_aim();
+	
 	struct player_data *player= get_player_data(player_index);
 	struct monster_data *monster= get_monster_data(player->monster_index);
 	struct object_data *object= get_object_data(monster->object_index);
@@ -139,7 +146,7 @@ void initialize_player_physics_variables(
 //#ifdef DEBUG
 	obj_set(*variables, 0x80);
 //#endif
-	
+
 	variables->head_direction= 0;
 	variables->adjusted_yaw= variables->direction= INTEGER_TO_FIXED(object->facing);
 	variables->adjusted_pitch= variables->elevation= 0;
@@ -281,61 +288,6 @@ void get_absolute_pitch_range(
 	*maximum= constants->maximum_elevation;
 }
 
-/* deltas of zero are ignored; all deltas must be in [-FIXED_ONE,FIXED_ONE] which will be scaled
-	to the maximum for that value */
-uint32 mask_in_absolute_positioning_information(
-	uint32 action_flags,
-	_fixed delta_yaw,
-	_fixed delta_pitch,
-	_fixed delta_position)
-{
-	struct physics_variables *variables= &local_player->variables;
-	short encoded_delta;
-
-	if ((delta_yaw||variables->angular_velocity) && !(action_flags&_override_absolute_yaw))
-	{
-		// Bit-shifting is always done with positive_numbers,
-		// for consistent rounding regardless of direction
-		int sign_yaw = 1.0;
-		if (delta_yaw < 0)
-		{
-			sign_yaw = -1.0;
-			delta_yaw = -delta_yaw;
-		}
-		encoded_delta= sign_yaw*(delta_yaw>>(FIXED_FRACTIONAL_BITS-ABSOLUTE_YAW_BITS))+MAXIMUM_ABSOLUTE_YAW/2;
-		encoded_delta= PIN(encoded_delta, 0, MAXIMUM_ABSOLUTE_YAW-1);
-		action_flags= SET_ABSOLUTE_YAW(action_flags, encoded_delta)|_absolute_yaw_mode;
-	}
-
-	if ((delta_pitch||variables->vertical_angular_velocity) && !(action_flags&_override_absolute_pitch))
-	{
-		int sign_pitch = 1.0;
-		if (delta_pitch < 0)
-		{
-			sign_pitch = -1.0;
-			delta_pitch = -delta_pitch;
-		}
-		encoded_delta= sign_pitch*(delta_pitch>>(FIXED_FRACTIONAL_BITS-ABSOLUTE_PITCH_BITS))+MAXIMUM_ABSOLUTE_PITCH/2;
-		encoded_delta= PIN(encoded_delta, 0, MAXIMUM_ABSOLUTE_PITCH-1);
-		action_flags= SET_ABSOLUTE_PITCH(action_flags, encoded_delta)|_absolute_pitch_mode;
-	}
-
-	if (delta_position && !(action_flags&_override_absolute_position))
-	{
-		int sign_position = 1.0;
-		if (delta_position < 0)
-		{
-			sign_position = -1.0;
-			delta_position = -delta_position;
-		}
-		encoded_delta= sign_position*(delta_position>>(FIXED_FRACTIONAL_BITS-ABSOLUTE_POSITION_BITS))+MAXIMUM_ABSOLUTE_POSITION/2;
-		encoded_delta= PIN(encoded_delta, 0, MAXIMUM_ABSOLUTE_POSITION-1);
-		action_flags= SET_ABSOLUTE_POSITION(action_flags, encoded_delta)|_absolute_position_mode;
-	}
-
-	return action_flags;
-}
-
 void kill_player_physics_variables(
 	short player_index)
 {
@@ -355,6 +307,89 @@ _fixed get_player_forward_velocity_scale(
 		dy*sine_table[FIXED_INTEGERAL_PART(variables->direction)])>>TRIG_SHIFT))/constants->maximum_forward_velocity;
 }
 
+fixed_yaw_pitch virtual_aim_delta()
+{
+	return vir_aim_delta;
+}
+
+void resync_virtual_aim()
+{
+	vir_aim_delta = {0, 0};
+}
+
+uint32 process_aim_input(uint32 action_flags, fixed_yaw_pitch delta)
+{
+	// Classic behavior modes
+	const bool classic_precision = !input_preferences->extra_mouse_precision;
+	const bool classic_limits = input_preferences->classic_aim_speed_limits;
+	
+	// Classic precision behavior:
+	// - round magnitudes within (0, FIXED_ONE) to FIXED_ONE
+	// - round toward zero instead of nearest
+	// - lock virtual aim to physical aim
+	
+	auto clamp = [classic_limits](fixed_angle theta, int encoding_bits) -> fixed_angle
+	{
+		const angle encoding_bias = (1<<encoding_bits)/2;
+		const angle encoding_limit = encoding_bias - 1; // encoding supports [-bias, bias-1] but we want +/- symmetry
+		const angle limit = classic_limits ? encoding_bias/2 : encoding_limit;
+		return A1_PIN(theta, -limit*FIXED_ONE, limit*FIXED_ONE);
+	};
+	
+	auto round = [classic_precision](fixed_angle theta) -> angle
+	{
+		return classic_precision ?
+			SGN(theta) * std::max<angle>(1, std::abs(theta/FIXED_ONE)) :
+			(theta + SGN(theta)*FIXED_ONE/2) / FIXED_ONE;
+	};
+	
+	auto encode = [](angle theta, int encoding_bits) -> uint32
+	{
+		return (theta + (1<<encoding_bits)/2) & ((1<<encoding_bits) - 1);
+	};
+	
+	const physics_variables& local_phys = local_player->variables;
+	
+	// The delta from the current physical aim to the requested virtual aim
+	const fixed_yaw_pitch full_delta = {delta.yaw + vir_aim_delta.yaw, delta.pitch + vir_aim_delta.pitch};
+	
+	// Process yaw input
+	if (!(action_flags & _override_absolute_yaw))
+	{
+		const fixed_angle target = clamp(full_delta.yaw, ABSOLUTE_YAW_BITS); // the high-precision target delta
+		const angle payload = round(target); // the low-precision delta to be encoded
+		
+		if (payload || local_phys.angular_velocity)
+			action_flags = SET_ABSOLUTE_YAW(action_flags, encode(payload, ABSOLUTE_YAW_BITS)) | _absolute_yaw_mode;
+		
+		// Update virtual yaw
+		vir_aim_delta.yaw = classic_precision ? 0 : target - payload*FIXED_ONE;
+		assert(std::abs(vir_aim_delta.yaw) <= FIXED_ONE/2);
+	}
+	
+	// Explicit and automatic recentering do not occur under absolute pitch mode; therefore we
+	// 1) try to always use absolute pitch mode if the user doesn't want auto-recentering; and
+	// 2) always avoid absolute pitch mode while an explicit recentering operation is in progress
+	// (pitch control is necessarily locked out until the recentering completes; no way to cancel)
+	
+	const bool explicitly_recentering = local_phys.flags & _RECENTERING_BIT;
+	
+	// Process pitch input
+	if (!(action_flags & _override_absolute_pitch) && !explicitly_recentering)
+	{
+		const fixed_angle target = clamp(full_delta.pitch, ABSOLUTE_PITCH_BITS); // the high-precision target delta
+		const angle payload = round(target); // the low-precision delta to be encoded
+		
+		if (payload || local_phys.vertical_angular_velocity || dont_auto_recenter())
+			action_flags = SET_ABSOLUTE_PITCH(action_flags, encode(payload, ABSOLUTE_PITCH_BITS)) | _absolute_pitch_mode;
+		
+		// Update virtual pitch
+		vir_aim_delta.pitch = classic_precision ? 0 : target - payload*FIXED_ONE;
+		assert(std::abs(vir_aim_delta.pitch) <= FIXED_ONE/2);
+	}
+	
+	return action_flags;
+}
 
 
 /* ---------- private code */
@@ -405,8 +440,8 @@ _fixed get_player_forward_velocity_scale(
 	new_location.z= FIXED_TO_WORLD(variables->position.z);
 
 	/* check for 2d collisions with walls and knock the player back out of the wall (because of
-		the way the physics updates work, we don’t worry about collisions with the floor or
-		ceiling).  ONLY MODIFY THE PLAYER’S FIXED_POINT3D POSITION IF WE HAD A COLLISION */
+		the way the physics updates work, we don‚Äôt worry about collisions with the floor or
+		ceiling).  ONLY MODIFY THE PLAYER‚ÄôS FIXED_POINT3D POSITION IF WE HAD A COLLISION */
 	if (PLAYER_IS_DEAD(player)) new_location.z+= FIXED_TO_WORLD(DROP_DEAD_HEIGHT);
 	if (take_action && !first_time && player->last_supporting_polygon_index!=player->supporting_polygon_index) changed_polygon(player->last_supporting_polygon_index, player->supporting_polygon_index, player_index);
 	player->last_supporting_polygon_index= first_time ? NONE : player->supporting_polygon_index;
@@ -416,7 +451,7 @@ _fixed get_player_forward_velocity_scale(
 	if (PLAYER_IS_DEAD(player)) new_location.z-= FIXED_TO_WORLD(DROP_DEAD_HEIGHT);
 
 	/* check for 2d collisions with solid objects and knock the player back out of the object.
-		ONLY MODIFY THE PLAYER’S FIXED_POINT3D POSITION IF WE HAD A COLLISION. */
+		ONLY MODIFY THE PLAYER‚ÄôS FIXED_POINT3D POSITION IF WE HAD A COLLISION. */
 	object_floor= INT16_MIN;
 	{
 		short obstruction_index= legal_player_move(player->monster_index, &new_location, &object_floor);
@@ -507,7 +542,9 @@ static void physics_update(
 	fixed_point3d new_position;
 	short sine, cosine;
 	_fixed delta_z;
-	_fixed delta; /* used as a scratch ‘change’ variable */
+	_fixed delta; /* used as a scratch ‚Äòchange‚Äô variable */
+	
+	const bool player_is_local = (player == local_player);
 
 	if (PLAYER_IS_DEAD(player)) /* dead players immediately loose all bodily control */
 	{
@@ -529,6 +566,10 @@ static void physics_update(
 		}
 		
 		variables->floor_height-= DROP_DEAD_HEIGHT;
+		
+		// Prohibit twitching while dead (!)
+		if (player_is_local)
+			resync_virtual_aim();
 	}
 	delta_z= variables->position.z-variables->floor_height;
 
@@ -547,7 +588,7 @@ static void physics_update(
 		action_flags&= ~_absolute_pitch_mode;
 	}
 
-	/* handle turning left or right; if we’ve exceeded our maximum velocity lock out user actions
+	/* handle turning left or right; if we‚Äôve exceeded our maximum velocity lock out user actions
 		until we return to a legal range */
 	if (action_flags&_absolute_yaw_mode)
 	{
@@ -591,6 +632,10 @@ static void physics_update(
 					FLOOR(variables->head_direction-constants->fast_angular_velocity, 0) :
 					CEILING(variables->head_direction+constants->fast_angular_velocity, 0);
 		}
+		
+		// Let yaw controls resync virtual yaw
+		if (player_is_local && (action_flags & (_turning|_looking)) != 0)
+			vir_aim_delta.yaw = 0;
 	}
 
 	if (action_flags&_absolute_pitch_mode)
@@ -608,27 +653,28 @@ static void physics_update(
 			action_flags|= variables->elevation<0 ? _looking_up : _looking_down;
 		}
 	
-		/* handle looking up and down; if we’re moving at our terminal velocity forward or backward,
+		/* handle looking up and down; if we‚Äôre moving at our terminal velocity forward or backward,
 			without any side-to-side motion, recenter our head vertically */
 
-        // ZZZ: only do auto-recentering if the user wants it
-        if(!PLAYER_DOESNT_AUTO_RECENTER(player)) {
-            if (!(action_flags&FLAGS_WHICH_PREVENT_RECENTERING)) /* can’t recenter if any of these are true */
-		    {
-			    if (((action_flags&_moving_forward) && (variables->velocity==constants->maximum_forward_velocity)) ||
-				    ((action_flags&_moving_backward) && (variables->velocity==-constants->maximum_backward_velocity)))
-			    {
-				    if (variables->elevation<0)
-				    {
-					    variables->elevation= CEILING(variables->elevation+constants->angular_recentering_velocity, 0);
-				    }
-				    else
-				    {
-					    variables->elevation= FLOOR(variables->elevation-constants->angular_recentering_velocity, 0);
-				    }
-			    }
-		    }
-        }
+		if (!(action_flags&FLAGS_WHICH_PREVENT_RECENTERING)) /* can‚Äôt recenter if any of these are true */
+		{
+			if (((action_flags&_moving_forward) && (variables->velocity==constants->maximum_forward_velocity)) ||
+				((action_flags&_moving_backward) && (variables->velocity==-constants->maximum_backward_velocity)))
+			{
+				if (variables->elevation<0)
+				{
+					variables->elevation= CEILING(variables->elevation+constants->angular_recentering_velocity, 0);
+				}
+				else
+				{
+					variables->elevation= FLOOR(variables->elevation-constants->angular_recentering_velocity, 0);
+				}
+				
+				// Let auto-recentering resync virtual pitch
+				if (player_is_local)
+					vir_aim_delta.pitch = 0;
+			}
+		}
 
 		switch (action_flags&_looking_vertically)
 		{
@@ -647,10 +693,14 @@ static void physics_update(
 					CEILING(variables->vertical_angular_velocity+constants->angular_deceleration, 0);
 				break;
 		}
+		
+		// Let pitch controls resync virtual pitch
+		if (player_is_local && (action_flags & _looking_vertically) != 0)
+			vir_aim_delta.pitch = 0;
 	}
 
-	/* if we’re on the ground (or rising up from it), allow movement; if we’re flying through
-		the air, don’t let the player adjust his velocity in any way */
+	/* if we‚Äôre on the ground (or rising up from it), allow movement; if we‚Äôre flying through
+		the air, don‚Äôt let the player adjust his velocity in any way */
 	if (delta_z<=0 || (variables->flags&_HEAD_BELOW_MEDIA_BIT))
 	{
 		if (action_flags&_absolute_position_mode)
@@ -668,7 +718,7 @@ static void physics_update(
 		}
 		else
 		{
-			/* handle moving forward or backward; if we’ve exceeded our maximum velocity lock out user actions
+			/* handle moving forward or backward; if we‚Äôve exceeded our maximum velocity lock out user actions
 				until we return to a legal range */
 			if (variables->velocity<-constants->maximum_backward_velocity||variables->velocity>constants->maximum_forward_velocity) action_flags&= ~_moving;
 			switch (action_flags&_moving)
@@ -690,7 +740,7 @@ static void physics_update(
 			}
 		}
 		
-		/* handle sidestepping left or right; if we’ve exceeded our maximum velocity lock out user actions
+		/* handle sidestepping left or right; if we‚Äôve exceeded our maximum velocity lock out user actions
 			until we return to a legal range */
 		if (variables->perpendicular_velocity<-constants->maximum_perpendicular_velocity||variables->perpendicular_velocity>constants->maximum_perpendicular_velocity) action_flags&= ~_sidestepping;
 		switch (action_flags&_sidestepping)
@@ -738,10 +788,29 @@ static void physics_update(
 		variables->external_velocity.k+= constants->climbing_acceleration;
 	}
 
-	/* change the player’s elevation based on his vertical angular velocity; if we’re recentering and
-		have recentered clear the recentering bit */
+	// Apply vertical angular velocity
 	variables->elevation+= variables->vertical_angular_velocity;
+	
+	// Clamp virtual pitch to the effective limits of the low-precision physical pitch
+	// (this won't enlarge the virtual pitch delta)
+	if (player_is_local)
+	{
+		const fixed_angle min_pitch = FIXED_INTEGERAL_PART(-constants->maximum_elevation) * FIXED_ONE;
+		const fixed_angle max_pitch = FIXED_INTEGERAL_PART(constants->maximum_elevation) * FIXED_ONE;
+		const fixed_angle unclamped_physical_pitch = FIXED_INTEGERAL_PART(variables->elevation) * FIXED_ONE;
+		const fixed_angle unclamped_virtual_pitch = unclamped_physical_pitch + vir_aim_delta.pitch;
+		const fixed_angle clamped_physical_pitch = A1_PIN(unclamped_physical_pitch, min_pitch, max_pitch);
+		const fixed_angle clamped_virtual_pitch = A1_PIN(unclamped_virtual_pitch, min_pitch, max_pitch);
+		const fixed_angle new_delta = clamped_virtual_pitch - clamped_physical_pitch;
+		assert(std::abs(new_delta) <= std::abs(vir_aim_delta.pitch));
+		vir_aim_delta.pitch = new_delta;
+	}
+	
+	// Clamp high-precision physical pitch to physics model limits
+	// (note that the low-precision pitch can slightly violate a non-integral lower bound due to rounding toward -inf)
 	variables->elevation= PIN(variables->elevation, -constants->maximum_elevation, constants->maximum_elevation);
+	
+	// If we're explicitly recentering and have reached or passed 0 pitch, stop at 0
 	if ((variables->flags&_RECENTERING_BIT) && !(action_flags&_absolute_pitch_mode))
 	{
 		if ((variables->elevation<=0&&(action_flags&_looking_down))||(variables->elevation>=0&&(action_flags&_looking_up)))
@@ -751,13 +820,13 @@ static void physics_update(
 		}
 	}
 
-	/* change the player’s heading based on his angular velocities */
+	/* change the player‚Äôs heading based on his angular velocities */
 	variables->last_direction= variables->direction;
 	variables->direction+= variables->angular_velocity;
 	if (variables->direction<0) variables->direction+= INTEGER_TO_FIXED(FULL_CIRCLE);
 	if (variables->direction>=INTEGER_TO_FIXED(FULL_CIRCLE)) variables->direction-= INTEGER_TO_FIXED(FULL_CIRCLE);
 	
-	/* change the player’s x,y position based on his direction and velocities (parallel and perpendicular)  */
+	/* change the player‚Äôs x,y position based on his direction and velocities (parallel and perpendicular)  */
 	new_position= variables->position;
 	cosine= cosine_table[FIXED_INTEGERAL_PART(variables->direction)], sine= sine_table[FIXED_INTEGERAL_PART(variables->direction)];
 	new_position.x+= (variables->velocity*cosine-variables->perpendicular_velocity*sine)>>TRIG_SHIFT;
@@ -769,7 +838,7 @@ static void physics_update(
 	if (new_position.z>variables->floor_height) variables->flags|= _ABOVE_GROUND_BIT; else variables->flags&= (uint16)~_ABOVE_GROUND_BIT;
 
 	/* if we just landed on the ground, or we just came up through the ground, absorb some of
-		the player’s external_velocity.k (and in the case of hitting the ground, reflect it) */
+		the player‚Äôs external_velocity.k (and in the case of hitting the ground, reflect it) */
 	if (variables->external_velocity.k>0 && (variables->old_flags&_BELOW_GROUND_BIT) && !(variables->flags&_BELOW_GROUND_BIT))
 	{
 		variables->external_velocity.k/= 2*COEFFICIENT_OF_ABSORBTION; /* slow down */
@@ -795,14 +864,14 @@ static void physics_update(
 	{
 		small_enough_velocity = SMALL_ENOUGH_VELOCITY;
 	}
-	if (ABS(variables->external_velocity.k)<small_enough_velocity &&
-		ABS(variables->floor_height-new_position.z)<CLOSE_ENOUGH_TO_FLOOR)
+	if (std::abs(variables->external_velocity.k)<small_enough_velocity &&
+		std::abs(variables->floor_height-new_position.z)<CLOSE_ENOUGH_TO_FLOOR)
 	{
 		variables->external_velocity.k= 0, new_position.z= variables->floor_height;
 		variables->flags&= ~(_BELOW_GROUND_BIT|_ABOVE_GROUND_BIT);
 	}
 
-	/* change the player’s z position based on his vertical velocity (if we hit the ground coming down
+	/* change the player‚Äôs z position based on his vertical velocity (if we hit the ground coming down
 		then bounce and absorb most of the blow */
 	new_position.x+= variables->external_velocity.i;
 	new_position.y+= variables->external_velocity.j;
@@ -813,7 +882,7 @@ static void physics_update(
 		_fixed delta= (delta_z<=0) ? constants->external_deceleration : (constants->external_deceleration>>2);
 		int32 magnitude= isqrt(dx*dx + dy*dy);
 
-		if (magnitude && magnitude>ABS(delta))
+		if (magnitude && magnitude> std::abs(delta))
 		{
 			variables->external_velocity.i-= (dx*delta)/magnitude;
 			variables->external_velocity.j-= (dy*delta)/magnitude;
@@ -824,7 +893,7 @@ static void physics_update(
 		}
 	}
 
-	/* lower the player’s externally-induced angular velocity */
+	/* lower the player‚Äôs externally-induced angular velocity */
 	variables->external_angular_velocity= (variables->external_angular_velocity>=0) ?
 		FLOOR(variables->external_angular_velocity-constants->external_angular_deceleration, 0) :
 		CEILING(variables->external_angular_velocity+constants->external_angular_deceleration, 0);
@@ -833,14 +902,14 @@ static void physics_update(
 	variables->last_position= variables->position;
 	variables->position= new_position;
 
-	/* if the player is moving, adjust step_phase by step_delta (if the player isn’t moving
-		continue to adjust step_phase until it is zero)  if the player is in the air, don’t
+	/* if the player is moving, adjust step_phase by step_delta (if the player isn‚Äôt moving
+		continue to adjust step_phase until it is zero)  if the player is in the air, don‚Äôt
 		update phase until he lands. */
 	variables->flags&= (uint16)~_STEP_PERIOD_BIT;
 	if (constants->maximum_forward_velocity)
-		variables->step_amplitude= (MAX(ABS(variables->velocity), ABS(variables->perpendicular_velocity))*FIXED_ONE)/constants->maximum_forward_velocity;
+		variables->step_amplitude= (MAX(std::abs(variables->velocity), std::abs(variables->perpendicular_velocity))*FIXED_ONE)/constants->maximum_forward_velocity;
 	else	// CB: "Missed Island" physics would produce a division by 0
-		variables->step_amplitude= MAX(ABS(variables->velocity), ABS(variables->perpendicular_velocity))*FIXED_ONE;
+		variables->step_amplitude= MAX(std::abs(variables->velocity), std::abs(variables->perpendicular_velocity))*FIXED_ONE;
 	if (delta_z>=0)
 	{
 		if (variables->velocity||variables->perpendicular_velocity)

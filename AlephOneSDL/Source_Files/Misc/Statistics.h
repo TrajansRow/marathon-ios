@@ -28,15 +28,17 @@
 #include <queue>
 #include <string>
 
-#include <SDL_mutex.h>
-#include <SDL_thread.h>
+#include <SDL2/SDL_mutex.h>
+#include <SDL2/SDL_thread.h>
 
 #include "sdl_dialogs.h"
 
 class StatsManager {
 public:
 	static StatsManager* instance() { 
-		if (!instance_) instance_  = new StatsManager();
+		static StatsManager *instance_ = nullptr;
+		if (!instance_) 
+			instance_  = new StatsManager();
 		return instance_;
 	}
 
@@ -55,7 +57,6 @@ private:
 	};
 
 	StatsManager();
-	static StatsManager* instance_;
 
 	void CheckForDone(dialog* d);
 

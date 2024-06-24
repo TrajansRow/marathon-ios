@@ -26,8 +26,10 @@
 #ifndef _CSERIES_STRINGS_
 #define _CSERIES_STRINGS_
 
-#if defined(__GNUC__)
-#define PRINTF_STYLE_ARGS(n,m) __attribute__((format(printf,n,m)))
+#if defined(__clang__)
+#define PRINTF_STYLE_ARGS(n,m) __attribute__((__format__(__printf__,n,m)))
+#elif defined(__GNUC__)
+#define PRINTF_STYLE_ARGS(n,m) __attribute__((format(gnu_printf,n,m)))
 #else
 #define PRINTF_STYLE_ARGS(n,m)
 #endif
@@ -70,6 +72,13 @@ extern void mac_roman_to_unicode(const char *input, uint16 *output);
 extern void mac_roman_to_unicode(const char *input, uint16 *output, int max_len);
 std::string mac_roman_to_utf8(const std::string& input);
 std::string utf8_to_mac_roman(const std::string& input);
+
+#ifdef __WIN32__
+std::wstring utf8_to_wide(const char* utf8);
+std::wstring utf8_to_wide(const std::string& utf8);
+std::string wide_to_utf8(const wchar_t* utf16);
+std::string wide_to_utf8(const std::wstring& utf16);
+#endif
 
 // Substitute special variables like application name or version
 std::string expand_app_variables(const std::string& input);

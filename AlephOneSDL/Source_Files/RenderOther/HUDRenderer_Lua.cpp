@@ -34,16 +34,10 @@ HUD_RENDERER_LUA.CPP
 #ifdef HAVE_OPENGL
 #include "OGL_Headers.h"
 #include "OGL_Render.h"
-#endif
-
 #include "MatrixStack.hpp"
-#include "AlephOneHelper.h"
+#endif
 
 #include <math.h>
-
-#if defined(__WIN32__) || defined(__MINGW32__)
-#undef DrawText
-#endif
 
 extern bool MotionSensorActive;
 
@@ -105,9 +99,6 @@ blip_info HUD_Lua_Class::entity_blip(size_t index)
 	return m_blips[index];
 }
 
-// DJB OpenGL SaveState
-#include "SaveState.h"
-
 void HUD_Lua_Class::start_draw(void)
 {
 	alephone::Screen *scr = alephone::Screen::instance();
@@ -119,37 +110,22 @@ void HUD_Lua_Class::start_draw(void)
 #ifdef HAVE_OPENGL
 	if (m_opengl)
 	{
-    // DJB OpenGL See if we can just ignore saving of attributes...
-    // glPushAttrib(GL_ALL_ATTRIB_BITS);
-    SaveState ss0 (GL_TEXTURE_2D);
-    SaveState ss1 (GL_CULL_FACE);
-    SaveState ss2 (GL_DEPTH_TEST);
-    SaveState ss3 (GL_ALPHA_TEST);
-    SaveState ss4 (GL_STENCIL_TEST);
-    SaveState ss5 (GL_BLEND);
-    SaveState ss6 (GL_FOG);
-    
-		glEnable(GL_TEXTURE_2D);
+		//glPushAttrib(GL_ALL_ATTRIB_BITS);
+		//glEnable(GL_TEXTURE_2D);
 		glDisable(GL_DEPTH_TEST);
 		glDisable(GL_ALPHA_TEST);
 		glDisable(GL_STENCIL_TEST);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glDisable(GL_FOG);
-      
-  
-    if(useShaderRenderer()) {
-      //DCW oh jeez this prevents the hud from working...
-      /*MatrixStack::Instance()->matrixMode(MS_MODELVIEW);
-      MatrixStack::Instance()->pushMatrix();
-      MatrixStack::Instance()->loadIdentity();
-      MatrixStack::Instance()->translatef(m_wr.x, m_wr.y, 0.0);*/
-    } else {
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
-        glTranslatef(m_wr.x, m_wr.y, 0.0);
-    }
+		//glDisable(GL_FOG);
+        
+		MSI()->matrixMode(MS_MODELVIEW);
+		MSI()->pushMatrix();
+		MSI()->loadIdentity();
+		MSI()->translatef(m_wr.x, m_wr.y, 0.0);
+
+		//DCW oh jeez... I cannot explain why I need to set MS_PROJECTION here, when we didn't need it for Classic OpenGL.
+		MSI()->matrixMode(MS_PROJECTION);
 		
 		m_surface = NULL;
 	}
@@ -168,10 +144,7 @@ void HUD_Lua_Class::start_draw(void)
 			m_surface = SDL_ConvertSurfaceFormat(MainScreenSurface(), SDL_PIXELFORMAT_BGRA8888, 0);
 			SDL_SetSurfaceBlendMode(m_surface, SDL_BLENDMODE_BLEND);
 		}
-		SDL_SetClipRect(m_surface, NULL);
-		SDL_FillRect(m_surface, NULL, SDL_MapRGBA(m_surface->format, 0, 0, 0, 0));
-		
-//		SDL_SetAlpha(MainScreenSurface(), SDL_SRCALPHA, 0xff);
+		SDL_FillRect(m_surface, NULL, SDL_MapRGBA(m_surface->format, 0, 0, 0, 0));	
 	}
 	
 	
@@ -186,26 +159,11 @@ void HUD_Lua_Class::end_draw(void)
 #ifdef HAVE_OPENGL
 	if (m_opengl)
 	{
-    if(useShaderRenderer()) {
-        //DCW oh jeez this prevents the hud from working...
-         /*MatrixStack::Instance()->matrixMode(MS_MODELVIEW);
-         MatrixStack::Instance()->popMatrix();*/
-       } else {
-         glMatrixMode(GL_MODELVIEW);
-         glPopMatrix();
-       }
-    // DJB OpenGL See if we can just ignore saving of attributes...
-    // glPopAttrib();
-  }
-	else
-#endif
-	if (m_surface)
-	{
-		SDL_Surface *video = MainScreenSurface();
-		SDL_BlitSurface(m_surface, NULL, video, NULL);
-//		SDL_SetAlpha(video, 0, 0xff);
-		SDL_SetClipRect(video, 0);
+		MSI()->matrixMode(MS_MODELVIEW);
+		MSI()->popMatrix();
+		//glPopAttrib();
 	}
+#endif
 }
 
 void HUD_Lua_Class::apply_clip(void)
@@ -217,6 +175,14 @@ void HUD_Lua_Class::apply_clip(void)
     r.y = m_wr.y + scr->lua_clip_rect.y;
     r.w = MIN(scr->lua_clip_rect.w, m_wr.w - scr->lua_clip_rect.x);
     r.h = MIN(scr->lua_clip_rect.h, m_wr.h - scr->lua_clip_rect.y);
+#ifdef HAVE_OPENGL
+	if (m_opengl)
+	{
+		glEnable(GL_SCISSOR_TEST);
+		scr->scissor_screen_to_rect(r);
+	}
+	else
+#endif
 	if (m_surface)
 	{
 		SDL_SetClipRect(MainScreenSurface(), &r);
@@ -329,7 +295,7 @@ void HUD_Lua_Class::fill_rect(float x, float y, float w, float h,
 #ifdef HAVE_OPENGL
 	if (m_opengl)
 	{
-		glColor4f(r, g, b, a);
+		MSI()->color4f(r, g, b, a);
 		OGL_RenderRect(x, y, w, h);
 	}
 	else
@@ -344,6 +310,7 @@ void HUD_Lua_Class::fill_rect(float x, float y, float w, float h,
 		SDL_FillRect(m_surface, &rect,
 								 SDL_MapRGBA(m_surface->format, static_cast<unsigned char>(r * 255), static_cast<unsigned char>(g * 255), static_cast<unsigned char>(b * 255), static_cast<unsigned char>(a * 255)));
 		SDL_BlitSurface(m_surface, &rect, MainScreenSurface(), &rect);
+		SDL_SetClipRect(MainScreenSurface(), NULL);
 	}
 }	
 
@@ -358,7 +325,7 @@ void HUD_Lua_Class::frame_rect(float x, float y, float w, float h,
 #ifdef HAVE_OPENGL
 	if (m_opengl)
 	{
-		glColor4f(r, g, b, a);
+		MSI()->color4f(r, g, b, a);
 		OGL_RenderFrame(x, y, w, h, t);
 	}
 	else
@@ -391,6 +358,7 @@ void HUD_Lua_Class::frame_rect(float x, float y, float w, float h,
 		rect.h = static_cast<Uint16>(h - t - t);
 		SDL_FillRect(m_surface, &rect, color);
 		SDL_BlitSurface(m_surface, &rect, MainScreenSurface(), &rect);
+		SDL_SetClipRect(MainScreenSurface(), NULL);
 	}
 }	
 
@@ -409,30 +377,14 @@ void HUD_Lua_Class::draw_text(FontSpecifier *font, const char *text,
 #ifdef HAVE_OPENGL
 	if (m_opengl)
 	{
-    int previousMode;
-    if(useShaderRenderer()) {
-      previousMode=MatrixStack::Instance()->currentActiveMode();
-      MatrixStack::Instance()->matrixMode(MS_MODELVIEW);
-      MatrixStack::Instance()->pushMatrix();
-      MatrixStack::Instance()->translatef(x, y + (font->Height * scale), 0);
-      MatrixStack::Instance()->scalef(scale, scale, 1.0);
-      MatrixStack::Instance()->color4f(r, g, b, a);
-    } else {
-      glMatrixMode(GL_MODELVIEW);
-      glPushMatrix();
-      glTranslatef(x, y + (font->Height * scale), 0);
-      glScalef(scale, scale, 1.0);
-      glColor4f(r, g, b, a);
-    }
+		MSI()->matrixMode(MS_MODELVIEW);
+		MSI()->pushMatrix();
+		MSI()->translatef(x, y + (font->Height * scale), 0);
+		MSI()->scalef(scale, scale, 1.0);
+		MSI()->color4f(r, g, b, a);
 		font->OGL_Render(text);
-    if(useShaderRenderer()) {
-      MatrixStack::Instance()->color4f(1, 1, 1, 1);
-      MatrixStack::Instance()->popMatrix();
-      MatrixStack::Instance()->matrixMode(previousMode);
-    } else {
-      glColor4f(1, 1, 1, 1);
-      glPopMatrix();
-    }
+		MSI()->color4f(1, 1, 1, 1);
+		MSI()->popMatrix();
 	}
 	else
 #endif
@@ -486,6 +438,7 @@ void HUD_Lua_Class::draw_text(FontSpecifier *font, const char *text,
                                               static_cast<unsigned char>(a * 255)),
                                   font->Style);
             SDL_BlitSurface(m_surface, &rect, MainScreenSurface(), &rect);
+			SDL_SetClipRect(MainScreenSurface(), NULL);
         }
 	}
 }
@@ -495,7 +448,7 @@ void HUD_Lua_Class::draw_image(Image_Blitter *image, float x, float y)
 	if (!m_drawing)
 		return;
 	
-	Image_Rect r = { x, y, image->crop_rect.w, image->crop_rect.h };
+	Image_Rect r{ x, y, image->crop_rect.w, image->crop_rect.h };
 	
 	if (!r.w || !r.h)
 		return;
@@ -507,6 +460,7 @@ void HUD_Lua_Class::draw_image(Image_Blitter *image, float x, float y)
         r.y += m_wr.y;
     }
 	image->Draw(MainScreenSurface(), r);
+	SDL_SetClipRect(MainScreenSurface(), NULL);
 }
 
 void HUD_Lua_Class::draw_shape(Shape_Blitter *shape, float x, float y)
@@ -536,5 +490,6 @@ void HUD_Lua_Class::draw_shape(Shape_Blitter *shape, float x, float y)
         r.x += m_wr.x;
         r.y += m_wr.y;
         shape->SDL_Draw(MainScreenSurface(), r);
+		SDL_SetClipRect(MainScreenSurface(), NULL);
     }
 }

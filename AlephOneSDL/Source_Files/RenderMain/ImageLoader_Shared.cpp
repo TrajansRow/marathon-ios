@@ -28,12 +28,17 @@
  *          adapted from DevIL (openil.sourceforge.net)
  */
 
+#if defined(_MSC_VER)
+#define NOMINMAX
+#include <algorithm>
+#endif
+
 #include "AStream.h"
 #include "cstypes.h"
 #include "DDS.h"
 #include "ImageLoader.h"
-#include "SDL.h"
-#include "SDL_endian.h"
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_endian.h>
 #include "Logging.h"
 
 
@@ -43,9 +48,12 @@
 #endif
 
 #include <cmath>
-static inline float log2(int x) { return std::log((float) x) / std::log(2.0); }
-
 #include <stdlib.h>
+
+using std::min;
+using std::max;
+
+static inline float log2(int x) { return std::log((float) x) / std::log(2.0); }
 
 int ImageDescriptor::GetMipMapSize(int level) const
 {
@@ -74,8 +82,6 @@ int ImageDescriptor::GetMipMapSize(int level) const
 
 const uint32 *ImageDescriptor::GetMipMapPtr(int Level) const
 {
-  // DJB OpenGL
-  assert ( Format != PVRTC4 );
 	int totalSize = 0;
 	for (int i = 0; i < Level; i++) {
 		totalSize += GetMipMapSize(i);
@@ -90,9 +96,6 @@ const uint32 *ImageDescriptor::GetMipMapPtr(int Level) const
 
 uint32 *ImageDescriptor::GetMipMapPtr(int Level)
 {
-  // DJB OpenGL
-  assert ( Format != PVRTC4 );
-  
 	int totalSize = 0;
 	for (int i = 0; i < Level; i++) {
 		totalSize += GetMipMapSize(i);
@@ -125,9 +128,6 @@ void ImageDescriptor::Resize(int _Width, int _Height, int _TotalBytes)
 
 bool ImageDescriptor::Minify()
 {
-  // DJB OpenGL
-  assert ( Format != PVRTC4 );
-
 	if (MipMapCount > 1)
 	{
 		int newSize = Size - GetMipMapSize(0);
@@ -145,33 +145,33 @@ bool ImageDescriptor::Minify()
 	else if (Format == RGBA8)
 	{
 		if (!(Width > 1 || Height > 1)) return false;
+		int newWidth = Width >> 1;
+		int newHeight = Height >> 1;
 #ifdef HAVE_OPENGL
-    int newWidth = Width >> 1;
-    int newHeight = Height >> 1;
-    if (OGL_IsActive()) {
-      uint32 *newPixels = new uint32[newWidth * newHeight];
-      // DJB OpenGL not using gluScaleImage
-      printf ( "********************* gluScaleImage not present *****************************\n" );
-      // Every other pixel, Could average...
-      for ( int y = 0; y < newHeight; y ++ ) {
-        int offset = y * newWidth;
-        for ( int x = 0; x < newWidth; x++ ) {
-          newPixels[offset+x] = Pixels[x*2 + y*2*Width];
-        }
-      }
-      /*
-       gluScaleImage(GL_RGBA, Width, Height, GL_UNSIGNED_BYTE, Pixels, newWidth,
-       newHeight, GL_UNSIGNED_BYTE,
-       newPixels);
-       */
-      delete [] Pixels;
-      Pixels = newPixels;
-      Width = newWidth;
-      Height = newHeight;
-      Size = newWidth * newHeight;
-      return true;
-    }
-		else
+		if (OGL_IsActive())
+		{
+			uint32 *newPixels = new uint32[newWidth * newHeight];
+            
+            // DJB OpenGL not using gluScaleImage
+            //printf ( "********************* gluScaleImage not present *****************************\n" );
+            // Every other pixel, Could average...
+            for ( int y = 0; y < newHeight; y ++ ) {
+              int offset = y * newWidth;
+              for ( int x = 0; x < newWidth; x++ ) {
+                newPixels[offset+x] = Pixels[x*2 + y*2*Width];
+              }
+            }
+            
+			//gluScaleImage(GL_RGBA, Width, Height, GL_UNSIGNED_BYTE, Pixels, newWidth, newHeight, GL_UNSIGNED_BYTE, newPixels);
+			delete []Pixels;
+			Pixels = newPixels;
+			Width = newWidth;
+			Height = newHeight;
+			Size = newWidth * newHeight;
+			return true;
+			
+		} 
+		else 
 #endif
 		{
 			fprintf(stderr, "GL not active\n");
@@ -264,11 +264,12 @@ bool ImageDescriptor::LoadMipMapFromFile(OpenedFile& file, int flags, int level,
 		SDL_Surface *src = SDL_CreateRGBSurfaceFrom(&img.front(), srcWidth, srcHeight, ddsd.ddpfPixelFormat.dwRGBBitCount, pitch, ddsd.ddpfPixelFormat.dwRBitMask, ddsd.ddpfPixelFormat.dwGBitMask, ddsd.ddpfPixelFormat.dwBBitMask, (ddsd.ddpfPixelFormat.dwFlags & DDPF_ALPHAPIXELS) ? ddsd.ddpfPixelFormat.dwRGBAlphaBitMask : 0);
 		SDL_SetSurfaceBlendMode(src, SDL_BLENDMODE_NONE); // disable SDL_SRCALPHA
 		
-#ifdef ALEPHONE_LITTLE_ENDIAN
-		SDL_Surface *dst = SDL_CreateRGBSurfaceFrom(buffer, dstWidth, dstHeight, 32, dstWidth * 4, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
-#else
-		SDL_Surface *dst = SDL_CreateRGBSurfaceFrom(buffer, dstWidth, dstHeight, 32, dstWidth * 4, 0xff000000, 0x00ff0000, 0x0000ff00, 0x000000ff);
-#endif
+		SDL_Surface *dst = nullptr;
+		if (PlatformIsLittleEndian()) {
+			dst = SDL_CreateRGBSurfaceFrom(buffer, dstWidth, dstHeight, 32, dstWidth * 4, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
+		} else {
+			dst = SDL_CreateRGBSurfaceFrom(buffer, dstWidth, dstHeight, 32, dstWidth * 4, 0xff000000, 0x00ff0000, 0x0000ff00, 0x000000ff);
+		}
 		SDL_BlitSurface(src, NULL, dst, NULL);
 		SDL_FreeSurface(src);
 		SDL_FreeSurface(dst);
@@ -400,22 +401,22 @@ bool ImageDescriptor::LoadDDSFromFile(FileSpecifier& File, int flags, int actual
  		inputStream.read((char *) &ddsd.ddpfPixelFormat.dwBBitMask, 4);		
  		inputStream.read((char *) &ddsd.ddpfPixelFormat.dwRGBAlphaBitMask, 4);
 		
-#ifndef ALEPHONE_LITTLE_ENDIAN
-		if (ddsd.ddpfPixelFormat.dwRGBBitCount == 24) 
-		{
-			// the masks are in the correct order, but will be in the wrong place...move them down
-			ddsd.ddpfPixelFormat.dwRBitMask >>= 8;
-			ddsd.ddpfPixelFormat.dwGBitMask >>= 8;
-			ddsd.ddpfPixelFormat.dwBBitMask >>= 8;
+		if (!PlatformIsLittleEndian()) {
+			if (ddsd.ddpfPixelFormat.dwRGBBitCount == 24) 
+			{
+				// the masks are in the correct order, but will be in the wrong place...move them down
+				ddsd.ddpfPixelFormat.dwRBitMask >>= 8;
+				ddsd.ddpfPixelFormat.dwGBitMask >>= 8;
+				ddsd.ddpfPixelFormat.dwBBitMask >>= 8;
+			}
 		}
-#endif
 
 		inputStream >> ddsd.ddsCaps.dwCaps1;
 		inputStream >> ddsd.ddsCaps.dwCaps2;
 		inputStream.ignore(8);
 
 		inputStream.ignore(4);
-	} catch (AStream::failure f) {
+	} catch (const AStream::failure& f) {
 		fprintf(stderr, "exception %s, returning false\n", f.what());
 		return false;
 	}
@@ -588,9 +589,6 @@ static bool DecompressDXTC5(uint32 *out, int width, int height, uint32 *in);
 	
 bool ImageDescriptor::MakeRGBA()
 {
-  // DJB OpenGL
-  assert ( Format != PVRTC4 );
-  
 	ImageDescriptor RGBADesc;
 	RGBADesc.Width = Width;
 	RGBADesc.Height = Height;
@@ -627,18 +625,11 @@ bool ImageDescriptor::MakeRGBA()
 
 void ImageDescriptor::PremultiplyAlpha()
 {
-  // DJB OpenGL
-  assert ( Format != PVRTC4 );
-  
 	if (PremultipliedAlpha) return;
 	for (int i = 0; i < GetNumPixels(); i++)
 	{
 		// do these two optimizations without unpacking
-#ifdef ALEPHONE_LITTLE_ENDIAN
-		uint32 alphaMask = 0xff000000;
-#else
-		uint32 alphaMask = 0x000000ff;
-#endif
+		constexpr uint32 alphaMask = PlatformIsLittleEndian() ? 0xff000000 : 0x000000ff;
 
 		if ((Pixels[i] & alphaMask) == alphaMask)
 			continue;
@@ -760,18 +751,18 @@ static bool DecompressDXTC1(uint32 *out, int width, int height, uint32 *in)
 					
 					if (((x + i) < width) && ((y + j) < height)) {
 						Offset = (y + j) * (width * 4) + (x + i) * 4;
-// this make absolutely no sense to me, but it works on my G4...
-#ifdef ALEPHONE_LITTLE_ENDIAN
-						data[Offset + 0] = col->r;
-						data[Offset + 1] = col->g;
-						data[Offset + 2] = col->b;
-						data[Offset + 3] = col->a;
-#else
-						data[Offset + 0] = col->b;
-						data[Offset + 1] = col->g;
-						data[Offset + 2] = col->r;
-						data[Offset + 3] = col->a;
-#endif
+						// this make absolutely no sense to me, but it works on my G4...
+						if (PlatformIsLittleEndian()) {
+							data[Offset + 0] = col->r;
+							data[Offset + 1] = col->g;
+							data[Offset + 2] = col->b;
+							data[Offset + 3] = col->a;
+						} else {
+							data[Offset + 0] = col->b;
+							data[Offset + 1] = col->g;
+							data[Offset + 2] = col->r;
+							data[Offset + 3] = col->a;
+						}
 					}
 				}
 			}
@@ -862,15 +853,15 @@ static bool DecompressDXTC3(uint32 *out, int width, int height, uint32 *in)
 					
 					if (((x + i) < width) && ((y + j) < height)) {
 						Offset = (y + j) * (width * 4) + (x + i) * 4;
-#ifdef ALEPHONE_LITTLE_ENDIAN
-						data[Offset + 0] = col->r;
-						data[Offset + 1] = col->g;
-						data[Offset + 2] = col->b;
-#else
-						data[Offset + 0] = col->b;
-						data[Offset + 1] = col->g;
-						data[Offset + 2] = col->r;
-#endif
+						if (PlatformIsLittleEndian()) {
+							data[Offset + 0] = col->r;
+							data[Offset + 1] = col->g;
+							data[Offset + 2] = col->b;
+						} else {
+							data[Offset + 0] = col->b;
+							data[Offset + 1] = col->g;
+							data[Offset + 2] = col->r;
+						}
 					}
 				}
 			}
@@ -958,15 +949,15 @@ static bool DecompressDXTC5(uint32 *out, int width, int height, uint32 *in)
 					// only put pixels out < width or height
 					if (((x + i) < width) && ((y + j) < height)) {
 						Offset = (y + j) * (width * 4) + (x + i) * 4;
-#ifdef ALEPHONE_LITTLE_ENDIAN
-						data[Offset + 0] = col->r;
-						data[Offset + 1] = col->g;
-						data[Offset + 2] = col->b;
-#else
-						data[Offset + 0] = col->b;
-						data[Offset + 1] = col->g;
-						data[Offset + 2] = col->r;
-#endif
+						if (PlatformIsLittleEndian()) {
+							data[Offset + 0] = col->r;
+							data[Offset + 1] = col->g;
+							data[Offset + 2] = col->b;
+						} else {
+							data[Offset + 0] = col->b;
+							data[Offset + 1] = col->g;
+							data[Offset + 2] = col->r;
+						}
 					}
 				}
 			}

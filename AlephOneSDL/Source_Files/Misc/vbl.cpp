@@ -29,9 +29,9 @@ Thursday, November 19, 1992 1:27:23 AM
 	the enumeration 'turning_head' had to be changed to '_turn_not_rotate' to make this
 	file compile.  go figure.
 Wednesday, December 2, 1992 2:31:05 PM
-	the world doesnÕt change while the mouse button is pressed.
+	the world doesnâ€™t change while the mouse button is pressed.
 Friday, January 15, 1993 11:19:11 AM
-	the world doesnÕt change after 14 ticks have passed without a screen refresh.
+	the world doesnâ€™t change after 14 ticks have passed without a screen refresh.
 Friday, January 22, 1993 3:06:32 PM
 	world_ticks was never being initialized to zero.  hmmm.
 Saturday, March 6, 1993 12:23:48 PM
@@ -47,7 +47,7 @@ Sunday, May 22, 1994 8:51:15 PM
 	distribute a circular queue of keyboard flags (we're the keyboard_controller, not the
 	movement_controller).
 Thursday, June 2, 1994 12:55:52 PM
-	gee, now we donÕt even maintain the queue we just send our actions to PLAYER.C.
+	gee, now we donâ€™t even maintain the queue we just send our actions to PLAYER.C.
 Tuesday, July 5, 1994 9:27:49 PM
 	nuked most of the shit in here. changed the vbl task to a time
 	manager task. the only functions from the old vbl.c that remain are precalculate_key_information()
@@ -80,6 +80,8 @@ Feb 20, 2002 (Woody Zenfell):
 #include <string.h>
 #include <stdlib.h>
 
+#include <boost/algorithm/string/predicate.hpp>
+
 #include "map.h"
 #include "interface.h"
 #include "shell.h"
@@ -98,8 +100,6 @@ Feb 20, 2002 (Woody Zenfell):
 #include "joystick.h"
 #include "Movie.h"
 #include "InfoTree.h"
-
-#include "AlephOneHelper.h"
 
 /* ---------- constants */
 
@@ -148,7 +148,7 @@ ActionQueue *get_player_recording_queue(
 static void remove_input_controller(void);
 static void save_recording_queue_chunk(short player_index);
 static void read_recording_queue_chunks(void);
-static bool pull_flags_from_recording(short count);
+static short pull_flags_from_recording(short count);
 // LP modifications for object-oriented file handling; returns a test for end-of-file
 static bool vblFSRead(OpenedFile& File, int32 *count, void *dest, bool& HitEOF);
 static void record_action_flags(short player_identifier, const uint32 *action_flags, short count);
@@ -174,8 +174,6 @@ void initialize_keyboard_controller(
 	
 //	vassert(NUMBER_OF_KEYS == NUMBER_OF_STANDARD_KEY_DEFINITIONS,
 //		csprintf(temporary, "NUMBER_OF_KEYS == %d, NUMBER_OF_KEY_DEFS = %d. Not Equal!", NUMBER_OF_KEYS, NUMBER_OF_STANDARD_KEY_DEFINITIONS));
-	assert(NUMBER_OF_STANDARD_KEY_DEFINITIONS==NUMBER_OF_LEFT_HANDED_KEY_DEFINITIONS);
-	assert(NUMBER_OF_LEFT_HANDED_KEY_DEFINITIONS==NUMBER_OF_POWERBOOK_KEY_DEFINITIONS);
 	
 	// get globals initialized
 	heartbeat_count= 0;
@@ -189,8 +187,6 @@ void initialize_keyboard_controller(
 	
 	/* Allocate the recording queues */	
 	replay.recording_queues = new ActionQueue[MAXIMUM_NUMBER_OF_PLAYERS];
-	assert(replay.recording_queues);
-	if(!replay.recording_queues) alert_out_of_memory();
 	
 	/* Allocate the individual ones */
 	for (player_index= 0; player_index<MAXIMUM_NUMBER_OF_PLAYERS; player_index++)
@@ -198,7 +194,6 @@ void initialize_keyboard_controller(
 		queue= get_player_recording_queue(player_index);
 		queue->read_index= queue->write_index = 0;
 		queue->buffer= new uint32[MAXIMUM_QUEUE_SIZE];
-		if(!queue->buffer) alert_out_of_memory();
 	}
 	enter_mouse(0);
 }
@@ -207,6 +202,12 @@ void set_keyboard_controller_status(
 	bool active)
 {
 	input_task_active= active;
+
+	// flush events when changing game state
+	SDL_PumpEvents();
+	SDL_FlushEvents(SDL_KEYDOWN, SDL_KEYUP);
+	SDL_FlushEvents(SDL_MOUSEMOTION, SDL_MOUSEWHEEL);
+	SDL_FlushEvents(SDL_CONTROLLERAXISMOTION, SDL_CONTROLLERBUTTONUP);
 
 	// We enable/disable mouse control here
 	if (active) {
@@ -250,6 +251,21 @@ void decrement_replay_speed(
 	if (replay.replay_speed > MINIMUM_REPLAY_SPEED) replay.replay_speed--;
 }
 
+void set_replay_speed(short speed)
+{
+	replay.replay_speed = speed;
+}
+
+int get_replay_speed()
+{
+	return replay.replay_speed;
+}
+
+bool game_is_being_replayed()
+{
+	return replay.game_is_being_replayed;
+}
+
 void increment_heartbeat_count(int value)
 {
 	heartbeat_count+=value;
@@ -261,13 +277,15 @@ bool has_recording_file(void)
 	return get_recording_filedesc(File);
 }
 
+bool first_frame_rendered = true;
+
 /* Called by the time manager task in vbl_macintosh.c */
 bool input_controller(
 	void)
 {
 	if (input_task_active || Movie::instance()->IsRecording())
 	{
-		if((heartbeat_count-dynamic_world->tick_count) < MAXIMUM_TIME_DIFFERENCE)
+		if((heartbeat_count-dynamic_world->tick_count) < ((first_frame_rendered || game_is_networked) ? MAXIMUM_TIME_DIFFERENCE : 1))
 		{
 			if (game_is_networked) // input from network
 			{
@@ -283,8 +301,9 @@ bool input_controller(
 					if (replay.replay_speed > 0 || (--phase<=0))
 					{
 						short flag_count= MAX(replay.replay_speed, 1);
+						flag_count = pull_flags_from_recording(flag_count);
 					
-						if (!pull_flags_from_recording(flag_count)) // oops. silly me.
+						if (!flag_count) // oops. silly me.
 						{
 							if (replay.have_read_last_chunk)
 							{
@@ -433,48 +452,34 @@ void save_recording_queue_chunk(
  *
  * Function: pull_flags_from_recording
  * Purpose:  remove one flag from each queue from the recording buffer.
- * Returns:  true if it pulled the flags, false if it didn't
+ * Returns:  number of flags actually pulled
  *
  *********************************************************************************************/
-static bool pull_flags_from_recording(
+static short pull_flags_from_recording(
 	short count)
 {
-	short player_index;
-	bool success= true;
-	
-	// first check that we can pull something from each playerÕs queue
-	// (at the beginning of the game, we wonÕt be able to)
-	// i'm not sure that i really need to do this check. oh well.
-	for (player_index = 0; success && player_index<dynamic_world->player_count; player_index++)
+	short true_count = count;
+	for (short player_index = 0; player_index < dynamic_world->player_count; player_index++)
 	{
-		if(get_recording_queue_size(player_index)==0) success= false;
-	}
-
-	if(success)
-	{
-		for (player_index = 0; player_index < dynamic_world->player_count; player_index++)
+		ActionQueue* queue = get_player_recording_queue(player_index);
+		for (short index = 0; index < count; index++)
 		{
-			short index;
-			ActionQueue  *queue;
-		
-			queue= get_player_recording_queue(player_index);
-			for (index= 0; index<count; index++)
+			if (get_recording_queue_size(player_index) != 0)
 			{
-				if (queue->read_index != queue->write_index)
-				{
 #ifdef DEBUG_REPLAY
-					debug_stream_of_flags(*(queue->buffer+queue->read_index), player_index);
+				debug_stream_of_flags(*(queue->buffer + queue->read_index), player_index);
 #endif
-                    GetRealActionQueues()->enqueueActionFlags(player_index, queue->buffer + queue->read_index, 1);
-					INCREMENT_QUEUE_COUNTER(queue->read_index);
-				} else {
-					dprintf("Dropping flag?");
-				}
+				GetRealActionQueues()->enqueueActionFlags(player_index, queue->buffer + queue->read_index, 1);
+				INCREMENT_QUEUE_COUNTER(queue->read_index);
+			}
+			else {
+				true_count = index;
+				break;
 			}
 		}
 	}
 	
-	return success;
+	return true_count;
 }
 
 static short get_recording_queue_size(
@@ -527,6 +532,8 @@ void get_recording_header_data(
 	obj_copy(*game_information, replay.header.game_information);
 }
 
+extern int movie_export_phase;
+
 bool setup_for_replay_from_file(
 	FileSpecifier& File,
 	uint32 map_checksum,
@@ -546,6 +553,7 @@ bool setup_for_replay_from_file(
 		replay.resource_data= NULL;
 		replay.resource_data_size= 0l;
 		replay.film_resource_offset= NONE;
+		movie_export_phase = 0;
 		
 		byte Header[SIZEOF_recording_header];
 		FilmFile.Read(SIZEOF_recording_header,Header);
@@ -555,9 +563,7 @@ bool setup_for_replay_from_file(
 		/* Set to the mapfile this replay came from.. */
 		if(use_map_file(replay.header.map_checksum))
 		{
-			replay.fsread_buffer= new char[DISK_CACHE_SIZE]; 
-			assert(replay.fsread_buffer);
-			
+			replay.fsread_buffer= new char[DISK_CACHE_SIZE];
 			replay.location_in_cache= NULL;
 			replay.bytes_in_cache= 0;
 			replay.replay_speed= 1;
@@ -945,33 +951,6 @@ static void remove_input_controller(
 	replay.valid= false;
 }
 
-
-void reset_mml_keyboard()
-{
-	// no reset
-}
-
-void parse_mml_keyboard(const InfoTree& root)
-{
-	int16 which_set;
-	if (!root.read_indexed("set", which_set, NUMBER_OF_KEY_SETUPS))
-		return;
-	
-	BOOST_FOREACH(InfoTree ktree, root.children_named("key"))
-	{
-		int16 index;
-		if (!ktree.read_indexed("index", index, NUMBER_OF_STANDARD_KEY_DEFINITIONS))
-			continue;
-		
-		int16 keycode;
-		if (!ktree.read_attr("sdl", keycode))
-			continue;
-		
-		all_key_definitions[which_set][index].offset = static_cast<SDL_Scancode>(keycode);
-	}
-}
-
-
 static void StreamToPlayerStart(uint8* &S, player_start_data& Object)
 {
 	StreamToValue(S,Object.team);
@@ -1119,10 +1098,29 @@ void move_replay(void)
 		alert_user(infoError, strERRORS, fileError, error);
 }
 
+static uint32_t hotkey_sequence[3] {0};
+static constexpr uint32_t hotkey_used = 0x80000000;
+
+void encode_hotkey_sequence(int hotkey)
+{
+	hotkey_sequence[0] =
+		(3 << _cycle_weapons_forward_bit) |
+		hotkey_used;
+	
+	hotkey_sequence[1] =
+		((hotkey / 4 + 1) << _cycle_weapons_forward_bit) |
+		hotkey_used;
+	
+	hotkey_sequence[2] =
+		((hotkey % 4) << _cycle_weapons_forward_bit) |
+		hotkey_used;
+}
 
 /*
  *  Poll keyboard and return action flags
  */
+
+uint32_t last_input_update;
 
 uint32 parse_keymap(void)
 {
@@ -1135,6 +1133,8 @@ uint32 parse_keymap(void)
 	memset(key_map, 0, sizeof(key_map));
       } else {
 		  memcpy(key_map, SDL_GetKeyboardState(NULL), sizeof(key_map));
+		  auto mod_state = SDL_GetModState();
+		  key_map[SDL_SCANCODE_CAPSLOCK] = mod_state & KMOD_CAPS ? 1 : 0;
       }
       
       // ZZZ: let mouse code simulate keypresses
@@ -1144,15 +1144,15 @@ uint32 parse_keymap(void)
       // Parse the keymap
 		for (int i = 0; i < NUMBER_OF_STANDARD_KEY_DEFINITIONS; ++i)
 		{
-			BOOST_FOREACH(const SDL_Scancode& code, input_preferences->key_bindings[i])
+			for (const SDL_Scancode& code : input_preferences->key_bindings[i])
 			{
-				if (key_map[code] || fake_key_map[code]) //DCW added fake_key_map
+				if (key_map[code])
 					flags |= standard_key_definitions[i].action_flag;
 			}
 		}
-      
+		
       // Post-process the keymap
-      struct special_flag_data *special = special_flags;
+		struct special_flag_data *special = special_flags;
       for (unsigned i=0; i<NUMBER_OF_SPECIAL_FLAGS; i++, special++) {
 	if (flags & special->flag) {
 	  switch (special->type) {
@@ -1160,7 +1160,7 @@ uint32 parse_keymap(void)
 	    // If this flag has a double-click flag and has been hit within
 	    // DOUBLE_CLICK_PERSISTENCE (but not at MAXIMUM_FLAG_PERSISTENCE),
 	    // mask on the double-click flag */
-	    if (shouldAllowDoubleClick() && special->persistence < MAXIMUM_FLAG_PERSISTENCE
+	    if (special->persistence < MAXIMUM_FLAG_PERSISTENCE
 		&&	special->persistence > MAXIMUM_FLAG_PERSISTENCE - DOUBLE_CLICK_PERSISTENCE)
 	      flags |= special->alternate_flag;
 	    break;
@@ -1180,47 +1180,146 @@ uint32 parse_keymap(void)
 	} else
 	  special->persistence = FLOOR(special->persistence-1, 0);
       }
-      
 
-      bool do_interchange =
-	      (local_player->variables.flags & _HEAD_BELOW_MEDIA_BIT) ?
-	      (input_preferences->modifiers & _inputmod_interchange_swim_sink) != 0:
-	      (input_preferences->modifiers & _inputmod_interchange_run_walk) != 0;
-      
+	  if (!hotkey_sequence[0])
+	  {
+		  for (auto i = 0; i < NUMBER_OF_HOTKEYS; ++i)
+		  {
+			  auto& hotkey = input_preferences->hotkey_bindings[i];
+			  for (auto it : hotkey)
+			  {
+				  if (key_map[it])
+				  {
+					  encode_hotkey_sequence(i);
+					  break;
+				  }
+			  }
+		  }
+	  }
+
+	  if (hotkey_sequence[0])
+	  {
+		  flags &= ~(_cycle_weapons_forward | _cycle_weapons_backward);
+		  flags |= (hotkey_sequence[0] & ~hotkey_used);
+		  hotkey_sequence[0] = hotkey_sequence[1];
+		  hotkey_sequence[1] = hotkey_sequence[2];
+		  hotkey_sequence[2] = 0;
+	  }
+
       // Handle the selected input controller
-      if (input_preferences->input_device != _keyboard_or_game_pad) {
-	_fixed delta_yaw, delta_pitch, delta_velocity;
-	test_mouse(input_preferences->input_device, &flags, &delta_yaw, &delta_pitch, &delta_velocity);
-	flags = mask_in_absolute_positioning_information(flags, delta_yaw, delta_pitch, delta_velocity);
-        if (do_interchange)
-	    flags ^= _run_dont_walk;
-      } else {
-        int joyflags = process_joystick_axes(flags, heartbeat_count);
-        if (joyflags != flags) {
-            flags = joyflags;
-        } else {
-
-          // Modify flags with run/walk and swim/sink if we're using the keyboard
-        if (do_interchange)
-	    flags ^= _run_dont_walk;
-        }
+      if (input_preferences->input_device == _mouse_yaw_pitch) {
+          flags = process_aim_input(flags, pull_mouselook_delta());
       }
       
+      int joyflags = process_joystick_axes(flags, heartbeat_count);
+      if (joyflags != flags) {
+          flags = joyflags;
+      }
+
+      // if the user prefers to toggle run/swim, the flag becomes latched
+      if (input_preferences->modifiers & _inputmod_run_key_toggle)
+      {
+          static bool persistence = false;
+          if (flags & _run_dont_walk)
+          {
+              if (persistence)
+              {
+                  flags &= ~_run_dont_walk;
+              }
+
+              persistence = true;
+          }
+          else
+          {
+              persistence = false;
+          }
+      }
+
+      if (input_preferences->modifiers & _inputmod_run_key_toggle)
+      {
+          static bool run_swim = false;
+          if (flags & _run_dont_walk)
+          {
+              run_swim = !run_swim;
+          }
+
+          if (run_swim)
+          {
+              flags |= _run_dont_walk;
+          }
+          else
+          {
+              flags &= ~_run_dont_walk;
+          }
+      }
+      else
+      {
+          bool do_interchange =
+              (local_player->variables.flags & _HEAD_BELOW_MEDIA_BIT) ?
+              (input_preferences->modifiers & _inputmod_interchange_swim_sink) != 0:
+              (input_preferences->modifiers & _inputmod_interchange_run_walk) != 0;
+
+           if (do_interchange)
+           {
+               flags ^= _run_dont_walk;
+           }
+      }
+		
       
       if (player_in_terminal_mode(local_player_index))
-	flags = build_terminal_action_flags((char *)/*key_map*/fake_key_map); //DCW changed to fake_key_map
+	flags = build_terminal_action_flags((char *)key_map);
     } // if(get_keyboard_controller_status())
   
   return flags;
 }
 
-
+extern std::vector<DirectorySpecifier> data_search_path;
 /*
  *  Get random demo replay from map
  */
 
-bool setup_replay_from_random_resource(uint32 map_checksum)
+bool setup_replay_from_random_resource()
 {
+	std::vector<FileSpecifier> demos;
+	
+	// search the Demos/ folder for *.filA files
+	for (auto& dir : data_search_path)
+	{
+		DirectorySpecifier scripts = dir + "Demos";
+
+		auto entries = scripts.ReadDirectory();
+		for (auto& entry : entries)
+		{
+			if (entry.is_directory)
+			{
+				continue;
+			}
+
+			if (boost::algorithm::ends_with(entry.name, ".filA"))
+			{
+				FileSpecifier demo = scripts + entry.name;
+				demos.push_back(demo);
+			}
+		}
+	}
+
+	if (demos.size())
+	{
+		static auto last_played_index = -1;
+		auto index = 0;
+		if (demos.size() > 1)
+		{
+			do
+			{
+				index = local_random() % demos.size();
+			}
+			while (index == last_played_index);
+		}
+		
+		last_played_index = index;
+		return setup_for_replay_from_file(demos[index], 0, false);
+	}
+	
 	// not supported in SDL version
 	return false;
 }
@@ -1241,7 +1340,7 @@ timer_task_proc install_timer_task(short tasks_per_second, timer_func func)
 	// We only handle one task, which is enough
 	tm_period = 1000 / tasks_per_second;
 	tm_func = func;
-	tm_last = SDL_GetTicks();
+	tm_last = machine_tick_count();
 	tm_accum = 0;
 	return (timer_task_proc)tm_func;
 }
@@ -1255,9 +1354,14 @@ void execute_timer_tasks(uint32 time)
 {
 	if (tm_func) {
 		if (Movie::instance()->IsRecording()) {
-			tm_func();
+			if (get_fps_target() == 0 ||
+				movie_export_phase++ % (get_fps_target() / 30) == 0)
+			{
+				tm_func();
+			}
 			return;
 		}
+		
 		uint32 now = time;
 		tm_accum += now - tm_last;
 		tm_last = now;
@@ -1274,3 +1378,5 @@ void execute_timer_tasks(uint32 time)
 		}
 	}
 }
+
+

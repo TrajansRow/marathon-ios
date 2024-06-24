@@ -22,21 +22,24 @@
 	
 	By Loren Petrich, June 16, 2001
 */
+
+#if defined _MSC_VER
+#define NOMINMAX
+#include <algorithm>
+#endif
+
 #ifndef MODEL_3D
 #define MODEL_3D
 
 #include "cseries.h"
 
-using namespace std;
-
-#ifdef HAVE_OPENGL
-
 #ifdef HAVE_OPENGL
 #include "OGL_Headers.h"
-#endif
 
 #include <vector>
 #include "vec3.h"
+
+using std::vector;
 
 
 // For boned models; calculate vertices from these
@@ -179,7 +182,7 @@ struct Model3D
 	GLushort *SFPtrBase() {return &SeqFrmPointers[0];}
 	
 	// True number of sequences:
-	int TrueNumSeqs() {return max(int(SeqFrmPointers.size()-1),0);}
+	int TrueNumSeqs() {return std::max(int(SeqFrmPointers.size()-1),0);}
 	
 	// Add-on transforms for the positions and the normals
 	Model3D_Transform TransformPos, TransformNorm;

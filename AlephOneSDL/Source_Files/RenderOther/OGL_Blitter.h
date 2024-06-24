@@ -26,14 +26,12 @@
 #include "cseries.h"
 #include "ImageLoader.h"
 #include "Image_Blitter.h"
-
-#ifdef HAVE_OPENGL
 #include "OGL_Headers.h"
-#endif
 
 #include <vector>
 #include <set>
-using namespace std;
+
+using std::vector;
 
 #ifdef HAVE_OPENGL
 class OGL_Blitter;
@@ -46,7 +44,6 @@ public:
 	void Unload();
 
 	void Draw(SDL_Surface *dst_surface, const Image_Rect& dst, const Image_Rect& src) { Draw(dst, src); }
-    void Draw(const SDL_Rect& dst);
 	void Draw(const Image_Rect& dst) { Draw(dst, crop_rect); }
 	void Draw(const Image_Rect& dst, const Image_Rect& src);
 	
@@ -75,7 +72,7 @@ private:
 	bool m_textures_loaded;
 	
 	static const int tile_size = 256;
-	static set<OGL_Blitter*> *m_blitter_registry;
+	static std::set<OGL_Blitter*> *m_blitter_registry;
 };
 
 #endif

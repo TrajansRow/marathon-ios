@@ -134,7 +134,7 @@ void SglColor3us(GLushort r, GLushort g, GLushort b);
 void SglColor3usv(const GLushort* v);
 void SglColor4f(GLfloat r, GLfloat g, GLfloat b, GLfloat a);
 void SglColor4fv(const GLfloat* v);
-void SglColor4usv( const GLushort *v );
+void SglColor4usv(const GLushort* v);
 #endif
 
 // Initializer; returns whether or not OpenGL is present
@@ -223,6 +223,7 @@ enum
 	OGL_Flag_HUD		= 0x0800,	// Whether to do the HUD with OpenGL
 	OGL_Flag_Blur		= 0x1000,   // Whether to blur landscapes and glowing textures
 	OGL_Flag_BumpMap	= 0x2000,   // Whether to use bump mapping
+	OGL_Flag_MimicSW    = 0x4000,   // Whether to mimic software perspective
 };
 
 struct OGL_ConfigureData
@@ -387,14 +388,24 @@ void OGL_ResetModelSkins(bool Clear_OGL_Txtrs);
 
 #endif // def HAVE_OPENGL
 
+// Fog modes
+enum {
+	OGL_Fog_Linear,
+	OGL_Fog_Exp,
+	OGL_Fog_Exp2
+};
 
 // Fog data record
 struct OGL_FogData
 {
 	rgb_color Color;
 	float Depth;		// In World Units (1024 internal units)
+	float Start;		// In World Units (1024 internal units); Linear only
 	bool IsPresent;
 	bool AffectsLandscapes;
+	int Mode;
+
+	float LandscapeMix;	// 0-1
 };
 
 // Fog types
@@ -405,8 +416,8 @@ enum
 	OGL_NUMBER_OF_FOG_TYPES
 };
 
-OGL_FogData *OGL_GetFogData(int Type);
 
+OGL_FogData *OGL_GetFogData(int Type);
 
 class InfoTree;
 void parse_mml_opengl(const InfoTree& root);

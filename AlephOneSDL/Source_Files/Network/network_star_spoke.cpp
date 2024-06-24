@@ -58,7 +58,7 @@ enum {
         kDefaultInGameTicksBeforeNetDeath = 5 * TICKS_PER_SECOND,
         kDefaultOutgoingFlagsQueueSize = TICKS_PER_SECOND / 2,
         kDefaultRecoverySendPeriod = TICKS_PER_SECOND / 2,
-	kDefaultTimingWindowSize =  3 * TICKS_PER_SECOND,
+	kDefaultTimingWindowSize = 3 * TICKS_PER_SECOND,
 	kDefaultTimingNthElement = kDefaultTimingWindowSize / 2,
 	kLossyByteStreamDataBufferSize = 1280,
 	kTypicalLossyByteStreamChunkSize = 56,
@@ -123,6 +123,7 @@ static WindowedNthElementFinder<int32> sNthElementFinder(kDefaultTimingWindowSiz
 static bool sTimingMeasurementValid;
 static int32 sTimingMeasurement;
 static bool sHeardFromHub = false;
+static bool sWorldUpdate = false;
 
 static vector<int32> sDisplayLatencyBuffer; // stores the last 30 latency calculations, in ticks
 static uint32 sDisplayLatencyCount = 0;
@@ -159,7 +160,6 @@ static void handle_lossy_byte_stream_message(AIStream& ps, IncomingGameDataPacke
 static void process_optional_message(AIStream& ps, IncomingGameDataPacketProcessingContext& context, uint16 inMessageType);
 static bool spoke_tick();
 static void send_packet();
-static void send_position_sync_packet();
 static void send_identification_packet();
 
 
@@ -253,6 +253,7 @@ spoke_initialize(const NetAddrBlock& inHubAddress, int32 inFirstTick, size_t inN
         sOutstandingTimingAdjustment = 0;
 
         sNetworkTicker = 0;
+		sWorldUpdate = false;
         sLastNetworkTickHeard = 0;
         sLastNetworkTickSent = 0;
         sConnected = true;
@@ -698,7 +699,7 @@ spoke_received_game_data_packet_v1(AIStream& ps, bool reflected_flags)
 				if(theSmallestUnreadTick >= sSmallestRealGameTick)
 				{
 					WritableTickBasedActionQueue& theQueue = *(sNetworkPlayers[i].mQueue);
-					assert(theQueue.getWriteTick() == sSmallestUnreceivedTick);
+					assert(!sNetworkPlayers[i].mConnected || theQueue.getWriteTick() == sSmallestUnreceivedTick);
 					assert(theQueue.availableCapacity() > 0);
 					logTraceNMT("enqueueing flags %x for player %d tick %d", theFlags, i, theQueue.getWriteTick());
 					theQueue.enqueue(theFlags);
@@ -977,11 +978,6 @@ spoke_tick()
 		if (sHeardFromHub) {
 			if(shouldSend || (sNetworkTicker - sLastNetworkTickSent) >= sSpokePreferences.mRecoverySendPeriod)
 				send_packet();
-      if (sHubIsLocal) {
-        capture_position_sums_and_check_for_dsync();
-      } else if(!(sNetworkTicker % 30)) {
-          send_position_sync_packet();
-      }
 		} else {
 			if (!(sNetworkTicker % 30))
 				send_identification_packet();
@@ -1020,11 +1016,22 @@ spoke_tick()
 
         check_send_packet_to_hub();
 
+		sWorldUpdate = true;
+
         // We want to run again.
         return true;
 }
 
+bool spoke_check_world_update()
+{
+	if (sWorldUpdate)
+	{
+		sWorldUpdate = false;
+		return true;
+	}
 
+	return false;
+}
 
 static void
 send_packet()
@@ -1102,42 +1109,7 @@ send_packet()
         }
 }
 
-static void
-send_position_sync_packet()
-{
-  try {
-    AOStreamBE hdr(sOutgoingFrame->data, kStarPacketHeaderSize);
-    AOStreamBE ps(sOutgoingFrame->data, ddpMaxData, kStarPacketHeaderSize);
-    
-    // Packet type
-    hdr << (uint16)kSpokeToHubPositionSyncSum;
-        
-    player_data *player= get_player_data(sLocalPlayerIndex);
 
-    int32 positionSum = player->location.x + player->location.y + player->location.z;
-    ps << positionSum;
-    
-    //printf ("Position sending: %d\n",positionSum);
-    
-    // blank out the CRC before calculating it
-    sOutgoingFrame->data[2] = 0;
-    sOutgoingFrame->data[3] = 0;
-    
-    uint16 crc = calculate_data_crc_ccitt(sOutgoingFrame->data, ps.tellp());
-    hdr << crc;
-    
-    // Send the packet
-    sOutgoingFrame->data_size = ps.tellp();
-    
-    if(sHubIsLocal)
-      send_frame_to_local_hub(sOutgoingFrame, &sHubAddress, kPROTOCOL_TYPE, 0 /* ignored */);
-    else
-      NetDDPSendFrame(sOutgoingFrame, &sHubAddress, kPROTOCOL_TYPE, 0 /* ignored */);
-    
-  }
-  catch (...) {
-  }
-}
 
 static void
 send_identification_packet()

@@ -25,9 +25,8 @@
 #include "Logging.h"
 #include "InfoTree.h"
 
+#include <functional>
 #include <string>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
 
 #include "network.h"
 
@@ -46,8 +45,6 @@ using namespace std;
 
 extern bool game_is_networked;
 
-Console *Console::m_instance = NULL;
-
 Console::Console() : m_active(false), m_carnage_messages_exist(false), m_use_lua_console(true)
 {
 	m_command_iter = m_prev_commands.end();
@@ -56,6 +53,7 @@ Console::Console() : m_active(false), m_carnage_messages_exist(false), m_use_lua
 }
 
 Console *Console::instance() {
+	static Console *m_instance = nullptr;
 	if (!m_instance) {
 		m_instance = new Console;
 	}
@@ -86,7 +84,7 @@ static pair<string, string> split(string buffer)
 	return pair<string, string>(command, remainder);
 }
 
-void CommandParser::register_command(string command, boost::function<void(const string&)> f)
+void CommandParser::register_command(string command, std::function<void(const string&)> f)
 {
 	lowercase(command);
 	m_commands[command] = f;
@@ -95,7 +93,7 @@ void CommandParser::register_command(string command, boost::function<void(const 
 void CommandParser::register_command(string command, const CommandParser& command_parser)
 {
 	lowercase(command);
-	m_commands[command] = boost::bind(&CommandParser::parse_and_execute, command_parser, _1);
+	m_commands[command] = std::bind(&CommandParser::parse_and_execute, command_parser, std::placeholders::_1);
 }
 
 void CommandParser::unregister_command(string command)
@@ -159,7 +157,7 @@ void Console::enter() {
 		m_callback(m_buffer);
 	}
 	
-	m_callback.clear();
+	m_callback = nullptr;
 	m_buffer.clear();
 	m_displayBuffer.clear();
 	m_active = false;
@@ -175,13 +173,13 @@ void Console::abort() {
 		m_callback(m_buffer);
 	}
 
-	m_callback.clear();
+	m_callback = nullptr;
 	m_active = false;
 	SDL_StopTextInput();
 }
 
 void Console::backspace() {
-	if (!m_buffer.empty()) {
+	if (m_cursor_position > 0) {
 		m_cursor_position--;
 		m_buffer.erase(m_cursor_position, 1);
 		m_displayBuffer.erase(cursor_position(), 1);
@@ -290,9 +288,7 @@ void Console::line_end() {
 	m_cursor_position = m_buffer.length();
 }
 
-#include "AlephOneHelper.h"
-
-void Console::activate_input(boost::function<void (const std::string&)> callback,
+void Console::activate_input(std::function<void (const std::string&)> callback,
 			     const std::string& prompt)
 {
 	assert(!m_active);
@@ -303,22 +299,15 @@ void Console::activate_input(boost::function<void (const std::string&)> callback
 	m_active = true;
 	m_cursor_position = 0;
 	
-  //DCW Alternate ios input.
-  if(game_is_networked)
-    getSomeTextFromIOS("Chat", "");
-  else
-    getSomeTextFromIOS("Console", "");
-  return;
-
-  
-  SDL_StartTextInput();
+	SDL_StartTextInput();
+	SDL_FlushEvent(SDL_TEXTINPUT);
 }
 
 void Console::deactivate_input() {
 	m_buffer.clear();
 	m_displayBuffer.clear();
 	
-	m_callback.clear();
+	m_callback = nullptr;
 	m_active = false;
 	SDL_StopTextInput();
 }
@@ -483,7 +472,7 @@ void parse_mml_console(const InfoTree& root)
 	if (root.read_attr("use_lua_console", use_lua_console))
 		console->use_lua_console(use_lua_console);
 	
-	BOOST_FOREACH(InfoTree macro, root.children_named("macro"))
+	for (const InfoTree &macro : root.children_named("macro"))
 	{
 		std::string input, output;
 		if (!macro.read_attr("input", input) || !input.size())
@@ -492,7 +481,7 @@ void parse_mml_console(const InfoTree& root)
 		macro.read_attr("output", output);
 		console->register_macro(input, output);
 	}
-	BOOST_FOREACH(InfoTree message, root.children_named("carnage_message"))
+	for (const InfoTree &message : root.children_named("carnage_message"))
 	{
 		int16 projectile_type;
 		if (!message.read_indexed("projectile_type", projectile_type, NUMBER_OF_PROJECTILE_TYPES))

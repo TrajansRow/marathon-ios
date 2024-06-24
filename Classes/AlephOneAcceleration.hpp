@@ -6,7 +6,7 @@
 //  Copyright © 2020 SDG Productions. All rights reserved.
 //
 
-#include "SDL.h"
+#include "SDL2/SDL.h"
 
 #ifndef AlephOneAcceleration_hpp
 #define AlephOneAcceleration_hpp

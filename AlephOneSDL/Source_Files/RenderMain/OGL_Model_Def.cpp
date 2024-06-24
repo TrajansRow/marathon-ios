@@ -27,8 +27,6 @@
 #include "cseries.h"
 #include "OGL_Model_Def.h"
 #include "OGL_Setup.h"
-#include "AlephOneAcceleration.hpp"
-
 
 #ifdef HAVE_OPENGL
 
@@ -58,7 +56,8 @@ struct SequenceMapEntry
 	}
 	bool operator<(const SequenceMapEntry& other) const
 	{
-		return (Sequence < other.Sequence || ModelSequence < other.ModelSequence);
+		if (Sequence != other.Sequence) return Sequence < other.Sequence;
+		return ModelSequence < other.ModelSequence;
 	}
 };
 
@@ -221,7 +220,7 @@ void OGL_SkinManager::Reset(bool Clear_OGL_Txtrs)
 			for (int l=0; l<NUMBER_OF_TEXTURES; l++)
 			{
 				if (IDsInUse[k][l])
-					AOA::deleteTextures(1,&IDs[k][l]);
+					glDeleteTextures(1,&IDs[k][l]);
 			}
 	}
 	
@@ -278,11 +277,11 @@ bool OGL_SkinManager::Use(short CLUT, short Which)
 	bool LoadSkin = false;
 	if (!InUse)
 	{
-		AOA::genTextures(1,&TxtrID);
+		glGenTextures(1,&TxtrID);
 		InUse = true;
 		LoadSkin = true;
 	}
-	AOA::bindTexture(GL_TEXTURE_2D,TxtrID, NULL, 0);
+	glBindTexture(GL_TEXTURE_2D,TxtrID);
 	return LoadSkin;
 }
 
@@ -528,8 +527,8 @@ void OGL_ModelData::Load()
 						// Find minimum and maximum for each coordinate
 						for (int ic=0; ic<3; ic++)
 						{
-							NewBoundingBox[0][ic] = min(NewBoundingBox[0][ic],Corner[ic]);
-							NewBoundingBox[1][ic] = max(NewBoundingBox[1][ic],Corner[ic]);
+							NewBoundingBox[0][ic] = std::min(NewBoundingBox[0][ic],Corner[ic]);
+							NewBoundingBox[1][ic] = std::max(NewBoundingBox[1][ic],Corner[ic]);
 						}
 					}
 					else
@@ -711,7 +710,7 @@ void parse_mml_opengl_model(const InfoTree& root)
 		def.ModelType.push_back('\0');
 	}
 	
-	BOOST_FOREACH(InfoTree seqmap, root.children_named("seq_map"))
+	for (const InfoTree &seqmap : root.children_named("seq_map"))
 	{
 		SequenceMapEntry e;
 		if (!seqmap.read_indexed("seq", e.Sequence, MAXIMUM_SHAPES_PER_COLLECTION))
@@ -721,7 +720,7 @@ void parse_mml_opengl_model(const InfoTree& root)
 		entry.SequenceMap.push_back(e);
 	}
 	
-	BOOST_FOREACH(InfoTree skin, root.children_named("skin"))
+	for (const InfoTree &skin : root.children_named("skin"))
 	{
 		int16 clut = ALL_CLUTS;
 		skin.read_attr_bounded<int16>("clut", clut, ALL_CLUTS, SILHOUETTE_BITMAP_SET);

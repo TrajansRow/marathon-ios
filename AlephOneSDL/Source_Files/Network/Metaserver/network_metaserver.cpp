@@ -37,7 +37,7 @@
 #include "CommunicationsChannel.h"
 #include "preferences.h"
 #include "alephversion.h"
-#include "network/a1HTTP.h"
+#include "HTTP.h"
 
 #include <string>
 #include <iostream>
@@ -252,7 +252,7 @@ MetaserverClient::connect(const std::string& serverName, uint16 port, const std:
 		LoginAndPlayerInfoMessage theLoginMessage(userName, m_playerName, m_teamName);
 		m_channel->enqueueOutgoingMessage(theLoginMessage);
 	
-		auto_ptr<Message> theSaltOrAcceptMessage(m_channel->receiveMessage());
+		std::unique_ptr<Message> theSaltOrAcceptMessage(m_channel->receiveMessage());
 		if (theSaltOrAcceptMessage.get() == 0)
 			throw ServerConnectException("Server Disconnected");
 	
@@ -313,7 +313,7 @@ MetaserverClient::connect(const std::string& serverName, uint16 port, const std:
 			BigChunkOfDataMessage theKeyMessage(kCLIENT_KEY, (uint8 *) theKey, sizeof(theKey));
 			m_channel->enqueueOutgoingMessage(theKeyMessage);
 
-			auto_ptr<Message> theResponseMessage(m_channel->receiveMessage());
+			std::unique_ptr<Message> theResponseMessage(m_channel->receiveMessage());
 			if (!theResponseMessage.get())
 			{
 				throw ServerConnectException("Server Disconnected");
@@ -343,11 +343,11 @@ MetaserverClient::connect(const std::string& serverName, uint16 port, const std:
 
 		m_channel->enqueueOutgoingMessage(LocalizationMessage());
 
-		auto_ptr<LoginSuccessfulMessage> theLoginSuccessfulMessage(m_channel->receiveSpecificMessageOrThrow<LoginSuccessfulMessage>());
+		std::unique_ptr<LoginSuccessfulMessage> theLoginSuccessfulMessage(m_channel->receiveSpecificMessageOrThrow<LoginSuccessfulMessage>());
 
-//	auto_ptr<SetPlayerDataMessage> theSetPlayerDataMessage(m_channel->receiveSpecificMessageOrThrow<SetPlayerDataMessage>());
+//	std::unique_ptr<SetPlayerDataMessage> theSetPlayerDataMessage(m_channel->receiveSpecificMessageOrThrow<SetPlayerDataMessage>());
 
-		auto_ptr<RoomListMessage> theRoomListMessage(m_channel->receiveSpecificMessageOrThrow<RoomListMessage>());
+		std::unique_ptr<RoomListMessage> theRoomListMessage(m_channel->receiveSpecificMessageOrThrow<RoomListMessage>());
 		m_dispatcher.get()->handle(theRoomListMessage.get(), m_channel.get());
 
 		m_channel->disconnect();
@@ -379,10 +379,10 @@ MetaserverClient::connect(const std::string& serverName, uint16 port, const std:
 
 		m_channel->enqueueOutgoingMessage(NameAndTeamMessage(m_playerName, m_teamName));
 
-		auto_ptr<IDAndLimitMessage> theIDAndLimitMessage(m_channel->receiveSpecificMessageOrThrow<IDAndLimitMessage>());
+		std::unique_ptr<IDAndLimitMessage> theIDAndLimitMessage(m_channel->receiveSpecificMessageOrThrow<IDAndLimitMessage>());
 		m_playerID = theIDAndLimitMessage->playerID();
 
-		auto_ptr<DenialMessage> theRoomAcceptMessage(m_channel->receiveSpecificMessageOrThrow<DenialMessage>());
+		std::unique_ptr<DenialMessage> theRoomAcceptMessage(m_channel->receiveSpecificMessageOrThrow<DenialMessage>());
 
 		m_channel->setMessageHandler(m_dispatcher.get());
 	} 
@@ -435,7 +435,7 @@ MetaserverClient::pump()
 void
 MetaserverClient::pumpAll()
 {
-	for_each(s_instances.begin(), s_instances.end(), mem_fun(&MetaserverClient::pump));
+	for_each(s_instances.begin(), s_instances.end(), mem_fn(&MetaserverClient::pump));
 }
 
 

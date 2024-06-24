@@ -27,8 +27,6 @@ SW_TEXTURE_EXTRAS.CPP
 #include "InfoTree.h"
 #include "screen.h"
 
-SW_Texture_Extras *SW_Texture_Extras::m_instance;
-
 extern short bit_depth;
 void SW_Texture::build_opac_table()
 {
@@ -152,7 +150,7 @@ void reset_mml_software()
 
 void parse_mml_software(const InfoTree& root)
 {
-	BOOST_FOREACH(InfoTree ttree, root.children_named("texture"))
+	for (const InfoTree &ttree : root.children_named("texture"))
 	{
 		int16 coll, bitmap;
 		if (!ttree.read_indexed("coll", coll, NUMBER_OF_COLLECTIONS) ||

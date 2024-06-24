@@ -24,22 +24,20 @@ ALEPHVERSION.H
 
 
 #define A1_DISPLAY_NAME "Aleph One"
-#define A1_DISPLAY_VERSION "1.3a2"
-#define A1_DISPLAY_DATE_VERSION "2017-02-05"
-#define A1_DATE_VERSION "20170205"
+#define A1_DISPLAY_VERSION "1.8.1"
+#define A1_DISPLAY_DATE_VERSION "2024-05-13"
+#define A1_DATE_VERSION "20240513"
 
-#ifdef WIN32
+#ifdef _WIN32
+#define WIN_VERSION_STRING 0,2024,5,13 // <-- don't forget to update that for windows releases
 #define A1_DISPLAY_PLATFORM "Windows"
 #define A1_UPDATE_PLATFORM "windows"
 #elif defined (__APPLE__) && defined(__MACH__)
 #ifdef MAC_APP_STORE
 #define A1_DISPLAY_PLATFORM "Mac OS X (App Store)"
 #define A1_UPDATE_PLATFORM "macappstore"
-#elif defined(TARGET_OS_IPHONE)
-#define A1_DISPLAY_PLATFORM "iOS"
-#define A1_UPDATE_PLATFORM "ios"
 #else
-#define A1_DISPLAY_PLATFORM "Mac OS X"
+#define A1_DISPLAY_PLATFORM "macOS"
 #define A1_UPDATE_PLATFORM "macosx"
 #endif
 #elif defined (linux)

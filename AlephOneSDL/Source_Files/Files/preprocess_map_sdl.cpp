@@ -127,21 +127,14 @@ bool choose_saved_game_to_load(FileSpecifier &saved_game)
 /*
  *  Save game
  */
-#include "AlephOneHelper.h"
 
 bool save_game(void)
 {
-  // DJB Just save with current saved game by calling the helper
-  helperSaveGame();
-  return true;
-  
-	pause_game();
     bool success = create_quick_save();
     if (success)
         screen_printf("Game saved");
     else
         screen_printf("Save failed");
-	resume_game();
 
 	return success;
 }

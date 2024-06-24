@@ -46,12 +46,9 @@
 
 #include <vector>
 
-#include "SDL_thread.h"
-#include "SDL_timer.h"
-#include "SDL_error.h"
-
-#include <sched.h> //DCW needed for setting self QOS
-#include <pthread.h> //DCW needed for setting self QOS
+#include <SDL2/SDL_thread.h>
+#include <SDL2/SDL_timer.h>
+#include <SDL2/SDL_error.h>
 
 #include "Logging.h"
 
@@ -133,12 +130,9 @@ static int
 thread_loop(void* inData) {
     myTMTask*	theTMTask	= (myTMTask*) inData;
     
-    uint32	theLastRunTime	= SDL_GetTicks();
+    uint32	theLastRunTime	= machine_tick_count();
     uint32	theCurrentRunTime;
     int32	theDrift	= 0;
-  
-  //DCW Set iOS interactive QOS
-  pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
 
 #ifdef DEBUG
     theTMTask->mProfilingData.mStartTime	= theLastRunTime;
@@ -150,7 +144,7 @@ thread_loop(void* inData) {
         // made for some VERY long waits if we were running late...
         int32	theDelay 	= theTMTask->mPeriod - theDrift;
         if(theDelay > 0)
-            SDL_Delay(theDelay);
+            sleep_for_machine_ticks(theDelay);
         else {
             // We missed a deadline!
 #ifdef DEBUG
@@ -172,7 +166,7 @@ thread_loop(void* inData) {
             theTMTask->mProfilingData.mNumCallsThisReset	= 0;
 #endif
 
-            theCurrentRunTime	= SDL_GetTicks();
+            theCurrentRunTime	= machine_tick_count();
             theDrift		+= theCurrentRunTime - theLastRunTime - theTMTask->mPeriod;
             theLastRunTime	= theCurrentRunTime;
 
@@ -187,7 +181,7 @@ thread_loop(void* inData) {
             theDelay = theTMTask->mPeriod - theDrift;
             
             if(theDelay > 0)
-                SDL_Delay(theDelay);
+                sleep_for_machine_ticks(theDelay);
             else {
                 // We did miss a deadline!
 #ifdef DEBUG
@@ -196,7 +190,7 @@ thread_loop(void* inData) {
             }
         }
     
-	theCurrentRunTime	= SDL_GetTicks();
+	theCurrentRunTime	= machine_tick_count();
 	theDrift		+= theCurrentRunTime - theLastRunTime - theTMTask->mPeriod;
         theLastRunTime		= theCurrentRunTime;
 
@@ -241,7 +235,7 @@ thread_loop(void* inData) {
     theTMTask->mIsRunning = false;
     
 #ifdef DEBUG
-    theTMTask->mProfilingData.mFinishTime	= SDL_GetTicks();
+    theTMTask->mProfilingData.mFinishTime	= machine_tick_count();
 #endif
     
     return 0;
@@ -276,8 +270,7 @@ myXTMSetup(int32 time, bool (*func)(void)) {
     theTask->mThread		= SDL_CreateThread(thread_loop, "myXTMSetup_taskThread", theTask);
 
     // Set thread priority a little higher
-  //DCW Prevent setting scheduler parameters to permit QOS on iOS
-   //BoostThreadPriority(theTask->mThread);
+    BoostThreadPriority(theTask->mThread);
     
     sOutstandingTasks.push_back(theTask);
     
@@ -303,7 +296,7 @@ myTMReset(myTMTaskPtr task) {
         // mIsRunning to false.  I'm going to take the easy lazy evil way out and just hope that
         // doesn't happen.
         if(task->mIsRunning)
-            task->mResetTime	= SDL_GetTicks();
+            task->mResetTime	= machine_tick_count();
         
         // Otherwise, we need to start a new thread for the task.
         else {
@@ -322,8 +315,7 @@ myTMReset(myTMTaskPtr task) {
             task->mThread	= SDL_CreateThread(thread_loop, "myTMReset_taskThread", task);
 
             // Set thread priority a little higher
-          //DCW Prevent setting scheduler parameters to permit QOS on iOS
-          //BoostThreadPriority(task->mThread);
+            BoostThreadPriority(task->mThread);
         }
     }
 }
@@ -357,15 +349,12 @@ myTMDumpProfile(myTMTask* inTask) {
 // a small handful of (small) elements anyway.
 void
 myTMCleanup(bool inWaitForFinishers) {
-    vector<myTMTaskPtr>::iterator	i;
-
-    for(i = sOutstandingTasks.begin(); i != sOutstandingTasks.end(); ++i) {
+    auto i = sOutstandingTasks.begin();
+    while (i != sOutstandingTasks.end()) {
         if((*i)->mKeepRunning == false && (inWaitForFinishers || (*i)->mIsRunning == false)) {
             myTMTaskPtr	theDeadTask = *i;
-            
-            // This does the right thing: i is sent to erase(), but before erase is called, i is decremented so
-            // the iterator remains valid.
-            sOutstandingTasks.erase(i--);
+            auto next_i = sOutstandingTasks.erase(i);
+            i = next_i;
             
 #ifdef DEBUG
             myTMDumpProfile(theDeadTask);
@@ -374,5 +363,7 @@ myTMCleanup(bool inWaitForFinishers) {
             SDL_WaitThread(theDeadTask->mThread, NULL);
             delete theDeadTask;
         }
+        else
+            ++i; // skip task
     }
 }

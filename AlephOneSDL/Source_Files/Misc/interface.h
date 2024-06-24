@@ -244,7 +244,6 @@ enum { /* states. */
 bool game_window_is_full_screen(void);
 void set_change_level_destination(short level_number);
 bool networking_available(void);
-void free_and_unlock_memory(void);
 
 /* ---------- prototypes/INTERFACE.C */
 
@@ -258,7 +257,6 @@ bool suppress_background_events(void);
 void set_game_state(short new_state);
 short get_game_state(void);
 short get_game_controller(void);
-bool current_netgame_allows_microphone();
 void set_change_level_destination(short level_number);
 bool check_level_change(void);
 void pause_game(void);
@@ -276,12 +274,13 @@ void stop_interface_fade(void);
 bool enabled_item(short item);
 void paint_window_black(void);
 
+void set_game_focus_lost();
+void set_game_focus_gained();
+
 /* ---------- prototypes/INTERFACE_MACINTOSH.C */
 void do_preferences(void);
 short get_level_number_from_user(void);
 void toggle_menus(bool game_started);
-void install_network_microphone(void);
-void remove_network_microphone(void);
 
 // Should return NONE if user cancels, 0 for single player, or 1 for multiplayer.
 // Game has been loaded from file before this is called so elements like
@@ -369,6 +368,8 @@ void set_keyboard_controller_status(bool active);
 bool get_keyboard_controller_status(void);
 void pause_keyboard_controller(bool active);
 int32 get_heartbeat_count(void);
+float get_heartbeat_fraction(void);
+void wait_until_next_frame(void);
 void sync_heartbeat_count(void);
 void process_action_flags(short player_identifier, const uint32 *action_flags, short count);
 void rewind_recording(void);
@@ -379,6 +380,7 @@ void check_recording_replaying(void);
 bool has_recording_file(void);
 void increment_replay_speed(void);
 void decrement_replay_speed(void);
+void set_replay_speed(short);
 void reset_recording_and_playback_queues(void);
 uint32 parse_keymap(void);
 
@@ -405,10 +407,6 @@ enum {	// Results for network_join
 bool network_gather(bool inResumingGame);
 int network_join(void);
 
-/* ---------- prototypes/NETWORK_MICROPHONE.C */
-
-void handle_microphone(bool triggered);
-
 /* ---------- prototypes/PHYSICS.C */
 
 void reset_absolute_positioning_device(_fixed yaw, _fixed pitch, _fixed velocity);
@@ -433,22 +431,16 @@ bool get_default_theme_spec(FileSpecifier& File);
 // by name, new interface to search for all simultaneously instead of duplicating effort.
 void get_default_file_specs(FileSpecifier* outMapSpec, FileSpecifier* outShapesSpec, FileSpecifier* outSoundsSpec, FileSpecifier* outPhysicsSpec);
 
-// external resources: terminals for Marathon 1
-void set_external_resources_file(FileSpecifier&);
-void close_external_resources();
-extern OpenedResourceFile ExternalResources;
-
 // LP change: resets field of view to whatever the player had had when reviving
 void ResetFieldOfView();
 
 // LP change: modification of Josh Elsasser's dont-switch-weapons patch
 bool dont_switch_to_new_weapon();
 
-// ZZZ: corresponds with dont_switch_to_new_weapon()
 bool dont_auto_recenter();
 
 // ZZZ: let code disable (standardize)/enable behavior modifiers like
-// dont_switch and dont_auto_recenter
+// dont_switch
 void standardize_player_behavior_modifiers();
 void restore_custom_player_behavior_modifiers();
 

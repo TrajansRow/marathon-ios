@@ -24,6 +24,7 @@
 
 #include <string.h>
 #include <math.h>
+#include <iostream>
 
 #include "VecOps.h"
 #include "cseries.h"
@@ -31,15 +32,8 @@
 
 #ifdef HAVE_OPENGL
 
-#ifdef __WIN32__
-#include <windows.h>
-#endif
-
 #include "Model3D.h"
-
-#ifdef HAVE_OPENGL
 #include "OGL_Headers.h"
-#endif
 
 /* Need Sgl* macros */
 #include "OGL_Setup.h"
@@ -596,9 +590,9 @@ void Model3D::RenderBoundingBox(const GLfloat *EdgeColor, const GLfloat *Diagona
 				BBoxVertices[Indx][2] = BoundingBox[i3][2];
 			}
 	
-	glDisable(GL_TEXTURE_2D);
-	glDisableClientState(GL_COLOR_ARRAY);
-	glEnableClientState(GL_VERTEX_ARRAY);
+	//glDisable(GL_TEXTURE_2D);  //NOT SUPPORTED ANGLE ENUM
+	//glDisableClientState(GL_COLOR_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
+	//glEnableClientState(GL_VERTEX_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
 	glVertexPointer(3,GL_FLOAT,0,BBoxVertices[0]);
 	
 	if (EdgeColor)
@@ -661,7 +655,7 @@ void Model3D::BuildTrigTables()
 void Model3D::BuildInverseVSIndices()
 {
 	if (VtxSrcIndices.empty()) return;
-	
+
 	InverseVSIndices.resize(VtxSrcIndices.size());
 	InvVSIPointers.resize(VtxSources.size()+1);		// One extra member
 	
@@ -721,7 +715,7 @@ bool Model3D::FindPositions_Neutral(bool UseModelTransform)
 		for (size_t k=0; k<NumVertices; k++, IP++, PP+=3)
 		{
 			size_t VSIndex = *IP;
-			if (VSIndex >= 0 && VSIndex < NumVtxSources)
+			if (VSIndex < NumVtxSources)
 			{
 				Model3D_VertexSource& VS = VtxSources[VSIndex];
 				TransformPoint(PP,VS.Position,TransformPos);
@@ -738,7 +732,7 @@ bool Model3D::FindPositions_Neutral(bool UseModelTransform)
 		for (size_t k=0; k<NumVertices; k++, IP++)
 		{
 			size_t VSIndex = *IP;
-			if (VSIndex >= 0 && VSIndex < NumVtxSources)
+			if (VSIndex < NumVtxSources)
 			{
 				Model3D_VertexSource& VS = VtxSources[VSIndex];
 				GLfloat *VP = VS.Position;

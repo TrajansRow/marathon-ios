@@ -27,7 +27,8 @@
 #include "Logging.h"
 #include "cseries.h"
 #include "shell.h"
-
+#include <thread>
+#include <mutex>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -35,8 +36,6 @@
 #include <stdio.h>
 #include "FileHandler.h"
 #include "InfoTree.h"
-
-#include "AlephOneHelper.h"
 
 #ifndef NO_STD_NAMESPACE
 using std::vector;
@@ -47,8 +46,7 @@ enum { kStringBufferSize = 1024 };
 
 static Logger*	sCurrentLogger	= NULL;
 static FILE*	sOutputFile	= NULL;
-//static int	sLoggingThreshhold = logNoteLevel;	// log messages at or above this level will be squelched
-static int  sLoggingThreshhold = logTraceLevel;  // DCW logging test
+static int	sLoggingThreshhold = logNoteLevel;	// log messages at or above this level will be squelched
 static bool	sShowLocations	= true;			// should filenames and line numbers be printed as well?
 static bool	sFlushOutput	= false;		// flush output after every log-write?  (good if crash expected)
 const char*	logDomain	= "global";
@@ -104,17 +102,29 @@ Logger::~Logger() {
 
 class TopLevelLogger : public Logger {
 public:
-    TopLevelLogger() : mMostRecentCommonStackDepth(0), mMostRecentlyPrintedStackDepth(0) {}
     virtual void pushLogContextV(const char* inFile, int inLine, const char* inContext, va_list inArgs);
     virtual void popLogContext();
     virtual void logMessageV(const char* inDomain, int inLevel, const char* inFile, int inLine, const char* inMessage, va_list inArgs);
 	void flush();
 protected:
-    vector<string>	mContextStack;
-    size_t	mMostRecentCommonStackDepth;
-    size_t	mMostRecentlyPrintedStackDepth;
-};
 
+    struct LogData
+    {
+        vector<string>	mContextStack;
+        size_t	mMostRecentCommonStackDepth = 0;
+        size_t	mMostRecentlyPrintedStackDepth = 0;
+    };
+
+    LogData& getLogData()
+    {
+        static std::mutex mutex;
+        std::lock_guard lock(mutex);
+        return _log_data[std::this_thread::get_id()];
+    }
+
+private:
+    std::unordered_map<std::thread::id, LogData> _log_data;
+};
 
 void
 TopLevelLogger::pushLogContextV(const char* inFile, int inLine, const char* inContext, va_list inArgs) {
@@ -128,15 +138,16 @@ TopLevelLogger::pushLogContextV(const char* inFile, int inLine, const char* inCo
                 snprintf(stringBuffer, kStringBufferSize, " (%s:%d)", inFile, inLine);
                 theContextString += stringBuffer;
         }
-        mContextStack.push_back(theContextString);
+        getLogData().mContextStack.push_back(theContextString);
 }
 
 
 void
 TopLevelLogger::popLogContext() {
-    mContextStack.pop_back();
-    if(mContextStack.size() < mMostRecentCommonStackDepth)
-        mMostRecentCommonStackDepth = mContextStack.size();
+    auto& log_data = getLogData();
+    log_data.mContextStack.pop_back();
+    if(log_data.mContextStack.size() < log_data.mMostRecentCommonStackDepth)
+        log_data.mMostRecentCommonStackDepth = log_data.mContextStack.size();
 }
 
 
@@ -152,10 +163,11 @@ void
 TopLevelLogger::logMessageV(const char* inDomain, int inLevel, const char* inFile, int inLine, const char* inMessage, va_list inArgs) {
     // Obviously eventually this will be settable more dynamically...
     // Also eventually some logged messages could be posted in a dialog in addition to appended to the file.
-    // DCW: if sOutputFile is null, we still want stderr for debugging!
-    if( (sOutputFile != NULL || usingA1DEBUG() ) && inLevel < sLoggingThreshhold) {
+    if(sOutputFile != NULL && inLevel < sLoggingThreshhold) {
         char	stringBuffer[kStringBufferSize];
-        size_t firstDepthToPrint = mMostRecentCommonStackDepth;
+        auto& log_data = getLogData();
+
+        size_t firstDepthToPrint = log_data.mMostRecentCommonStackDepth;
     /*
         // This was designed to give a little context when coming back from deep stacks, but it seems
         // rather annoying to me in practice.  (Maybe should be set to only kick in for bigger stack depth differences,
@@ -163,19 +175,19 @@ TopLevelLogger::logMessageV(const char* inDomain, int inLevel, const char* inFil
         if(mMostRecentlyPrintedStackDepth != mMostRecentCommonStackDepth && firstDepthToPrint > 0)
             firstDepthToPrint--;
     */
-        for(size_t depth = firstDepthToPrint; depth < mContextStack.size(); depth++) {
+        for(size_t depth = firstDepthToPrint; depth < log_data.mContextStack.size(); depth++) {
             string	theString(depth * 2, ' ');
     
             theString += "while ";
-            theString += mContextStack[depth];
+            theString += log_data.mContextStack[depth];
             
-            if(sOutputFile) fprintf(sOutputFile, "%s\n", theString.c_str());
+            fprintf(sOutputFile, "%s\n", theString.c_str());
 			fprintf(stderr, "%s\n", theString.c_str());
         }
         
         vsnprintf(stringBuffer, kStringBufferSize, inMessage, inArgs);
     
-        string	theString(mContextStack.size() * 2, ' ');
+        string	theString(log_data.mContextStack.size() * 2, ' ');
         
         theString += stringBuffer;
         
@@ -186,14 +198,14 @@ TopLevelLogger::logMessageV(const char* inDomain, int inLevel, const char* inFil
         else
             theString += "\n";
         
-        if(sOutputFile) fprintf(sOutputFile, "%s", theString.c_str());
+        fprintf(sOutputFile, "%s", theString.c_str());
 		fprintf(stderr, "%s", theString.c_str());
         
-        if(sFlushOutput && sOutputFile)
+        if(sFlushOutput)
                 fflush(sOutputFile);
         
-        mMostRecentCommonStackDepth = mContextStack.size();
-        mMostRecentlyPrintedStackDepth = mContextStack.size();
+        log_data.mMostRecentCommonStackDepth = log_data.mContextStack.size();
+        log_data.mMostRecentlyPrintedStackDepth = log_data.mContextStack.size();
     }
 }
 
@@ -220,7 +232,7 @@ const char *loggingFileName()
 {
 	if (!strlen(g_loggingFileName))
 	{
-		strncpy(g_loggingFileName, get_application_name(), 256);
+		strncpy(g_loggingFileName, get_application_name().c_str(), 256);
 		strncat(g_loggingFileName, " Log.txt", 256 - strlen(g_loggingFileName));
 	}
 	return g_loggingFileName;
@@ -232,7 +244,11 @@ InitializeLogging() {
     FileSpecifier fs = log_dir;
     fs += loggingFileName();
 
+#ifdef __WIN32__
+    sOutputFile = _wfopen(utf8_to_wide(fs.GetPath()).c_str(), L"a");
+#else
     sOutputFile = fopen(fs.GetPath(), "a");
+#endif
 
     sCurrentLogger = new TopLevelLogger;
     if(sOutputFile != NULL)
@@ -274,7 +290,7 @@ void reset_mml_logging()
 
 void parse_mml_logging(const InfoTree& root)
 {
-	BOOST_FOREACH(InfoTree dtree, root.children_named("logging_domain"))
+	for (const InfoTree &dtree : root.children_named("logging_domain"))
 	{
 		std::string domain;
 		if (!dtree.read_attr("domain", domain) || !domain.size())

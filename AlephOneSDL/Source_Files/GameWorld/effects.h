@@ -153,14 +153,14 @@ const int SIZEOF_effect_definition = 14;
 // Turned the list of active effects into a variable array
 
 extern std::vector<effect_data> EffectList;
-#define effects (&EffectList[0])
+#define effects (EffectList.data())
 
 // extern struct effect_data *effects;
 
 /* ---------- prototypes/EFFECTS.C */
 
 short new_effect(world_point3d *origin, short polygon_index, short type, angle facing);
-void update_effects(void); /* assumes ¶t==1 tick */
+void update_effects(void); /* assumes âˆ‚t==1 tick */
 
 void remove_all_nonpersistent_effects(void);
 void remove_effect(short effect_index);
@@ -175,6 +175,7 @@ effect_data *get_effect_data(
 
 //Added for dynamic lighting hints
 int effect_index_matching_object(const short object_index);
+
 
 // LP: to pack and unpack this data;
 // these do not make the definitions visible to the outside world

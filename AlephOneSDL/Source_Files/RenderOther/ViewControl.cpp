@@ -41,8 +41,7 @@ Dec 17, 2000 (Loren Petrich:
 #include "screen.h"
 #include "ViewControl.h"
 #include "InfoTree.h"
-
-#include "AlephOneHelper.h"
+#include "preferences.h"
 
 struct view_settings_definition {
 	bool MapActive;
@@ -102,9 +101,42 @@ static bool ScreenFontInited = false;
 static short ScreenFontInitedSize = -1;
 
 // Accessors:
-float View_FOV_Normal() {return FOV_Normal;}
-float View_FOV_ExtraVision() {return FOV_ExtraVision;}
-float View_FOV_TunnelVision() {return FOV_TunnelVision;}
+float View_FOV_Normal()
+{
+	if (graphics_preferences->screen_mode.fov != 0)
+	{
+		return graphics_preferences->screen_mode.fov;
+	}
+	else
+	{
+		return FOV_Normal;
+	}
+}
+
+float View_FOV_ExtraVision()
+{
+	// controversial; next someone will complain this isn't a separate slider
+	if (graphics_preferences->screen_mode.fov != 0)
+	{
+		return std::min(130, graphics_preferences->screen_mode.fov + 50);
+	}
+	else
+	{
+		return FOV_ExtraVision;
+	}
+}
+
+float View_FOV_TunnelVision()
+{
+	if (graphics_preferences->screen_mode.fov != 0)
+	{
+		return std::max(30, graphics_preferences->screen_mode.fov - 50);
+	}
+	else
+	{
+		return FOV_TunnelVision;
+	}
+}
 
 FontSpecifier& GetOnScreenFont()
 {
@@ -138,16 +170,16 @@ bool View_AdjustFOV(float& FOV, float FOV_Target)
 	bool Changed = false;
 	if (FOV_ChangeRate < 0) FOV_ChangeRate *= -1;
 	
-	if (FOV > FOV_Target + extraFieldOfView())
+	if (FOV > FOV_Target)
 	{
 		FOV -= FOV_ChangeRate;
-		FOV = MAX(FOV,FOV_Target + extraFieldOfView() );
+		FOV = MAX(FOV,FOV_Target);
 		Changed = true;
 	}
-	else if (FOV < FOV_Target + extraFieldOfView())
+	else if (FOV < FOV_Target)
 	{
 		FOV += FOV_ChangeRate;
-		FOV = MIN(FOV,FOV_Target + extraFieldOfView());
+		FOV = MIN(FOV,FOV_Target);
 		Changed = true;
 	}
 	
@@ -257,13 +289,13 @@ void parse_mml_view(const InfoTree& root)
 	root.read_attr("interlevel_in_effects", view_settings.DoInterlevelTeleportInEffects);
 	root.read_attr("interlevel_out_effects", view_settings.DoInterlevelTeleportOutEffects);
 	
-	BOOST_FOREACH(InfoTree font, root.children_named("font"))
+	for (const InfoTree &font : root.children_named("font"))
 	{
 		font.read_font(OnScreenFont);
 		ScreenFontInitedSize = -1;
 	}
 	
-	BOOST_FOREACH(InfoTree fov, root.children_named("fov"))
+	for (const InfoTree &fov : root.children_named("fov"))
 	{
 		fov.read_attr_bounded<float>("normal", FOV_Normal, 0, 180);
 		fov.read_attr_bounded<float>("extra", FOV_ExtraVision, 0, 180);
@@ -280,7 +312,7 @@ void reset_mml_landscapes()
 
 void parse_mml_landscapes(const InfoTree& root)
 {
-	BOOST_FOREACH(const InfoTree::value_type &v, root)
+	for (const InfoTree::value_type &v : root)
 	{
 		const std::string& name = v.first;
 		const InfoTree& child = v.second;

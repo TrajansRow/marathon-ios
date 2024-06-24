@@ -38,6 +38,8 @@ May 3, 2003 (Br'fin (Jeremy Parsons))
 #include "OGL_Subst_Texture_Def.h"
 #include "scottish_textures.h"
 
+#ifdef HAVE_OPENGL
+
 // Initialize the texture accounting
 void OGL_StartTextures();
 
@@ -186,7 +188,7 @@ class TextureManager
 	uint32 *GetOGLTexture(uint32 *ColorTable);
 	
 	// This one creates a fake landscape
-	uint32 *GetFakeLandscape();
+	uint32 *GetFakeLandscape() const;
 	
 	// This is for shrinking a texture
 	uint32 *Shrink(uint32 *Buffer);
@@ -206,12 +208,12 @@ public:
 	bool IsShadeless;
 	short TextureType;
 	bool LandscapeVertRepeat;
-
+    
 	bool FastPath;
 	
 	// The width of a landscape texture will be 2^(-Landscape_AspRatExp) * (the height)
 	short Landscape_AspRatExp;
-	
+
 	// Sets up all the texture stuff:	
 	bool Setup();
 	
@@ -238,6 +240,7 @@ public:
 	float GlowBloomScale() {return (TxtrOptsPtr->GlowBloomScale);}
 	float GlowBloomShift() {return (TxtrOptsPtr->GlowBloomShift);}
 	float LandscapeBloom() {return (TxtrOptsPtr->LandscapeBloom);}
+	int TileRatio() { return (1 << TxtrOptsPtr->TileRatioExp); }
 	
 	// Scaling and offset of the current texture;
 	// important for sprites, which will be padded to make them OpenGL-friendly.
@@ -254,6 +257,9 @@ public:
 	void SetupTextureMatrix();
 	void RestoreTextureMatrix();
 	
+	TextureManager(const TextureManager&) = delete;
+	TextureManager& operator= (const TextureManager&) = delete;
+	
 	TextureManager();
 	~TextureManager();
 };
@@ -269,35 +275,37 @@ inline byte FiveToEight(byte x) {return (x << 3) | ((x >> 2) & 0x07);}
 // ARGB 1555 to RGBA 8888
 inline GLuint Convert_16to32(uint16 InPxl)
 {
-#ifdef ALEPHONE_LITTLE_ENDIAN
-	// Alpha preset
-	GLuint OutPxl = 0xff000000;
-	GLuint Chan;
-	// Red
-	Chan = FiveToEight(InPxl >> 10);
-	OutPxl |= Chan;
-	// Green
-	Chan = FiveToEight(InPxl >> 5);
-	OutPxl |= Chan << 8;
-	// Blue
-	Chan = FiveToEight(InPxl & 0x1F);
-	OutPxl |= Chan << 16;
-#else
-	// Alpha preset
-	GLuint OutPxl = 0x000000ff;
-	GLuint Chan;
-	// Red
-	Chan = FiveToEight(InPxl >> 10);
-	OutPxl |= Chan << 24;
-	// Green
-	Chan = FiveToEight(InPxl >> 5);
-	OutPxl |= Chan << 16;
-	// Blue
-	Chan = FiveToEight(InPxl);
-	OutPxl |= Chan << 8;
-#endif
+	if (PlatformIsLittleEndian()) {
+		// perfect target for constexpr-if in C++17
+		// Alpha preset
+		GLuint OutPxl = 0xff000000;
+		GLuint Chan;
+		// Red
+		Chan = FiveToEight(InPxl >> 10);
+		OutPxl |= Chan;
+		// Green
+		Chan = FiveToEight(InPxl >> 5);
+		OutPxl |= Chan << 8;
+		// Blue
+		Chan = FiveToEight(InPxl & 0x1F);
+		OutPxl |= Chan << 16;
+		return OutPxl;
+	} else {
+		// Alpha preset
+		GLuint OutPxl = 0x000000ff;
+		GLuint Chan;
+		// Red
+		Chan = FiveToEight(InPxl >> 10);
+		OutPxl |= Chan << 24;
+		// Green
+		Chan = FiveToEight(InPxl >> 5);
+		OutPxl |= Chan << 16;
+		// Blue
+		Chan = FiveToEight(InPxl);
+		OutPxl |= Chan << 8;
+		return OutPxl;
+	}
 	
-	return OutPxl;
 }
 
 
@@ -339,14 +347,9 @@ bool& IsInfravisionActive();
 // the color values are from 0 to 1.
 bool SetInfravisionTint(short Collection, bool IsTinted, float Red, float Green, float Blue);
 
-void FindInfravisionVersion(short Collection, ImageDescriptorManager &imageManager);
-
 // Finds the infravision version of a color;
 // it makes no change if infravision is inactive.
 void FindInfravisionVersionRGBA(short Collection, GLfloat *Color);
-
-// Mass-production version of above; suitable for textures
-void FindInfravisionVersionRGBA(short Collection, int NumPixels, uint32 *Pixels);
 
 void FindSilhouetteVersion(ImageDescriptorManager &imageManager);
 
@@ -358,5 +361,7 @@ struct OGL_TexturesStats {
 };
 
 extern OGL_TexturesStats gGLTxStats;
+
+#endif
 
 #endif

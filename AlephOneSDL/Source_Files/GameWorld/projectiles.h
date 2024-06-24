@@ -115,7 +115,7 @@ struct projectile_data /* 32 bytes */
 
 	short target_index; /* for guided projectiles, the current target index */
 
-	angle elevation; /* facing is stored in the projectileÕs object */
+	angle elevation; /* facing is stored in the projectileâ€™s object */
 	
 	short owner_index; /* ownerless if NONE */
 	short owner_type; /* identical to the monster type which fired this projectile (valid even if owner==NONE) */
@@ -155,7 +155,7 @@ enum /* translate_projectile() flags */
 // Turned the list of active projectiles into a variable array
 
 extern std::vector<projectile_data> ProjectileList;
-#define projectiles (&ProjectileList[0])
+#define projectiles (ProjectileList.data())
 
 // extern struct projectile_data *projectiles;
 
@@ -174,7 +174,7 @@ void detonate_projectile(world_point3d *origin, short polygon_index, short type,
 // as may happen for a "penetrates media boundary" projectile.
 uint16 translate_projectile(short type, world_point3d *old_location, short old_polygon_index, world_point3d *new_location, short *new_polygon_index, short owner_index, short *obstruction_index, short *last_line_index, bool preflight, short projectile_indexx);
 
-void move_projectiles(void); /* assumes ¶t==1 tick */
+void move_projectiles(void); /* assumes âˆ‚t==1 tick */
 
 void remove_projectile(short projectile_index);
 void remove_all_projectiles(void);

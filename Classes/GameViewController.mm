@@ -28,6 +28,10 @@
 #include <fstream>
 #include <sstream>
 
+// Stupid hack to access this operation in SDL
+extern int SDL_SendMouseMotion(SDL_Window * window, SDL_TouchID mouseID, int relative, int x, int y);
+extern int SDL_SendMouseButton(SDL_Window * window, SDL_TouchID mouseID, Uint8 state, Uint8 button);
+
 extern float DifficultyMultiplier[];
 
 // Useful functions
@@ -36,18 +40,20 @@ extern "C" void setOpenGLView ( SDL_uikitopenglview* view );
 
 // For cheats
 #include "game_window.h"
+/*
+//The following is no longer supported in Aleph One
 extern void AddItemsToPlayer(short ItemType, short MaxNumber);
-extern void AddOneItemToPlayer(short ItemType, short MaxNumber);
+extern void AddOneItemToPlayer(short ItemType, short MaxNumber);*/
 
 
 extern "C" {
 
-#include "SDL_keyboard_c.h"
-#include "SDL_keyboard.h"
-#include "SDL_stdinc.h"
-#include "SDL_mouse_c.h"
-#include "SDL_mouse.h"
-#include "SDL_events.h"
+//Still needed for iOS 6-19-24?#include "SDL2/SDL_keyboard_c.h"
+#include "SDL2/SDL_keyboard.h"
+#include "SDL2/SDL_stdinc.h"
+//Still needed for iOS 6-19-24?#include "SDL2/SDL_mouse_c.h"
+#include "SDL2/SDL_mouse.h"
+#include "SDL2/SDL_events.h"
 }
 #include "cseries.h"
 #include <string.h>
@@ -383,7 +389,7 @@ short localFindActionTarget(
   [self.filmView addSubview:self.filmViewController.enclosingView];
   
   // Kill a warning
-  (void)all_key_definitions;
+	//Still needed for iOS 6-19-24?(void)all_key_definitions;
   mode = MenuMode;
   haveNewGamePreferencesBeenSet = NO;
   showControlsOverview = NO;
@@ -1123,7 +1129,7 @@ extern SDL_Surface *draw_surface;
   
   bool success = build_map_preview(image_stream);
   
-  ofstream thumbFile;
+	boost_swap_impl::ofstream thumbFile;
   thumbFile.open ((char*)[[self.saveGameViewController fullPath:self.currentSavedGame.mapFilename] UTF8String]);
   thumbFile << image_stream.str();
   thumbFile.close();
@@ -1431,9 +1437,23 @@ extern bool handle_open_replay(FileSpecifier& File);
       CGPoint location = [self transformTouchLocation:[recognizer locationInView:self.menuView]];
       location = [recognizer locationInView:self.menuView];
       lastMenuTap = location;
+			/*
       SDL_SendMouseMotion (NULL, SDL_TOUCH_MOUSEID, 0, location.x, location.y);
       SDL_SendMouseButton(NULL, SDL_TOUCH_MOUSEID, SDL_PRESSED, SDL_BUTTON_LEFT);
       SDL_SendMouseButton(NULL, SDL_TOUCH_MOUSEID, SDL_RELEASED, SDL_BUTTON_LEFT);
+			*/
+			
+			//Needed for safer iOS port. Simulate a push and release of the mouse at the desired point.
+			SDL_Event mouseEvent;
+			mouseEvent.type = SDL_MOUSEBUTTONDOWN; // Set the event type (button press)
+			mouseEvent.button.button = SDL_BUTTON_LEFT; // Set the button (left button)
+			mouseEvent.button.state = SDL_PRESSED; // Set the button state (pressed)
+			mouseEvent.motion.x = location.x; // Set the X coordinate
+			mouseEvent.motion.y = location.y; // Set the Y coordinate
+			SDL_PushEvent(&mouseEvent);
+			mouseEvent.button.state = SDL_RELEASED;
+			SDL_PushEvent(&mouseEvent);
+			
       SDL_GetRelativeMouseState(NULL, NULL);
     }
   }
@@ -1683,7 +1703,7 @@ _civilian_fusion_assimilated,
 
   local_player->suit_energy= MAX(local_player->suit_energy, 3*PLAYER_MAXIMUM_SUIT_ENERGY);
   local_player->suit_oxygen = MAX ( local_player->suit_oxygen, PLAYER_MAXIMUM_SUIT_OXYGEN );
-  mark_shield_display_as_dirty();  
+	mark_shield_display_as_dirty();
   currentSavedGame.haveCheated = [NSNumber numberWithBool:YES];
 }
 
@@ -1762,8 +1782,8 @@ short items[]=
     switch(get_item_kind(items[index]))
     {
       case _ammunition:
-        AddItemsToPlayer(items[index],10);
-        break;        
+				//The following is no longer supported in Aleph One: AddItemsToPlayer(items[index],10);
+        break;
       default:
         break;
     }
@@ -1796,10 +1816,10 @@ short items[]=
     {
       case _weapon:
         if(items[index]==_i_shotgun || items[index]==_i_magnum) {
-          AddOneItemToPlayer(items[index],2);
+					//The following is no longer supported in Aleph One: AddOneItemToPlayer(items[index],2);
         }
         else {
-          AddItemsToPlayer(items[index],1);
+					//The following is no longer supported in Aleph One: AddItemsToPlayer(items[index],1);
         }
         break;
       default:
@@ -1872,7 +1892,7 @@ short items[]=
         self.zoomInButton.hidden = YES;
         self.zoomOutButton.hidden = YES;
     }
-    [self updateReticule:get_player_desired_weapon(current_player_index)];
+//dcw shit test    [self updateReticule:get_player_desired_weapon(current_player_index)];
     if ( get_game_state() == _display_main_menu && ( mode == SDLMenuMode || mode == MenuMode || mode == CutSceneMode ) ) {
         //[self menuShowReplacementMenu];
       [self switchBackToGameView];
@@ -1926,26 +1946,10 @@ short items[]=
         self.HUDViewController.view.alpha = 1.0;
       }
       
-      if( shouldAutoBot() ) {
-        
-          //If autobot sees anything, run forward!
-        if(isMonsterCentered() || isMonsterOnLeft() || isMonsterOnRight()) {
-          setKey(((BasicHUDViewController*)self.HUDViewController).movePadView.forwardKey, 1);
-        } else {
-          setKey(((BasicHUDViewController*)self.HUDViewController).movePadView.forwardKey, 0);
-        }
-        
-          //Autobot just toggles action key constantly.
-        if (machine_tick_count() % 7 == 0) {
-          [self.HUDViewController actionDown:self];
-        } else if (machine_tick_count() % 19 == 0) {
-          [self.HUDViewController actionUp:self];
-        }
-      }
     }
-    
+		
     //DCW adding check for SDLMenuMode, so we don't run the main loop. It slurps up SDL events, which the menus need instead.
-    if ( !inMainLoop && mode != SDLMenuMode )
+    if ( !inMainLoop && mode != SDLMenuMode)
     {
         inMainLoop = YES;
         AlephOneMainLoop();

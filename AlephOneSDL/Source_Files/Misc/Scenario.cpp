@@ -28,10 +28,9 @@
 #include "Scenario.h"
 #include "InfoTree.h"
 
-Scenario *Scenario::m_instance;
-
 Scenario *Scenario::instance()
 {
+	static Scenario *m_instance = nullptr;
 	if (!m_instance) m_instance = new Scenario();
 	return m_instance;
 }
@@ -68,8 +67,12 @@ void parse_mml_scenario(const InfoTree& root)
 		Scenario::instance()->SetID(str);
 	if (root.read_attr("version", str))
 		Scenario::instance()->SetVersion(str);
-	
-	BOOST_FOREACH(InfoTree can_join, root.children_named("can_join"))
+
+	bool allows_classic_gameplay;
+	if (root.read_attr("allow_classic_gameplay", allows_classic_gameplay))
+		Scenario::instance()->SetAllowsClassicGameplay(allows_classic_gameplay);
+
+	for (const InfoTree &can_join : root.children_named("can_join"))
 	{
 		std::string compat = can_join.get_value("");
 		if (compat.size())

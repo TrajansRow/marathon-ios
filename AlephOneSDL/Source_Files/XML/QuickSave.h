@@ -58,9 +58,8 @@ public:
     
 private:
     QuickSaves() { }
-    void add(QuickSave save) { m_saves.push_back(save); }
+    void add(const QuickSave& save) { m_saves.push_back(save); }
     
-    static QuickSaves* m_instance;
     std::vector<QuickSave> m_saves;
 };
 
@@ -69,8 +68,9 @@ bool delete_quick_save(QuickSave& save);
 bool load_quick_save_dialog(FileSpecifier& saved_game);
 size_t saved_game_was_networked(FileSpecifier& saved_game);
 
-//DCW adding definitions here wo we can access these externally
+//Used for iOS port
 std::string build_save_metadata(QuickSave& save);
 bool build_map_preview(std::ostringstream& ostream);
+
 
 #endif

@@ -24,18 +24,19 @@ SOUNDFILE.CPP
 #include "Logging.h"
 #include "csmisc.h"
 #include "Decoder.h"
-
+#include "byte_swapping.h"
 #include <assert.h>
-#include <boost/make_shared.hpp>
 
 #include "BStream.h"
 #include <boost/iostreams/stream_buffer.hpp>
+#include <utility>
 
 namespace io = boost::iostreams;
 
 SoundHeader::SoundHeader() :
 	SoundInfo(),
-	data_offset(0)
+	data_offset(0),
+	signed_8bits(false)
 {
 }
 
@@ -44,8 +45,7 @@ bool SoundHeader::UnpackStandardSystem7Header(BIStreamBE &header)
 	try 
 	{
 		bytes_per_frame = 1;
-		signed_8bit = false;
-		sixteen_bit = false;
+		audio_format = AudioFormat::_8_bit;
 		stereo = false;
 		little_endian = false;
 		header.ignore(4); // sample pointer
@@ -55,7 +55,7 @@ bool SoundHeader::UnpackStandardSystem7Header(BIStreamBE &header)
 		header >> loop_end;
 		
 		return true;
-	} catch (basic_bstream::failure e) {
+	} catch (const basic_bstream::failure& e) {
 		return false;
 	}
 }
@@ -64,7 +64,6 @@ bool SoundHeader::UnpackExtendedSystem7Header(BIStreamBE &header)
 {
 	try 
 	{
-		signed_8bit = false;
 		header.ignore(4); // sample pointer
 		int32 num_channels;
 		header >> num_channels;
@@ -90,7 +89,7 @@ bool SoundHeader::UnpackExtendedSystem7Header(BIStreamBE &header)
 			if (format != FOUR_CHARS_TO_INT('t','w','o','s') || comp_id != -1) {
 				return false;
 			}
-			signed_8bit = true;
+			signed_8bits = true;
 			header.ignore(4);
 		} else {
 			header.ignore(22);
@@ -99,8 +98,8 @@ bool SoundHeader::UnpackExtendedSystem7Header(BIStreamBE &header)
 		int16 sample_size;
 		header >> sample_size;
 
-		sixteen_bit = (sample_size == 16);
-		bytes_per_frame = (sixteen_bit ? 2 : 1) * (stereo ? 2 : 1);
+		audio_format = sample_size == 16 ? AudioFormat::_16_bit : AudioFormat::_8_bit;
+		bytes_per_frame = (audio_format == AudioFormat::_16_bit ? 2 : 1) * (stereo ? 2 : 1);
 
 		length = num_frames * bytes_per_frame;
 		little_endian = false;
@@ -113,7 +112,7 @@ bool SoundHeader::UnpackExtendedSystem7Header(BIStreamBE &header)
 		}
 		
 		return true;
-	} catch (basic_bstream::failure e) {
+	} catch (const basic_bstream::failure& e) {
 		return false;
 	}
 }
@@ -149,25 +148,46 @@ bool SoundHeader::Load(BIStreamBE& s)
 	return false;
 }
 
-boost::shared_ptr<SoundData> SoundHeader::LoadData(BIStreamBE& s)
+std::shared_ptr<SoundData> SoundHeader::LoadData(BIStreamBE& s)
 {
-	if (!data_offset)
+	if (!data_offset || length <= 0)
 	{
-		return boost::shared_ptr<SoundData>();
+		return std::shared_ptr<SoundData>();
 	}
 
 	s.ignore(data_offset);
-	boost::shared_ptr<SoundData> p = boost::make_shared<SoundData>(length);
+	auto p = std::make_shared<SoundData>(length);
 	try 
 	{
 		s.read(reinterpret_cast<char*>(&(*p)[0]), length);
+
+		switch (audio_format)
+		{
+			case AudioFormat::_8_bit:
+				if (signed_8bits) {
+					ConvertSignedToUnsignedByte(p->data(), length);
+				}
+				break;
+			case AudioFormat::_16_bit:
+				if (little_endian ^ PlatformIsLittleEndian()) {
+					byte_swap_memory(p->data(), _2byte, length / 2);
+				}
+				break;
+		}
 	}
-	catch (basic_bstream::failure e)
+	catch (const basic_bstream::failure& e)
 	{
 		p.reset();
 	}
 
 	return p;
+}
+
+void SoundHeader::ConvertSignedToUnsignedByte(uint8* data, int length) 
+{
+	for (int i = 0; i < length; i++) {
+		data[i] = static_cast<int8>(data[i]) + 128;
+	}
 }
 
 bool SoundHeader::Load(OpenedFile &SoundFile)
@@ -178,7 +198,7 @@ bool SoundHeader::Load(OpenedFile &SoundFile)
 	return Load(s);
 }
 
-boost::shared_ptr<SoundData> SoundHeader::LoadData(OpenedFile& SoundFile)
+std::shared_ptr<SoundData> SoundHeader::LoadData(OpenedFile& SoundFile)
 {
 	io::stream_buffer<opened_file_device> sb(SoundFile);
 	BIStreamBE s(&sb);
@@ -238,7 +258,7 @@ bool SoundHeader::Load(LoadedResource& rsrc)
 	return false;
 }
 
-boost::shared_ptr<SoundData> SoundHeader::LoadData(LoadedResource& rsrc)
+std::shared_ptr<SoundData> SoundHeader::LoadData(LoadedResource& rsrc)
 {
 	io::stream_buffer<io::array_source> sb(reinterpret_cast<char*>(rsrc.GetPointer()), rsrc.GetLength());
 	BIStreamBE s(&sb);
@@ -322,9 +342,9 @@ bool SoundDefinition::Load(OpenedFile &SoundFile, bool LoadPermutations)
 }
 
 
-boost::shared_ptr<SoundData> SoundDefinition::LoadData(OpenedFile& SoundFile, short permutation)
+std::shared_ptr<SoundData> SoundDefinition::LoadData(OpenedFile& SoundFile, short permutation)
 {
-	boost::shared_ptr<SoundData> p;
+	std::shared_ptr<SoundData> p;
 	if (!SoundFile.IsOpen()) 
 	{
 		return p;
@@ -335,6 +355,11 @@ boost::shared_ptr<SoundData> SoundDefinition::LoadData(OpenedFile& SoundFile, sh
 		return p;
 	}
 
+	if (permutation >= sounds.size())
+	{
+		return p;
+	}
+	
 	return sounds[permutation].LoadData(SoundFile);
 }
 
@@ -342,7 +367,7 @@ bool M2SoundFile::Open(FileSpecifier& SoundFileSpec)
 {
 	Close();
 
-	std::auto_ptr<OpenedFile> sound_file(new OpenedFile);
+	auto sound_file = std::make_unique<OpenedFile>();
 
 	if (!SoundFileSpec.Open(*sound_file, false)) return false;
 
@@ -398,7 +423,7 @@ bool M2SoundFile::Open(FileSpecifier& SoundFileSpec)
 	}
 
 	// keep the sound file opened
-	opened_sound_file = sound_file;
+	opened_sound_file = std::move(sound_file);
 	
 	return true;
 }
@@ -416,7 +441,7 @@ SoundDefinition* M2SoundFile::GetSoundDefinition(int source, int sound_index)
 		return 0;
 }
 
-boost::shared_ptr<SoundData> M2SoundFile::GetSoundData(SoundDefinition* definition, int permutation)
+std::shared_ptr<SoundData> M2SoundFile::GetSoundData(SoundDefinition* definition, int permutation)
 {
 	return definition->LoadData(*opened_sound_file, permutation);
 }
@@ -487,7 +512,7 @@ SoundHeader M1SoundFile::GetSoundHeader(SoundDefinition* definition, int permuta
 	return it->second;
 }
 
-boost::shared_ptr<SoundData> M1SoundFile::GetSoundData(SoundDefinition* definition, int permutation)
+std::shared_ptr<SoundData> M1SoundFile::GetSoundData(SoundDefinition* definition, int permutation)
 {
 	int sound_index = definition->sound_code + std::min(permutation, MAXIMUM_PERMUTATIONS_PER_SOUND);
 

@@ -31,8 +31,8 @@
 #define VERSION "unknown version"
 #endif
 
-#include "SDL.h"
-#include "SDL_endian.h"
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_endian.h>
 #include <time.h>
 #include <string>
 
@@ -50,6 +50,13 @@
 #endif
 
 
+constexpr bool PlatformIsLittleEndian() noexcept {
+#ifdef ALEPHONE_LITTLE_ENDIAN
+	return true;
+#else
+	return false;
+#endif // end ALEPHONE_LITTLE_ENDIAN
+}
 /*
  *  Data types with specific bit width
  */
@@ -74,6 +81,12 @@ struct Rect {
 const int noErr = 0;
 #endif
 
+constexpr Rect MakeRect(int16 top, int16 left, int16 bottom, int16 right)
+	{ return {top, left, bottom, right}; }
+
+constexpr Rect MakeRect(SDL_Rect r)
+	{ return {int16(r.y), int16(r.x), int16(r.y + r.h), int16(r.x + r.w)}; }
+
 struct RGBColor {
 	uint16 red, green, blue;
 };
@@ -93,6 +106,7 @@ const int kFontIDCourier = 22;
 #include "cspixels.h"
 #include "csalerts.h"
 #include "csdialogs.h"
+#include "cspaths.h"
 #include "csmisc.h"
 
 

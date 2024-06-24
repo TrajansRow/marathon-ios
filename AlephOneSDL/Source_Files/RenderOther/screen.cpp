@@ -26,7 +26,6 @@
  * 
  *  Loren Petrich, Dec 23, 2000; moved shared content into screen_shared.cpp
  */
-
 #include "cseries.h"
 
 #include <math.h>
@@ -38,6 +37,7 @@
 #include "OGL_Headers.h"
 #include "OGL_Blitter.h"
 #include "OGL_Faders.h"
+#include "MatrixStack.hpp"
 #endif
 
 #include "world.h"
@@ -45,6 +45,7 @@
 #include "render.h"
 #include "shell.h"
 #include "interface.h"
+#include "interpolated_world.h"
 #include "player.h"
 #include "overhead_map.h"
 #include "fades.h"
@@ -68,23 +69,9 @@
 #include "lua_hud_script.h"
 #include "HUDRenderer_Lua.h"
 #include "Movie.h"
+#include "shell_options.h"
 
 #include <algorithm>
-
-#import "AlephOneHelper.h"
-#include "MatrixStack.hpp"
-#include <OpenGLES/ES3/gl.h>
-#include <OpenGLES/ES3/glext.h>
-#include "AlephOneAcceleration.hpp"
-#include "AlephOneHelper.h"
-
-#include <bx/bx.h>
-#include <bx/math.h>
-#include <bgfx/bgfx.h>
-
-#include "SDL_syswm.h"
-//DCW debug shader
-#include "OGL_Shader.h"
 
 #if defined(__WIN32__) || (defined(__MACH__) && defined(__APPLE__))
 #define MUST_RELOAD_VIEW_CONTEXT
@@ -107,6 +94,9 @@ SDL_Surface *Intro_Buffer = NULL; // intro screens, main menu, chapters, credits
 SDL_Surface *Intro_Buffer_corrected = NULL;
 bool intro_buffer_changed = false;
 SDL_Surface *Map_Buffer = NULL;
+
+// A bitmap_definition view of world_pixels for software rendering
+static bitmap_definition_buffer software_render_dest;
 
 #ifdef HAVE_OPENGL
 static OGL_Blitter Term_Blitter;
@@ -132,9 +122,6 @@ static int desktop_height;
 static int failed_multisamples = 0;		// remember when GL multisample setting didn't succeed
 static bool passed_shader = false;      // remember when we passed Shader tests
 
-// From shell_sdl.cpp
-extern bool option_nogamma;
-
 #include "screen_shared.h"
 
 using namespace alephone;
@@ -144,21 +131,35 @@ Screen Screen::m_instance;
 
 // Prototypes
 static bool need_mode_change(int window_width, int window_height, int log_width, int log_height, int depth, bool nogl);
-static void change_screen_mode(int width, int height, int depth, bool nogl, bool force_menu);
+static void change_screen_mode(int width, int height, int depth, bool nogl, bool force_menu, bool force_resize_hud = false);
 static bool get_auto_resolution_size(short *w, short *h, struct screen_mode_data *mode);
 static void build_sdl_color_table(const color_table *color_table, SDL_Color *colors);
 static void reallocate_world_pixels(int width, int height);
 static void reallocate_map_pixels(int width, int height);
 static void apply_gamma(SDL_Surface *src, SDL_Surface *dst);
-static void update_screen(SDL_Rect &source, SDL_Rect &destination, bool hi_rez);
+static void update_screen(SDL_Rect &source, SDL_Rect &destination, bool hi_rez, bool every_other_line);
 static void update_fps_display(SDL_Surface *s);
 static void DisplayPosition(SDL_Surface *s);
 static void DisplayMessages(SDL_Surface *s);
-static void DisplayNetMicStatus(SDL_Surface *s);
 static void DrawSurface(SDL_Surface *s, SDL_Rect &dest_rect, SDL_Rect &src_rect);
 static void clear_screen_margin();
 
 SDL_PixelFormat pixel_format_16, pixel_format_32;
+
+static bitmap_definition_buffer bitmap_definition_of_sdl_surface(const SDL_Surface* surface)
+{
+	assert(surface);
+	bitmap_definition_buffer buf(/*row_count:*/ surface->h);
+	auto& def = *buf.get();
+	def.width = surface->w;
+	def.height = surface->h;
+	def.bytes_per_row = surface->pitch;
+	def.flags = 0;
+	def.bit_depth = surface->format->BitsPerPixel;
+	def.row_addresses[0] = static_cast<pixel8*>(surface->pixels);
+	precalculate_bitmap_row_addresses(&def);
+	return buf;
+}
 
 // LP addition:
 void start_tunnel_vision_effect(
@@ -187,6 +188,11 @@ void Screen::Initialize(screen_mode_data* mode)
 		pixel_format_32 = *pf;
 		SDL_FreeFormat(pf);
 
+		Intro_Buffer = SDL_CreateRGBSurface(SDL_SWSURFACE, 640, 480, 32, pixel_format_32.Rmask, pixel_format_32.Gmask, pixel_format_32.Bmask, 0);
+		Intro_Buffer_corrected = SDL_CreateRGBSurface(SDL_SWSURFACE, 640, 480, 32, pixel_format_32.Rmask, pixel_format_32.Gmask, pixel_format_32.Bmask, 0);
+
+		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
+
 		uncorrected_color_table = (struct color_table *)malloc(sizeof(struct color_table));
 		world_color_table = (struct color_table *)malloc(sizeof(struct color_table));
 		visible_color_table = (struct color_table *)malloc(sizeof(struct color_table));
@@ -196,10 +202,6 @@ void Screen::Initialize(screen_mode_data* mode)
 		memset(world_color_table, 0, sizeof(struct color_table));
 		memset(visible_color_table, 0, sizeof(struct color_table));
 		memset(interface_color_table, 0, sizeof(struct color_table));
-
-		// Allocate the bitmap_definition structure for our GWorld (it is reinitialized every frame)
-		world_pixels_structure = (struct bitmap_definition *)malloc(sizeof(struct bitmap_definition) + sizeof(pixel8 *) * MAXIMUM_WORLD_HEIGHT);
-		assert(world_pixels_structure);
 
 		// Allocate and initialize our view_data structure
 		world_view = (struct view_data *)malloc(sizeof(struct view_data));
@@ -213,33 +215,11 @@ void Screen::Initialize(screen_mode_data* mode)
 		world_view->vertical_scale = 1;
 		world_view->tunnel_vision_active = false;
 		
-    
-    //DCW Get current display mode of first (and probably only) display
-    SDL_DisplayMode current;
-    int should_be_zero = SDL_GetCurrentDisplayMode(0, &current);
-    if(should_be_zero != 0)
-      // In case of error...
-      printf("Could not get display mode for video display %s", SDL_GetError());
-    else
-      // On success, print the current display mode.
-      printf("Current display mode is %dx%dpx @ %dhz.", current.w, current.h, current.refresh_rate);
-
-      //DCW: on retina displays, this is a fraction of the actual resolution.
-    desktop_height = current.h;
-    desktop_width = current.w;
-
-    printf ( "Desktop size: %d x %d\n", desktop_width, desktop_height );
-
-    
 		m_modes.clear();
-    
-    //DCW Push actual screen res here
-    m_modes.push_back(std::pair<int, int>(helperLongScreenDimension(), helperShortScreenDimension()));
-    
 		SDL_DisplayMode desktop;
 		if (SDL_GetDesktopDisplayMode(0, &desktop) == 0)
 		{
-			if (desktop.w >= 640/2 && desktop.h >= 480/2) //DCW divided original values by two, since retina displays have a smaller dimension in points than the native resolution.
+			if (desktop.w >= 640/2 && desktop.h >= 480/2) //DCW divided original values by two for iOS, since retina displays have a smaller dimension in points than the native resolution.
 			{
 				m_modes.push_back(std::pair<int, int>(desktop.w, desktop.h));
 			}
@@ -290,18 +270,6 @@ void Screen::Initialize(screen_mode_data* mode)
 				}
 			}
 		}
-    
-    // DJB support for iPhone/Touch
-    m_modes.push_back(std::pair<int, int>(480, 320));	//iphone 1
-    m_modes.push_back(std::pair<int, int>(960, 640));	//iphone 4
-    
-    //DCW
-    m_modes.push_back(std::pair<int, int>(1136, 640)); //iphone 5
-    m_modes.push_back(std::pair<int, int>(1334, 750)); //iphone 6
-    m_modes.push_back(std::pair<int, int>(1920, 1080)); //iphone 6+
-    m_modes.push_back(std::pair<int, int>(2048, 1538)); //ipad air 2
-    m_modes.push_back(std::pair<int, int>(2436, 1125)); //iPhone X
-
 
 		// these are not validated in graphics prefs because
 		// SDL is not initialized yet when prefs load, so
@@ -326,7 +294,8 @@ void Screen::Initialize(screen_mode_data* mode)
 	screen_mode = *mode;
 	change_screen_mode(&screen_mode, true);
 	screen_initialized = true;
-
+	
+	SDL_GL_SetSwapInterval(0); //Set default to no vsync like legacy OpenGL, unless player requests it (they really should).
 }
 
 int Screen::height()
@@ -346,12 +315,12 @@ float Screen::pixel_scale()
 
 int Screen::window_height()
 {
-	return std::max(static_cast<short>(480/2), screen_mode.height); //DCW added /2 due to this probably being a retina display
+	return std::max(static_cast<short>(480/2), screen_mode.height); //DCW added /2 due to this probably being a retina display on iOS
 }
 
 int Screen::window_width()
 {
-	return std::max(static_cast<short>(640/2), screen_mode.width); //DCW added /2 due to this probably being a retina display
+	return std::max(static_cast<short>(640/2), screen_mode.width);  //DCW added /2 due to this probably being a retina display on iOS
 }
 
 bool Screen::hud()
@@ -376,7 +345,7 @@ bool Screen::fifty_percent()
 
 bool Screen::seventyfive_percent()
 {
-	return screen_mode.height == 240;;
+	return screen_mode.height == 240;
 }
 
 SDL_Rect Screen::window_rect()
@@ -387,6 +356,11 @@ SDL_Rect Screen::window_rect()
 	r.x = (width() - r.w) / 2;
 	r.y = (height() - r.h) / 2;
 	return r;
+}
+
+SDL_Rect Screen::OpenGLViewPort()
+{
+	return m_viewport_rect;
 }
 
 SDL_Rect Screen::view_rect()
@@ -438,14 +412,6 @@ SDL_Rect Screen::view_rect()
 		r.h = r.h * 3 / 4;
 	}
 
-  // DJB stretch
-  // DCW not any more, DJB. I'm fine if the hud is covering the screen.
-  /*r.w = window_width();
-  r.h = window_height() - hud_rect().h;
-  r.x = ( width() - r.w ) / 2;
-  r.y = (height() - window_height()) / 2; //  + (available_height - r.h) / 2;
-  */
-  
 	return r;
 }
 
@@ -534,17 +500,6 @@ SDL_Rect Screen::hud_rect()
 	r.x = (width() - r.w) / 2;
 	r.y = window_height() - r.h + (height() - window_height()) / 2;
 
-  // DJB Handle iPhone HUD
-  if ( screen_mode.hud_scale_level == 3 ) {
-    r.w = r.w / 2;
-    r.h = r.h / 2;
-    // window_height() == SDL_GetVideoSurface()->w;
-    // height() == screen_mode.height
-    r.x = (screen_mode.width - r.w) / 2;
-    r.y = (screen_mode.height - r.h);
-  }
-
-  
 	return r;
 }
 
@@ -570,17 +525,34 @@ void Screen::bound_screen_to_rect(SDL_Rect &r, bool in_game)
 		int vpx = static_cast<int>(pixw/2.0f - (virw * vscale)/2.0f + (r.x * vscale) + 0.5f);
 		int vpy = static_cast<int>(pixh/2.0f - (virh * vscale)/2.0f + (r.y * vscale) + 0.5f);
 
-		if (!useShaderRenderer()) glMatrixMode(GL_PROJECTION);
-    MatrixStack::Instance()->matrixMode(GL_PROJECTION);
-		if (!useShaderRenderer()) glLoadIdentity();
-    MatrixStack::Instance()->loadIdentity();
+		MSI()->matrixMode(MS_PROJECTION);
+		MSI()->loadIdentity();
 		glViewport(vpx, pixh - vph - vpy, vpw, vph);
-		if (!useShaderRenderer()) glOrthof(0, r.w, r.h, 0, -1.0, 1.0);
-    MatrixStack::Instance()->orthof(0, r.w, r.h, 0, -1.0, 1.0);
+		m_viewport_rect.x = vpx;
+		m_viewport_rect.y = pixh - vph - vpy;
+		m_viewport_rect.w = vpw;
+		m_viewport_rect.h = vph;
+		MSI()->orthof(0, r.w, r.h, 0, -1.0, 1.0);
+		m_ortho_rect.x = m_ortho_rect.y = 0;
+		m_ortho_rect.w = r.w;
+		m_ortho_rect.h = r.h;
 	}
 #endif
 }
 
+void Screen::scissor_screen_to_rect(SDL_Rect &r)
+{
+#ifdef HAVE_OPENGL
+	if (MainScreenIsOpenGL())
+	{
+		glEnable(GL_SCISSOR_TEST);
+		glScissor(m_viewport_rect.x + (r.x * m_viewport_rect.w/m_ortho_rect.w),
+				  m_viewport_rect.y + ((m_ortho_rect.h - r.y - r.h) * m_viewport_rect.h/m_ortho_rect.h),
+				  r.w * m_viewport_rect.w/m_ortho_rect.w,
+				  r.h * m_viewport_rect.h/m_ortho_rect.h);
+	}
+#endif
+}
 
 
 void Screen::window_to_screen(int &x, int &y)
@@ -633,7 +605,7 @@ static void reallocate_world_pixels(int width, int height)
 	switch (bit_depth)
 	{
 	case 8:
-		world_pixels = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, f->BitsPerPixel, 0, 0, 0, 0);
+		world_pixels = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, 8, 0, 0, 0, 0);
 		break;
 	case 16:
 		world_pixels = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, 16, pixel_format_16.Rmask, pixel_format_16.Gmask, pixel_format_16.Bmask, 0);
@@ -660,7 +632,7 @@ static void reallocate_map_pixels(int width, int height)
 		SDL_FreeSurface(Map_Buffer);
 		Map_Buffer = NULL;
 	}
-	Map_Buffer = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, world_pixels->format->BitsPerPixel, world_pixels->format->Rmask, world_pixels->format->Gmask, world_pixels->format->Bmask, 0);
+	Map_Buffer = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, main_surface->format->BitsPerPixel, main_surface->format->Rmask, main_surface->format->Gmask, main_surface->format->Bmask, 0);
 	if (Map_Buffer == NULL)
 		alert_out_of_memory();
 	if (map_is_translucent()) {
@@ -689,7 +661,7 @@ void ReloadViewContext(void)
 
 bool map_is_translucent(void)
 {
-	return ( (screen_mode.translucent_map || !useClassicVisuals()) && NetAllowOverlayMap());
+	return (screen_mode.translucent_map && NetAllowOverlayMap());
 }
 
 /*
@@ -736,6 +708,11 @@ void enter_screen(void)
 	scr->lua_view_rect.y = scr->lua_map_rect.y = (h - wh) / 2;
 	scr->lua_view_rect.w = scr->lua_map_rect.w = ww;
 	scr->lua_view_rect.h = scr->lua_map_rect.h = wh;
+
+	scr->lua_text_margins.top = 0;
+	scr->lua_text_margins.left = 0;
+	scr->lua_text_margins.bottom = 0;
+	scr->lua_text_margins.right = 0;
 	
     screen_rectangle *term_rect = get_interface_rectangle(_terminal_screen_rect);
 	scr->lua_term_rect.x = (w - RECTANGLE_WIDTH(term_rect)) / 2;
@@ -840,9 +817,9 @@ static bool need_mode_change(int window_width, int window_height,
 	}
 	
 	// reset title, since SDL forgets sometimes
-	SDL_SetWindowTitle(main_screen, get_application_name());
-	
-	return false;
+	SDL_SetWindowTitle(main_screen, get_application_name().c_str());
+
+    return false;
 }
 
 static int change_window_filter(void *ctx, SDL_Event *event)
@@ -856,7 +833,7 @@ static int change_window_filter(void *ctx, SDL_Event *event)
 	return 1;
 }
 
-static void change_screen_mode(int width, int height, int depth, bool nogl, bool force_menu)
+static void change_screen_mode(int width, int height, int depth, bool nogl, bool force_menu, bool force_resize_hud)
 {
 	int prev_width = 0;
 	int prev_height = 0;
@@ -868,18 +845,12 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 	
 	int vmode_height = height;
 	int vmode_width = width;
-  
-  // DJB
-  vmode_width = desktop_width;
-  vmode_height = desktop_height;
-  
 	uint32 flags = (screen_mode.fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
 	if (screen_mode.high_dpi)
 		flags |= SDL_WINDOW_ALLOW_HIGHDPI;
 	
 	int sdl_width = (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : vmode_width;
 	int sdl_height = (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : vmode_height;
-  
 	if (force_menu)
 	{
 		vmode_width = 640;
@@ -918,30 +889,62 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 				break;
 		}
 	}
-  
+	
 	if (need_mode_change(sdl_width, sdl_height, vmode_width, vmode_height, depth, nogl)) {
-    
-    #ifdef HAVE_OPENGL
-      if (!nogl && screen_mode.acceleration != _no_acceleration) {
-        passed_shader = false;
-        flags |= SDL_WINDOW_OPENGL;
+#ifdef HAVE_OPENGL
+
+#ifdef        __APPLE__
+		
+		setenv("ANGLE_DEFAULT_PLATFORM", "metal", 0); //If we don't specify this, ANGLE will probably try to use the OpenGL backend (which is super slow)
+		
+        SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_EGL, 1);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+
+        // DCW force OpenGL ES 3.x. The default would otherwise be ES 2.
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+
+        // Explicitly set channel depths, otherwise we might get some < 8
         SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
         SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
         SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+        SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
         SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-        SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-        if (Get_OGL_ConfigureData().Multisamples > 0) {
-          SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-          SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, Get_OGL_ConfigureData().Multisamples);
-        } else {
-          SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
-          SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
-        }
-        SDL_GL_SetSwapInterval(Get_OGL_ConfigureData().WaitForVSync ? 1 : 0);
-      }
-    #endif
-    
+#endif
+
+#ifndef __APPLE__
+	if (!nogl && screen_mode.acceleration != _no_acceleration) {
+		passed_shader = false;
+		flags |= SDL_WINDOW_OPENGL;
+		SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+		SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+		SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16); //was SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+		SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+		//SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+        
+#ifdef _WIN32
+		SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
+		SDL_SetHint(SDL_HINT_VIDEO_WIN_D3DCOMPILER, "none");
+#endif
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+		if (Get_OGL_ConfigureData().Multisamples > 0) {
+			SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+			SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, Get_OGL_ConfigureData().Multisamples);
+		} else {
+			SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
+			SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+		}
+		SDL_GL_SetSwapInterval(Get_OGL_ConfigureData().WaitForVSync ? 1 : 0);
+	}
+#endif
+#endif 
+
 		
 		if (main_surface != NULL) {
 			SDL_FreeSurface(main_surface);
@@ -961,36 +964,49 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 		main_screen = NULL;
 		SDL_FilterEvents(change_window_filter, &window_id);
 	}
-    main_screen = SDL_CreateWindow(get_application_name(),
+	main_screen = SDL_CreateWindow(get_application_name().c_str(),
 								   SDL_WINDOWPOS_CENTERED,
 								   SDL_WINDOWPOS_CENTERED,
 								   sdl_width, sdl_height,
-								   flags);
+                                   flags);
+
+#ifdef _WIN32
+	if (main_screen == NULL && !nogl && screen_mode.acceleration != _no_acceleration) {
+		fprintf(stderr, "WARNING: Failed to create display window with Angle\n");
+		fprintf(stderr, "WARNING: Retrying with OpenGL ES\n");
+		SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "0");
+		main_screen = SDL_CreateWindow(get_application_name().c_str(),
+			SDL_WINDOWPOS_CENTERED,
+			SDL_WINDOWPOS_CENTERED,
+			sdl_width, sdl_height,
+			flags);
+	}
+
+#endif
+
+	bool context_created = false;
     
-    bool context_created = false;
+#ifdef HAVE_OPENGL
+	if (main_screen == NULL && !nogl && screen_mode.acceleration != _no_acceleration && Get_OGL_ConfigureData().Multisamples > 0) {
+		// retry with multisampling off
+		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
+		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+		main_screen = SDL_CreateWindow(get_application_name().c_str(),
+									   SDL_WINDOWPOS_CENTERED,
+									   SDL_WINDOWPOS_CENTERED,
+									   sdl_width, sdl_height,
+									   flags);
+		if (main_screen)
+			failed_multisamples = Get_OGL_ConfigureData().Multisamples;
+	}
     
-    
-    #ifdef HAVE_OPENGL
-      if (main_screen == NULL && !nogl && screen_mode.acceleration != _no_acceleration && Get_OGL_ConfigureData().Multisamples > 0) {
-        // retry with multisampling off
-        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
-        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
-        main_screen = SDL_CreateWindow(get_application_name(),
-                         SDL_WINDOWPOS_CENTERED,
-                         SDL_WINDOWPOS_CENTERED,
-                         sdl_width, sdl_height,
-                         flags);
-        if (main_screen)
-          failed_multisamples = Get_OGL_ConfigureData().Multisamples;
-      }
-    #endif
-       
+#endif
 	if (main_screen == NULL && !nogl && screen_mode.acceleration != _no_acceleration) {
 		fprintf(stderr, "WARNING: Failed to initialize OpenGL with 24 bit depth\n");
 		fprintf(stderr, "WARNING: Retrying with 16 bit depth\n");
 		SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
 		SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
-		main_screen = SDL_CreateWindow(get_application_name(),
+		main_screen = SDL_CreateWindow(get_application_name().c_str(),
 									   SDL_WINDOWPOS_CENTERED,
 									   SDL_WINDOWPOS_CENTERED,
 									   sdl_width, sdl_height,
@@ -998,25 +1014,30 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 		if (main_screen)
 			logWarning("Stencil buffer is not available");
 	}
-	if (main_screen != NULL && !nogl && screen_mode.acceleration == _shader_acceleration)
+	if (main_screen != NULL && !nogl && screen_mode.acceleration == _opengl_acceleration)
 	{
 		// see if we can actually run shaders
 		if (!context_created) {
-			SDL_GL_CreateContext(main_screen);
-			context_created = true;
+            
+            if(!SDL_GL_CreateContext(main_screen)) {
+                logWarning("Context could not be created!");
+            } else {
+                context_created = true;
+            }
 		}
-#ifdef __WIN32__
-		glewInit();
+
+#ifdef _WIN32
+		// Load GLES extensions using glad
+		gladLoadGLES2Loader((GLADloadproc)SDL_GL_GetProcAddress);
 #endif
-   
-    //DCW These extensions aren't needed on ios, I think. Commenting out check.
-	/*	if (!OGL_CheckExtension("GL_ARB_vertex_shader") || !OGL_CheckExtension("GL_ARB_fragment_shader") || !OGL_CheckExtension("GL_ARB_shader_objects") || !OGL_CheckExtension("GL_ARB_shading_language_100"))
+                
+		/*if (!OGL_CheckExtension("GL_ARB_vertex_shader") || !OGL_CheckExtension("GL_ARB_fragment_shader") || !OGL_CheckExtension("GL_ARB_shader_objects") || !OGL_CheckExtension("GL_ARB_shading_language_100"))
 		{
 			logWarning("OpenGL (Shader) renderer is not available");
-			fprintf(stderr, "WARNING: Failed to initialize OpenGL (Shader) renderer\n");
-			fprintf(stderr, "WARNING: Retrying with OpenGL (Classic) renderer\n");
-			screen_mode.acceleration = graphics_preferences->screen_mode.acceleration = _opengl_acceleration;
-			main_screen = SDL_CreateWindow(get_application_name(),
+			fprintf(stderr, "WARNING: Failed to initialize OpenGL renderer\n");
+			fprintf(stderr, "WARNING: Retrying with Software renderer\n");
+			screen_mode.acceleration = graphics_preferences->screen_mode.acceleration = _no_acceleration;
+			main_screen = SDL_CreateWindow(get_application_name().c_str(),
 										   SDL_WINDOWPOS_CENTERED,
 										   SDL_WINDOWPOS_CENTERED,
 										   sdl_width, sdl_height,
@@ -1031,30 +1052,30 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 
 	if (main_screen == NULL) {
 		fprintf(stderr, "Can't open video display (%s)\n", SDL_GetError());
-   
-      #ifdef HAVE_OPENGL
-          fprintf(stderr, "WARNING: Failed to initialize OpenGL with 24 bit colour\n");
-          fprintf(stderr, "WARNING: Retrying with 16 bit colour\n");
-          logWarning("Trying OpenGL 16-bit mode");
-          
-          SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 5);
-          SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 5);
-          SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 5);
+#ifdef HAVE_OPENGL
+		fprintf(stderr, "WARNING: Failed to initialize OpenGL with 24 bit colour\n");
+		fprintf(stderr, "WARNING: Retrying with 16 bit colour\n");
+		logWarning("Trying OpenGL 16-bit mode");
+		
+		SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 5);
+ 		SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 5);
+		SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 5);
 
-          main_screen = SDL_CreateWindow(get_application_name(),
-                           SDL_WINDOWPOS_CENTERED,
-                           SDL_WINDOWPOS_CENTERED,
-                           sdl_width, sdl_height,
-                           flags);
-      #endif
-    
+		main_screen = SDL_CreateWindow(get_application_name().c_str(),
+									   SDL_WINDOWPOS_CENTERED,
+									   SDL_WINDOWPOS_CENTERED,
+									   sdl_width, sdl_height,
+									   flags);
+        
+               
+#endif
 	}
 	if (main_screen == NULL && (flags & SDL_WINDOW_FULLSCREEN_DESKTOP)) {
 		fprintf(stderr, "Can't open video display (%s)\n", SDL_GetError());
 		fprintf(stderr, "WARNING: Trying in windowed mode");
 		logWarning("Trying windowed mode");
 		uint32 tempflags = flags & SDL_WINDOW_FULLSCREEN_DESKTOP;
-		main_screen = SDL_CreateWindow(get_application_name(),
+		main_screen = SDL_CreateWindow(get_application_name().c_str(),
 									   SDL_WINDOWPOS_CENTERED,
 									   SDL_WINDOWPOS_CENTERED,
 									   vmode_width, vmode_height,
@@ -1068,7 +1089,7 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 		fprintf(stderr, "WARNING: Trying in software mode");
 		logWarning("Trying software mode");
 		uint32 tempflags = (flags & ~SDL_WINDOW_OPENGL) | SDL_SWSURFACE;
-		main_screen = SDL_CreateWindow(get_application_name(),
+		main_screen = SDL_CreateWindow(get_application_name().c_str(),
 									   SDL_WINDOWPOS_CENTERED,
 									   SDL_WINDOWPOS_CENTERED,
 									   sdl_width, sdl_height,
@@ -1082,7 +1103,7 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 		fprintf(stderr, "WARNING: Trying in software windowed mode");
 		logWarning("Trying software windowed mode");
 		uint32 tempflags = (flags & ~(SDL_WINDOW_OPENGL|SDL_WINDOW_FULLSCREEN_DESKTOP)) | SDL_SWSURFACE;
-		main_screen = SDL_CreateWindow(get_application_name(),
+		main_screen = SDL_CreateWindow(get_application_name().c_str(),
 									   SDL_WINDOWPOS_CENTERED,
 									   SDL_WINDOWPOS_CENTERED,
 									   vmode_width, vmode_height,
@@ -1098,14 +1119,15 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 		logWarning("Unable to find working display mode; exiting");
 		vhalt("Cannot find a working video mode.");
 	}
-    
-      #ifdef HAVE_OPENGL
-        if (!context_created && !nogl && screen_mode.acceleration != _no_acceleration) {
-          SDL_GL_CreateContext(main_screen);
-          context_created = true;
+#ifdef HAVE_OPENGL
+	if (!context_created && !nogl && screen_mode.acceleration != _no_acceleration) {
+        if(!SDL_GL_CreateContext(main_screen)) {
+            logWarning("Context could not be created!");
+        } else {
+            context_created = true;
         }
-      #endif
-    
+	}
+#endif
 	} // end if need_window
 	if (nogl || screen_mode.acceleration == _no_acceleration) {
 		if (!main_render) {
@@ -1117,7 +1139,6 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 			main_texture = SDL_CreateTexture(main_render, pixel_format_32.format, SDL_TEXTUREACCESS_STREAMING, vmode_width, vmode_height);
 		}
 	}
-  
 	if (!main_surface) {
 		main_surface = SDL_CreateRGBSurface(SDL_SWSURFACE, vmode_width, vmode_height, 32, pixel_format_32.Rmask, pixel_format_32.Gmask, pixel_format_32.Bmask, 0);
 	}
@@ -1138,58 +1159,61 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 		SDL_FreeSurface(Term_Buffer);
 		Term_Buffer = NULL;
 	}
-	if (Intro_Buffer) {
-		SDL_FreeSurface(Intro_Buffer);
-		Intro_Buffer = NULL;
-	}
-	if (Intro_Buffer_corrected) {
-		SDL_FreeSurface(Intro_Buffer_corrected);
-		Intro_Buffer_corrected = NULL;
-	}
 
     screen_rectangle *term_rect = get_interface_rectangle(_terminal_screen_rect);
 	Term_Buffer = SDL_CreateRGBSurface(SDL_SWSURFACE, RECTANGLE_WIDTH(term_rect), RECTANGLE_HEIGHT(term_rect), 32, pixel_format_32.Rmask, pixel_format_32.Gmask, pixel_format_32.Bmask, pixel_format_32.Amask);
 
-	Intro_Buffer = SDL_CreateRGBSurface(SDL_SWSURFACE, 640, 480, 32, pixel_format_32.Rmask, pixel_format_32.Gmask, pixel_format_32.Bmask, 0);
-	Intro_Buffer_corrected = SDL_CreateRGBSurface(SDL_SWSURFACE, 640, 480, 32, pixel_format_32.Rmask, pixel_format_32.Gmask, pixel_format_32.Bmask, 0);
-
-  
-    #ifdef HAVE_OPENGL
-      if (!nogl && screen_mode.acceleration != _no_acceleration) {
-        static bool gl_info_printed = false;
-        if (!gl_info_printed)
-        {
-          printf("GL_VENDOR: %s\n", glGetString(GL_VENDOR));
-          printf("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
-          printf("GL_VERSION: %s\n", glGetString(GL_VERSION));
-          printf("GL_SHADING_LANGUAGE_VERSION: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
-          //		const char *gl_extensions = (const char *)glGetString(GL_EXTENSIONS);
-    //		printf("GL_EXTENSIONS: %s\n", gl_extensions);
-          gl_info_printed = true;
-        }
-        int pixw = MainScreenPixelWidth();
-        int pixh = MainScreenPixelHeight();
-        glScissor(0, 0, pixw, pixh);
-        glViewport(0, 0, pixw, pixh);
-        
-        OGL_ClearScreen();
-        glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-        
-    #ifdef __WIN32__
-        clear_screen();
-    #endif
-      }
-    #endif
-  
-	
-	if (in_game && screen_mode.hud)
-	{
-		if (prev_width != main_surface->w || prev_height != main_surface->h)
+#ifdef HAVE_OPENGL
+	if (!nogl && screen_mode.acceleration != _no_acceleration) {
+		static bool gl_info_printed = false;
+		if (!gl_info_printed)
 		{
-			L_Call_HUDResize();
-	  }
+            SDL_version compiled;
+            SDL_version linked;
+
+            SDL_VERSION(&compiled);
+            SDL_GetVersion(&linked);
+            printf("Compiled against SDL version %d.%d.%d, and are linking against SDL version %d.%d.%d.\n",
+                   compiled.major, compiled.minor, compiled.patch, linked.major, linked.minor, linked.patch);
+            SDL_GLContext context = SDL_GL_GetCurrentContext();
+            if (context == NULL) {
+                printf("SDL GL Context is NULL!\n");
+            }
+
+            printf("GL_VENDOR: %s\n", glGetString(GL_VENDOR));
+			printf("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
+			printf("GL_VERSION: %s\n", glGetString(GL_VERSION));
+            printf("GL_SHADING_LANGUAGE_VERSION: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+//		const char *gl_extensions = (const char *)glGetString(GL_EXTENSIONS);
+//		printf("GL_EXTENSIONS: %s\n", gl_extensions);
+			gl_info_printed = true;
+		}
+		int pixw = MainScreenPixelWidth();
+		int pixh = MainScreenPixelHeight();
+		glScissor(0, 0, pixw, pixh);
+		glViewport(0, 0, pixw, pixh);
+        
+        //Get the Matrix Stack into a cleaner state
+        MSI()->matrixMode(MS_MODELVIEW);
+        MSI()->loadIdentity();
+        MSI()->matrixMode(MS_TEXTURE);
+        MSI()->loadIdentity();
+        MSI()->matrixMode(MS_PROJECTION);
+        MSI()->loadIdentity();
+
+		OGL_ClearScreen();
+		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+		//glEnableClientState(GL_VERTEX_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
+		//glEnableClientState(GL_TEXTURE_COORD_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
+#ifdef __WIN32__
+		clear_screen();
+#endif
+	}
+#endif
+	
+	if (in_game && (screen_mode.hud && (prev_width != main_surface->w || prev_height != main_surface->h)) || force_resize_hud)
+	{
+		L_Call_HUDResize();
 	}
 }
 
@@ -1221,7 +1245,7 @@ bool get_auto_resolution_size(short *w, short *h, struct screen_mode_data *mode)
 	return false;
 }
 	
-void change_screen_mode(struct screen_mode_data *mode, bool redraw)
+void change_screen_mode(struct screen_mode_data *mode, bool redraw, bool resize_hud)
 {
 	// Get the screen mode here
 	screen_mode = *mode;
@@ -1237,12 +1261,12 @@ void change_screen_mode(struct screen_mode_data *mode, bool redraw)
 		}
 		else
 			get_auto_resolution_size(&w, &h, mode);
-		change_screen_mode(w, h, mode->bit_depth, false, !in_game);
+		change_screen_mode(w, h, mode->bit_depth, false, !in_game, resize_hud);
 		clear_screen();
 		recenter_mouse();
 	}
 
-	frame_count = frame_index = 0;
+	fps_counter.reset();
 }
 
 void change_screen_mode(short screentype)
@@ -1263,8 +1287,8 @@ void change_screen_mode(short screentype)
 	change_screen_mode(w, h, mode->bit_depth, false, force_menu_size);
 	clear_screen();
 	recenter_mouse();
-	
-	frame_count = frame_index = 0;
+
+	fps_counter.reset();
 }
 
 void toggle_fullscreen(bool fs)
@@ -1294,16 +1318,52 @@ void toggle_fullscreen()
  */
 
 static bool clear_next_screen = false;
+static void darken_world_window(void);
+
+void update_world_view_camera()
+{
+	world_view->yaw = current_player->facing;
+	world_view->pitch = current_player->elevation;
+	world_view->maximum_depth_intensity = current_player->weapon_intensity;
+
+	world_view->origin = current_player->camera_location;
+	if (graphics_preferences->screen_mode.bobbing_type != BobbingType::camera_and_weapon)
+		world_view->origin.z -= current_player->step_height;
+	world_view->origin_polygon_index = current_player->camera_polygon_index;
+
+	// Script-based camera control
+	auto use_cameras = UseLuaCameras();
+
+	world_view->virtual_yaw = world_view->yaw * FIXED_ONE;
+	world_view->virtual_pitch = world_view->pitch * FIXED_ONE;
+
+	if (!use_cameras)
+	{
+		world_view->show_weapons_in_hand =
+			!ChaseCam_GetPosition(world_view->origin,
+								  world_view->origin_polygon_index,
+								  world_view->yaw, world_view->pitch);
+
+		if (current_player_index == local_player_index)
+		{
+			world_view->virtual_yaw += virtual_aim_delta().yaw;
+			world_view->virtual_pitch += virtual_aim_delta().pitch;
+		}
+	}
+}
 
 void render_screen(short ticks_elapsed)
 {
 	// Make whatever changes are necessary to the world_view structure based on whichever player is frontmost
 	world_view->ticks_elapsed = ticks_elapsed;
 	world_view->tick_count = dynamic_world->tick_count;
-	world_view->yaw = current_player->facing;
-	world_view->pitch = current_player->elevation;
-	world_view->maximum_depth_intensity = current_player->weapon_intensity;
 	world_view->shading_mode = current_player->infravision_duration ? _shading_infravision : _shading_normal;
+
+	update_world_view_camera();
+
+	auto heartbeat_fraction = get_heartbeat_fraction();
+	world_view->heartbeat_fraction = heartbeat_fraction;
+	update_interpolated_world(heartbeat_fraction);
 
 	bool SwitchedModes = false;
 	
@@ -1390,6 +1450,13 @@ void render_screen(short ticks_elapsed)
 		PrevDepth = mode->bit_depth;
 	}
 
+	static bool PrevDrawEveryOtherLine = false;
+	bool DrawEveryOtherLine = mode->draw_every_other_line;
+	if (PrevDrawEveryOtherLine != DrawEveryOtherLine) {
+		ViewChangedSize = true;
+		PrevDrawEveryOtherLine = DrawEveryOtherLine;
+	}
+
 	SDL_Rect BufferRect = {0, 0, ViewRect.w, ViewRect.h};
 	// Now the buffer rectangle; be sure to shrink it as appropriate
 	if (!HighResolution && screen_mode.acceleration == _no_acceleration) {
@@ -1406,6 +1473,8 @@ void render_screen(short ticks_elapsed)
 	bool update_full_screen = false;
 	if (ViewChangedSize || MapChangedSize || SwitchedModes) {
 		clear_screen_margin();
+		if (!OGL_IsActive() && DrawEveryOtherLine)
+			clear_screen();
 		update_full_screen = true;
 		if (Screen::instance()->hud() && !Screen::instance()->lua_hud())
 			draw_interface();
@@ -1428,37 +1497,7 @@ void render_screen(short ticks_elapsed)
 		clear_next_screen = false;
 	}
 
-	switch (screen_mode.acceleration) {
-		case _opengl_acceleration:
-		case _shader_acceleration:
-			// If we're using the overhead map, fall through to no acceleration
-			if (!world_view->overhead_map_active && !world_view->terminal_mode_active)
-				break;
-		case _no_acceleration:
-			world_pixels_structure->width = world_view->screen_width;
-			world_pixels_structure->height = world_view->screen_height;
-			world_pixels_structure->bytes_per_row = world_pixels->pitch;
-			world_pixels_structure->flags = 0;
-			world_pixels_structure->bit_depth = bit_depth;
-			world_pixels_structure->row_addresses[0] = (pixel8 *)world_pixels->pixels;
-
-			//!! set world_pixels to VoidColor to avoid smearing?
-
-			precalculate_bitmap_row_addresses(world_pixels_structure);
-			break;
-		default:
-			assert(false);
-			break;
-	}
-
-	world_view->origin = current_player->camera_location;
-	if (!graphics_preferences->screen_mode.camera_bob)
-		world_view->origin.z -= current_player->step_height;
-	world_view->origin_polygon_index = current_player->camera_polygon_index;
-
-	// Script-based camera control
-	if (!UseLuaCameras())
-		world_view->show_weapons_in_hand = !ChaseCam_GetPosition(world_view->origin, world_view->origin_polygon_index, world_view->yaw, world_view->pitch);
+	interpolate_world_view(heartbeat_fraction);
 
 #ifdef HAVE_OPENGL
 	// Is map to be drawn with OpenGL?
@@ -1468,11 +1507,10 @@ void render_screen(short ticks_elapsed)
 		OGL_MapActive = false;
 
 	// Set OpenGL viewport to world view
-  Rect sr = {0, 0, static_cast<short>(Screen::instance()->height()), static_cast<short>(Screen::instance()->width())};
-  Rect vr = {static_cast<short>(ViewRect.y), static_cast<short>(ViewRect.x), static_cast<short>(ViewRect.y + ViewRect.h), static_cast<short>(ViewRect.x + ViewRect.w)};
+	Rect sr = MakeRect(0, 0, Screen::instance()->height(), Screen::instance()->width());
+	Rect vr = MakeRect(ViewRect);
 	Screen::instance()->bound_screen_to_rect(ViewRect);
-
-	OGL_SetWindow(sr, vr, true); //DCW notes; src should be screen rect (640x480, or whatever), and vr is the view rect; probably that size or smaller. Origins should be 0,0.
+	OGL_SetWindow(sr, vr, true);
 	
 #endif
 
@@ -1480,12 +1518,16 @@ void render_screen(short ticks_elapsed)
     // (GL must do this before render_view)
     if (screen_mode.acceleration != _no_acceleration)
         clear_screen_margin();
-  
-  clearSmartTrigger();
-  
-	// Render world view
-	render_view(world_view, world_pixels_structure);
     
+	// Update software_render_dest
+	if (OGL_IsActive())
+		software_render_dest.clear();
+	else if (software_render_dest.empty() || ViewChangedSize)
+		software_render_dest = bitmap_definition_of_sdl_surface(world_pixels);
+    
+	// Render world view
+	render_view(world_view, software_render_dest.get());
+
     // clear Lua drawing from previous frame
     // (SDL is slower if we do this before render_view)
     if (screen_mode.acceleration == _no_acceleration &&
@@ -1512,7 +1554,6 @@ void render_screen(short ticks_elapsed)
 		update_fps_display(disp_pixels);
 	  }
 	  DisplayPosition(disp_pixels);
-	  DisplayNetMicStatus(disp_pixels);
 	  DisplayScores(disp_pixels);
 	}
 	DisplayMessages(disp_pixels);
@@ -1521,58 +1562,26 @@ void render_screen(short ticks_elapsed)
 #ifdef HAVE_OPENGL
 	// Set OpenGL viewport to whole window (so HUD will be in the right position)
 	Screen::instance()->bound_screen();
-	OGL_SetWindow(sr, sr, true); //DCW notes: I'd expect this to be the full size of the screen (640x480, or whatever).
+	OGL_SetWindow(sr, sr, true);
 #endif
-  
-  
+	
+
 	// If the main view is not being rendered in software but OpenGL is active,
 	// then blit the software rendering to the screen
 	if (screen_mode.acceleration != _no_acceleration) {
 #ifdef HAVE_OPENGL
 		if (Screen::instance()->hud()) {
-      if (Screen::instance()->lua_hud()){
-        if (!shouldHideHud()) {
-          AOA::pushGroupMarker(0, "Draw LUA HUD");
-          Lua_DrawHUD(ticks_elapsed);
-          glPopGroupMarkerEXT();
-        }
-        
-        //DCW debug shader. Draws rect in middle of screen.
-        /*glBindFramebuffer(GL_FRAMEBUFFER, 1);
-        glBindRenderbuffer(GL_RENDERBUFFER, 1);
-        Shader *s = Shader::get(Shader::S_Debug);
-        s->enable();
-         GLfloat vVertices[12] = { -.5, .5, 0,
-         .5, .5, 0,
-         .5, -.5, 0,
-         -.5, -.5, 0};
-        GLubyte indices[] =   {0,1,2,
-          0,2,3};
-        glVertexAttribPointer(Shader::ATTRIB_VERTEX, 3, GL_FLOAT, GL_FALSE, 0, vVertices);
-        glEnableVertexAttribArray(Shader::ATTRIB_VERTEX);
-        AOA::pushGroupMarker(0, "Draw Debug Rect");
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, indices);
-        glPopGroupMarkerEXT();
-        Shader::disable();*/
-      }
+			if (Screen::instance()->lua_hud())
+				Lua_DrawHUD(ticks_elapsed);
 			else {
-        AOA::pushGroupMarker(0, "Draw HUD");
-        Rect dr = {static_cast<short>(HUD_DestRect.y), static_cast<short>(HUD_DestRect.x), static_cast<short>(HUD_DestRect.y + HUD_DestRect.h), static_cast<short>(HUD_DestRect.x + HUD_DestRect.w)};
+				Rect dr = MakeRect(HUD_DestRect);
 				OGL_DrawHUD(dr, ticks_elapsed);
-        glPopGroupMarkerEXT();
 			}
 		}
 		
 		if (world_view->terminal_mode_active) {
 			// Copy 2D rendering to screen
-      
-      //DCW debugging
-      //MatrixStack::Instance()->matrixMode(MS_PROJECTION);
-      //GLfloat m[16];
-      //MatrixStack::Instance()->getFloatv (MS_PROJECTION_MATRIX, m);
-      //printf ( "perojectionmatrixr: %f %f %f %f, %f %f %f %f, %f %f %f %f, %f %f %f %f\n",
-      //        m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8],m[9],m[10],m[11],m[12],m[13],m[14],m[15]);
-      
+
 			if (Term_RenderRequest) {
 				SDL_SetSurfaceBlendMode(Term_Buffer, SDL_BLENDMODE_NONE);
 				Term_Blitter.Load(*Term_Buffer);
@@ -1586,7 +1595,7 @@ void render_screen(short ticks_elapsed)
 		// Update world window
 		if (!world_view->terminal_mode_active &&
 			(!world_view->overhead_map_active || MapIsTranslucent))
-			update_screen(BufferRect, ViewRect, HighResolution);
+			update_screen(BufferRect, ViewRect, HighResolution, DrawEveryOtherLine);
 		
 		// Update map
 		if (world_view->overhead_map_active) {
@@ -1614,6 +1623,11 @@ void render_screen(short ticks_elapsed)
 			}
 		}
 
+		if (!get_keyboard_controller_status())
+		{
+			darken_world_window();
+		}
+
 		if (update_full_screen || Screen::instance()->lua_hud())
 		{
 			MainScreenUpdateRect(0, 0, 0, 0);
@@ -1624,11 +1638,22 @@ void render_screen(short ticks_elapsed)
 			MainScreenUpdateRects(1, &ViewRect);
 		}
 	}
-
+	
 #ifdef HAVE_OPENGL
 	// Swap OpenGL double-buffers
-  if (screen_mode.acceleration != _no_acceleration)
+	if (screen_mode.acceleration != _no_acceleration)
+	{
+		if (!get_keyboard_controller_status())
+		{
+			darken_world_window();
+		}
+
+		//dcw shit test - just for debugging!
+		//glClearColor(1,0,0,0);
+		//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		
 		OGL_SwapBuffers();
+	}
 #endif
 	
 	Movie::instance()->AddFrame(Movie::FRAME_NORMAL);
@@ -1639,19 +1664,44 @@ void render_screen(short ticks_elapsed)
  */
 
 template <class T>
-static inline void quadruple_surface(const T *src, int src_pitch, T *dst, int dst_pitch, const SDL_Rect &dst_rect)
+static inline void quadruple_surface(
+	const T *src,
+	int src_pitch,
+	T *dst, int dst_pitch,
+	const SDL_Rect &dst_rect,
+	bool every_other_line)
 {
 	int width = dst_rect.w / 2;
 	int height = dst_rect.h / 2;
 	dst += dst_rect.y * dst_pitch / sizeof(T) + dst_rect.x;
 	T *dst2 = dst + dst_pitch / sizeof(T);
 
+	uint32 black_pixel = SDL_MapRGB(main_surface->format, 0, 0, 0);
+	bool overlay_active = world_view->overhead_map_active
+		&& map_is_translucent();
+	
 	while (height-- > 0) {
-		for (int x=0; x<width; x++) {
-			T p = src[x];
-			dst[x * 2] = dst[x * 2 + 1] = p;
-			dst2[x * 2] = dst2[x * 2 + 1] = p;
+		if (every_other_line) {
+			if (overlay_active) {
+				// overlay map needs us to clear all the scanlines, so we have
+				// to put black in the "skipped" lines
+				for (int x=0; x<width; x++) {
+					dst[x * 2] = dst[x * 2 + 1] = src[x];
+					dst2[x * 2] = dst2[x * 2 + 1] = black_pixel;
+				}
+			} else {
+				for (int x=0; x<width; x++) {
+					dst[x * 2] = dst[x * 2 + 1] = src[x];
+				}
+			}
+		} else {
+			for (int x=0; x<width; x++) {
+				T p = src[x];
+				dst[x * 2] = dst[x * 2 + 1] = p;
+				dst2[x * 2] = dst2[x * 2 + 1] = p;
+			}
 		}
+
 		src += src_pitch / sizeof(T);
 		dst += dst_pitch * 2 / sizeof(T);
 		dst2 += dst_pitch * 2 / sizeof(T);
@@ -1724,7 +1774,7 @@ static inline bool pixel_formats_equal(SDL_PixelFormat* a, SDL_PixelFormat* b)
 		a->Bmask == b->Bmask);
 }
 
-static void update_screen(SDL_Rect &source, SDL_Rect &destination, bool hi_rez)
+static void update_screen(SDL_Rect &source, SDL_Rect &destination, bool hi_rez, bool every_other_line)
 {
 	SDL_Surface *s = world_pixels;
 	if (!using_default_gamma && bit_depth > 8) {
@@ -1744,7 +1794,7 @@ static void update_screen(SDL_Rect &source, SDL_Rect &destination, bool hi_rez)
 			if (SDL_LockSurface(main_surface) < 0) return;
 		}
 
-		if (s->format->BytesPerPixel != 1 && !pixel_formats_equal(s->format, main_surface->format))
+		if (!pixel_formats_equal(s->format, main_surface->format))
 		{
 			intermediary = SDL_ConvertSurface(s, main_surface->format, s->flags);
 			s = intermediary;
@@ -1753,13 +1803,13 @@ static void update_screen(SDL_Rect &source, SDL_Rect &destination, bool hi_rez)
 		switch (s->format->BytesPerPixel) 
 		{
 		case 1:
-			quadruple_surface((pixel8 *)s->pixels, s->pitch, (pixel8 *)main_surface->pixels, main_surface->pitch, destination);
+			quadruple_surface((pixel8 *)s->pixels, s->pitch, (pixel8 *)main_surface->pixels, main_surface->pitch, destination, every_other_line);
 			break;
 		case 2:
-			quadruple_surface((pixel16 *)s->pixels, s->pitch, (pixel16 *)main_surface->pixels, main_surface->pitch, destination);
+			quadruple_surface((pixel16 *)s->pixels, s->pitch, (pixel16 *)main_surface->pixels, main_surface->pitch, destination, every_other_line);
 			break;
 		case 4:
-			quadruple_surface((pixel32 *)s->pixels, s->pitch, (pixel32 *)main_surface->pixels, main_surface->pitch, destination);
+			quadruple_surface((pixel32 *)s->pixels, s->pitch, (pixel32 *)main_surface->pixels, main_surface->pitch, destination, every_other_line);
 			break;
 		}
 		
@@ -1819,7 +1869,7 @@ void initialize_gamma(void)
 
 void build_direct_color_table(struct color_table *color_table, short bit_depth)
 {
-	if (!option_nogamma && !default_gamma_inited)
+	if (!shell_options.nogamma && !default_gamma_inited)
 		initialize_gamma();
 	color_table->color_count = 256;
 	rgb_color *color = color_table->colors;
@@ -1839,8 +1889,13 @@ void change_interface_clut(struct color_table *color_table)
 
 void change_screen_clut(struct color_table *color_table)
 {
-	build_direct_color_table(uncorrected_color_table, bit_depth);
-	memcpy(interface_color_table, uncorrected_color_table, sizeof(struct color_table));
+	if (bit_depth == 8) {
+		memcpy(uncorrected_color_table, color_table, sizeof(struct color_table));
+		memcpy(interface_color_table, color_table, sizeof(struct color_table));
+	} else {
+		build_direct_color_table(uncorrected_color_table, bit_depth);
+		memcpy(interface_color_table, uncorrected_color_table, sizeof(struct color_table));
+	}
 
 	gamma_correct_color_table(uncorrected_color_table, world_color_table, screen_mode.gamma_level);
 	memcpy(visible_color_table, world_color_table, sizeof(struct color_table));
@@ -1856,6 +1911,15 @@ void animate_screen_clut(struct color_table *color_table, bool full_screen)
 		current_gamma_b[i] = color_table->colors[i].blue;
 	}
 	using_default_gamma = !memcmp(color_table, uncorrected_color_table, sizeof(struct color_table));
+	
+	if (interface_bit_depth == 8) {
+		SDL_Color colors[256];
+		build_sdl_color_table(color_table, colors);
+		if (world_pixels)
+			SDL_SetPaletteColors(world_pixels->format->palette, colors, 0, 256);
+		if (HUD_Buffer)
+			SDL_SetPaletteColors(HUD_Buffer->format->palette, colors, 0, 256);
+	}
 }
 
 void assert_world_color_table(struct color_table *interface_color_table, struct color_table *world_color_table)
@@ -1863,7 +1927,8 @@ void assert_world_color_table(struct color_table *interface_color_table, struct 
 	if (interface_bit_depth == 8) {
 		SDL_Color colors[256];
 		build_sdl_color_table(interface_color_table, colors);
-		SDL_SetPaletteColors(main_surface->format->palette, colors, 0, 256);
+		if (world_pixels)
+			SDL_SetPaletteColors(world_pixels->format->palette, colors, 0, 256);
 		if (HUD_Buffer)
 			SDL_SetPaletteColors(HUD_Buffer->format->palette, colors, 0, 256);
 	}
@@ -1893,9 +1958,9 @@ void render_overhead_map(struct view_data *view)
 #ifdef HAVE_OPENGL
 	if (OGL_IsActive()) {
 		// Set OpenGL viewport to world view
-    Rect sr = {0, 0, static_cast<short>(Screen::instance()->height()), static_cast<short>(Screen::instance()->width())};
+		Rect sr = MakeRect(0, 0, Screen::instance()->height(), Screen::instance()->width());
 		SDL_Rect MapRect = Screen::instance()->map_rect();
-    Rect mr = {static_cast<short>(MapRect.y), static_cast<short>(MapRect.x), static_cast<short>(MapRect.y + MapRect.h), static_cast<short>(MapRect.x + MapRect.w)};
+		Rect mr = MakeRect(MapRect);
 		Screen::instance()->bound_screen_to_rect(MapRect);
 		OGL_SetWindow(sr, mr, true);
 	}
@@ -1975,11 +2040,6 @@ static inline void draw_pattern_rect(T *p, int pitch, uint32 pixel, const SDL_Re
 	}
 }
 
-// DJB OpenGL use our handy SaveState class
-#include "SaveState.h"
-// DJB Use the helper
-#include "AlephOneHelper.h"
-
 void darken_world_window(void)
 {
 	// Get world window bounds
@@ -1987,90 +2047,53 @@ void darken_world_window(void)
 
 #ifdef HAVE_OPENGL
 	if (MainScreenIsOpenGL()) {
-    // Save current state
-    // DJB OpenGL Not saving state...
-    // glPushAttrib(GL_ALL_ATTRIB_BITS);
-    
-    // Disable everything but alpha blending
-    //SaveState ss0 ( GL_CULL_FACE );
-    //glDisable(GL_CULL_FACE);        //DCW This wasn't disabled in the new A1 code below. commenting out.
-    SaveState ss1 (GL_DEPTH_TEST);
-    SaveState ss2 (GL_ALPHA_TEST);
-    SaveState ss3 (GL_BLEND);
-    SaveState ss4 (GL_TEXTURE_2D);
-    SaveState ss5 (GL_FOG);
-    SaveState ss6 (GL_SCISSOR_TEST);
-    SaveState ss7 (GL_STENCIL_TEST);
-    
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_ALPHA_TEST);
-    glEnable(GL_BLEND);
-    glDisable(GL_TEXTURE_2D);
-    glDisable(GL_FOG);
-    glDisable(GL_SCISSOR_TEST);
-    glDisable(GL_STENCIL_TEST);
 
+		// Save current state
+        //glPushAttrib(GL_ALL_ATTRIB_BITS);
+        //bool isEnabled_GT2 = glIsEnabled (GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
+        bool isEnabled_GCF = glIsEnabled (GL_CULL_FACE);
+        bool isEnabled_GDT = glIsEnabled (GL_DEPTH_TEST);
+        //bool isEnabled_GAT = glIsEnabled (GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
+        bool isEnabled_GST = glIsEnabled (GL_STENCIL_TEST);
+        bool isEnabled_GB = glIsEnabled (GL_BLEND);
+        //bool isEnabled_GF = glIsEnabled (GL_FOG); //NOT SUPPORTED ANGLE ENUM
+        
 		// Disable everything but alpha blending
-		/*glDisable(GL_DEPTH_TEST);
-		glDisable(GL_ALPHA_TEST);
+		glDisable(GL_DEPTH_TEST);
+		//glDisable(GL_ALPHA_TEST); //NOT SUPPORTED ANGLE ENUM
 		glEnable(GL_BLEND);
-		glDisable(GL_TEXTURE_2D);
-		glDisable(GL_FOG);
+		//glDisable(GL_TEXTURE_2D); //NOT SUPPORTED ANGLE ENUM
+		//glDisable(GL_FOG);
 		glDisable(GL_SCISSOR_TEST);
-		glDisable(GL_STENCIL_TEST);*/
+		glDisable(GL_STENCIL_TEST);
 
 		// Direct projection
-		if (!useShaderRenderer()) glMatrixMode(GL_PROJECTION);
-    MatrixStack::Instance()->matrixMode(MS_PROJECTION);
-		if (!useShaderRenderer()) glPushMatrix();
-    MatrixStack::Instance()->pushMatrix();
-		if (!useShaderRenderer()) glLoadIdentity();
-    MatrixStack::Instance()->loadIdentity();
-		if (!useShaderRenderer()) glOrthof(0.0, GLfloat(main_surface->w), GLfloat(main_surface->h), 0.0, 0.0, 1.0);
-    MatrixStack::Instance()->orthof(0.0, GLfloat(main_surface->w), GLfloat(main_surface->h), 0.0, 0.0, 1.0);
-		if (!useShaderRenderer()) glMatrixMode(GL_MODELVIEW);
-    MatrixStack::Instance()->matrixMode(MS_MODELVIEW);
-		if (!useShaderRenderer()) glPushMatrix();
-    MatrixStack::Instance()->pushMatrix();
-		if (!useShaderRenderer()) glLoadIdentity();
-    MatrixStack::Instance()->loadIdentity();
+		MSI()->matrixMode(MS_PROJECTION);
+		MSI()->pushMatrix();
+		MSI()->loadIdentity();
+		MSI()->orthof(0.0, GLfloat(main_surface->w), GLfloat(main_surface->h), 0.0, 0.0, 1.0);
+		MSI()->matrixMode(MS_MODELVIEW);
+		MSI()->pushMatrix();
+		MSI()->loadIdentity();
 
-    
-      //DCW: IN the old code, DJB drew his own rectangle below, but the call has since changed to OGL_RenderRect. Maybe it works now?
-    
 		// Draw 50% black rectangle
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glColor4f(0.0, 0.0, 0.0, 0.5);
-    MatrixStack::Instance()->color4f(0.0, 0.0, 0.0, 0.5);
-    
-    Shader* previousShader = NULL;
-    Shader* rectShader = NULL;
-    
-    if(useShaderRenderer()) {
-      previousShader = lastEnabledShader();
-      rectShader = Shader::get(Shader::S_SolidColor);
-      rectShader->enable();
-        
-      GLfloat modelProjection[16];
-      MatrixStack::Instance()->getFloatvModelviewProjection(modelProjection);
-      rectShader->setMatrix4(Shader::U_MS_ModelViewProjectionMatrix, modelProjection);
-    }
-    
+		MSI()->color4f(0.0, 0.0, 0.0, 0.5);
 		OGL_RenderRect(r);
 
-    if(useShaderRenderer() && previousShader) {
-      previousShader->enable();
-    }
-    
 		// Restore projection and state
-		if (!useShaderRenderer()) glPopMatrix();
-    MatrixStack::Instance()->popMatrix();
-		if (!useShaderRenderer()) glMatrixMode(GL_PROJECTION);
-    MatrixStack::Instance()->matrixMode(MS_PROJECTION);
-		if (!useShaderRenderer()) glPopMatrix();
-    MatrixStack::Instance()->popMatrix();
-    // DJB OpenGL not saving attributes
-    // glPopAttrib();
+		MSI()->popMatrix();
+		MSI()->matrixMode(MS_PROJECTION);
+		MSI()->popMatrix();
+		//glPopAttrib();
+        //if ( isEnabled_GT2 ) { glEnable ( GL_TEXTURE_2D ) ; } else { glDisable ( GL_TEXTURE_2D ); } //NOT SUPPORTED ANGLE ENUM
+        if ( isEnabled_GCF ) { glEnable ( GL_CULL_FACE ) ; } else { glDisable ( GL_CULL_FACE ); }
+        if ( isEnabled_GDT ) { glEnable ( GL_DEPTH_TEST ) ; } else { glDisable ( GL_DEPTH_TEST ); }
+        //if ( isEnabled_GAT ) { glEnable ( GL_ALPHA_TEST ) ; } else { glDisable ( GL_ALPHA_TEST ); } //NOT SUPPORTED ANGLE ENUM
+        if ( isEnabled_GST ) { glEnable ( GL_STENCIL_TEST ) ; } else { glDisable ( GL_STENCIL_TEST ); }
+        if ( isEnabled_GB )  { glEnable ( GL_BLEND ) ; } else { glDisable ( GL_BLEND ); }
+        //if ( isEnabled_GF )  { glEnable ( GL_FOG ) ; } else { glDisable ( GL_FOG ); } //NOT SUPPORTED ANGLE ENUM
+
 
 		MainScreenSwap();
 		return;
@@ -2136,7 +2159,7 @@ void DrawSurface(SDL_Surface *s, SDL_Rect &dest_rect, SDL_Rect &src_rect)
 			new_src_rect.h = static_cast<Uint16>(new_src_rect.h * y_scale);
 		}
 		SDL_BlitSurface(surface, &new_src_rect, main_surface, &dest_rect);
-		if (!Screen::instance()->lua_hud())
+		if (!Screen::instance()->lua_hud() || (get_game_state() != _game_in_progress))
 			MainScreenUpdateRects(1, &dest_rect);
 		
 		if (surface != s)
@@ -2164,15 +2187,15 @@ void draw_intro_screen(void)
 		Intro_Blitter.Draw(dst_rect);
 		
 		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		//glEnableClientState(GL_VERTEX_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
+		//glEnableClientState(GL_TEXTURE_COORD_ARRAY); //NOT SUPPORTED ANGLE FUNCTION
 		OGL_DoFades(dst_rect.x, dst_rect.y, dst_rect.x + dst_rect.w, dst_rect.y + dst_rect.h);		
 		OGL_SwapBuffers();
 	} else
 #endif
 	{
 		SDL_Surface *s = Intro_Buffer;
-		if (!using_default_gamma && bit_depth > 8) {
+		if (!using_default_gamma) {
 			apply_gamma(Intro_Buffer, Intro_Buffer_corrected);
 			SDL_SetSurfaceBlendMode(Intro_Buffer_corrected, SDL_BLENDMODE_NONE);
 			s = Intro_Buffer_corrected;
@@ -2288,23 +2311,25 @@ int MainScreenWindowHeight()
 int MainScreenPixelWidth()
 {
 	int w = 0;
+	int dummy = 0;				// SDL 2.24/Win crashes if you pass nullptr
 #ifdef HAVE_OPENGL
 	if (MainScreenIsOpenGL())
-		SDL_GL_GetDrawableSize(main_screen, &w, NULL);
+		SDL_GL_GetDrawableSize(main_screen, &w, &dummy);
 	else
 #endif
-		SDL_GetRendererOutputSize(main_render, &w, NULL);
+		SDL_GetRendererOutputSize(main_render, &w, &dummy);
 	return w;
 }
 int MainScreenPixelHeight()
 {
 	int h = 0;
+	int dummy = 0;				// SDL 2.24/Win crashes if you pass nullptr
 #ifdef HAVE_OPENGL
 	if (MainScreenIsOpenGL())
-		SDL_GL_GetDrawableSize(main_screen, NULL, &h);
+		SDL_GL_GetDrawableSize(main_screen, &dummy, &h);
 	else
 #endif
-		SDL_GetRendererOutputSize(main_render, NULL, &h);
+		SDL_GetRendererOutputSize(main_render, &dummy, &h);
 	return h;
 }
 float MainScreenPixelScale()
@@ -2317,7 +2342,7 @@ bool MainScreenIsOpenGL()
 }
 void MainScreenSwap()
 {
-	AOA::swapWindow(main_screen);
+    SDL_GL_SwapWindow(main_screen);
 }
 void MainScreenCenterMouse()
 {

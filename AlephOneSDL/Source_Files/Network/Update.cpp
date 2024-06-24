@@ -22,13 +22,12 @@
 */
 
 #include "Update.h"
-#include "network/a1HTTP.h"
+#include "HTTP.h"
 #include <sstream>
 #include <boost/tokenizer.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include "alephversion.h"
 
-Update *Update::m_instance = 0;
 
 Update::Update() : m_status(NoUpdateAvailable), m_thread(0)
 {
@@ -82,7 +81,8 @@ int Update::Thread()
 	}
 
 	boost::char_separator<char> sep("\r\n");
-	boost::tokenizer<boost::char_separator<char> > tokens(fetcher.Response(), sep);
+	std::string response = fetcher.Response();
+	boost::tokenizer<boost::char_separator<char> > tokens(response, sep);
 	for (boost::tokenizer<boost::char_separator<char> >::iterator it = tokens.begin();
 	     it != tokens.end();
 	     ++it)

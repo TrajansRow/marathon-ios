@@ -27,15 +27,15 @@ Thursday, January 21, 1993 9:46:24 PM
 Saturday, January 23, 1993 9:46:34 PM
 	fixed arctangent, hopefully for the last time.  normalize_angle() is a little faster.
 Monday, January 25, 1993 3:01:47 PM
-	arctangent works (tested at 0.5¡ increments against SANEÕs tan), the only anomoly was
-	apparently arctan(0)==180¡.
+	arctangent works (tested at 0.5Â° increments against SANEâ€™s tan), the only anomoly was
+	apparently arctan(0)==180Â°.
 Wednesday, January 27, 1993 3:49:04 PM
-	final fix to arctangent, we swear.  recall lim(arctan(x)) as x approaches ¹/2 or 3¹/4 is ±°,
+	final fix to arctangent, we swear.  recall lim(arctan(x)) as x approaches Ï€/2 or 3Ï€/4 is Â±âˆž,
 	depending on which side we come from.  because we didn't realize this, arctan failed in the
-	case where x was very close to but slightly below ¹/2.  i think weÕve seen the last monster
-	suddenly ÔpanicÕ and bolt directly into a wall.
+	case where x was very close to but slightly below Ï€/2.  i think weâ€™ve seen the last monster
+	suddenly â€˜panicâ€™ and bolt directly into a wall.
 Sunday, July 25, 1993 11:51:42 PM
-	the arctan of 0/0 is now (arbitrairly) ¹/2 because weÕre sick of assert(y) failing.
+	the arctan of 0/0 is now (arbitrairly) Ï€/2 because weâ€™re sick of assert(y) failing.
 Monday, June 20, 1994 4:15:06 PM
 	bug fix in translate_point3d().
 
@@ -60,8 +60,6 @@ Jul 1, 2000 (Loren Petrich):
 #include <math.h>
 #include <limits.h>
 
-//DCW Used for mouse smoothing
-#include "mouse.h"
 
 
 
@@ -88,8 +86,8 @@ angle normalize_angle(
 */
 
 /* remember this is not wholly accurate, both distance or the sine/cosine values could be
-	negative, and the shift canÕt make negative numbers zero; this is probably ok because
-	weÕll have -1/1024th instead of zero, which is basically our margin for error anyway ... */
+	negative, and the shift canâ€™t make negative numbers zero; this is probably ok because
+	weâ€™ll have -1/1024th instead of zero, which is basically our margin for error anyway ... */
 world_point2d *translate_point2d(
 	world_point2d *point,
 	world_distance distance,
@@ -214,7 +212,7 @@ void build_trig_tables(
 	cosine_table= (int16 *) malloc(sizeof(int16)*NUMBER_OF_ANGLES);
 	tangent_table= (int32 *) malloc(sizeof(int32)*NUMBER_OF_ANGLES);
 	fc_assert(sine_table&&cosine_table&&tangent_table);
-  
+	
 	for (i=0;i<NUMBER_OF_ANGLES;++i)
 	{
 		theta= two_pi*(double)i/(double)NUMBER_OF_ANGLES;
@@ -226,8 +224,8 @@ void build_trig_tables(
 		if (i==QUARTER_CIRCLE) sine_table[i]= TRIG_MAGNITUDE, cosine_table[i]= 0;
 		if (i==HALF_CIRCLE) sine_table[i]= 0, cosine_table[i]= -TRIG_MAGNITUDE;
 		if (i==THREE_QUARTER_CIRCLE) sine_table[i]= -TRIG_MAGNITUDE, cosine_table[i]= 0;
-
-		/* what we care about here is NOT accuracy, rather weÕre concerned with matching the
+		
+		/* what we care about here is NOT accuracy, rather weâ€™re concerned with matching the
 			ratio of the existing sine and cosine tables as exactly as possible */
 		if (cosine_table[i])
 		{
@@ -235,7 +233,7 @@ void build_trig_tables(
 		}
 		else
 		{
-			/* we always take -°, even though the limit is ±°, depending on which side you
+			/* we always take -âˆž, even though the limit is Â±âˆž, depending on which side you
 				approach it from.  this is because of the direction we traverse the circle
 				looking for matches during arctan. */
 			tangent_table[i]= INT32_MIN;
@@ -252,7 +250,7 @@ static angle m2_arctangent(
 	world_distance y = yy;
 
 	long tangent;
-	register long last_difference, new_difference;
+	long last_difference, new_difference;
 	angle search_arc, theta;
 	
 	if (x)
@@ -271,7 +269,7 @@ static angle m2_arctangent(
 				
 				if ((last_difference<=0&&new_difference>=0) || (last_difference>=0&&new_difference<=0))
 				{
-					if (ABS(last_difference)<ABS(new_difference))
+					if (std::abs(last_difference)< std::abs(new_difference))
 					{
 						return theta-1;
 					}
@@ -293,11 +291,11 @@ static angle m2_arctangent(
 	}
 	else
 	{
-		/* so arctan(0,0)==¹/2 (bill me) */
+		/* so arctan(0,0)==Ï€/2 (bill me) */
 		return y<0 ? THREE_QUARTER_CIRCLE : QUARTER_CIRCLE;
 	}
 }
-/* one day weÕll come back here and actually make this run fast */
+/* one day weâ€™ll come back here and actually make this run fast */
 // LP change: made this long-distance friendly
 //
 static angle a1_arctangent(
@@ -471,6 +469,7 @@ world_distance guess_distance2d(
 	return distance>INT16_MAX ? INT16_MAX : distance;
 }
 
+// Return min(round(distance), INT16_MAX)
 world_distance distance3d(
 	world_point3d *p0,
 	world_point3d *p1)
@@ -478,28 +477,33 @@ world_distance distance3d(
 	int32 dx= (int32)p0->x - p1->x;
 	int32 dy= (int32)p0->y - p1->y;
 	int32 dz= (int32)p0->z - p1->z;
-	int32 distance= isqrt(dx*dx + dy*dy + dz*dz);
-	
-	return distance>INT16_MAX ? INT16_MAX : distance;
+	const Sint64 dist_squared = 1LL*dx*dx + 1LL*dy*dy + 1LL*dz*dz; // [0, ~2^33.6]
+	return dist_squared < 1L*INT16_MAX*INT16_MAX ? isqrt(dist_squared) : INT16_MAX;
+}
+
+// Return round(distance) if distance < 65536, else nonsense value round(sqrt(distance^2 - 2^32)); output in [0, 65536]
+static int32 m2_distance2d_int32(
+	const world_point2d* p0,
+	const world_point2d* p1)
+{
+	const int32 dx = 1L*p1->x - p0->x; // [-65535, 65535]
+	const int32 dy = 1L*p1->y - p0->y; // [-65535, 65535]
+	const Sint64 dist_squared = 1LL*dx*dx + 1LL*dy*dy; // [0, ~2^33]
+	return isqrt(uint32(dist_squared));
 }
 
 static world_distance m2_distance2d(
         world_point2d *p0,
         world_point2d *p1)
 {
-        return isqrt((p0->x-p1->x)*(p0->x-p1->x)+(p0->y-p1->y)*(p0->y-p1->y));
+	return int16(m2_distance2d_int32(p0, p1));
 }
 
 static world_distance a1_distance2d(
 	world_point2d *p0,
 	world_point2d *p1)
 {
-	// LP change: lengthening the values for more precise calculations;
-	// code cribbed from the previous function
-	int32 dx= (int32)p0->x - p1->x;
-	int32 dy= (int32)p0->y - p1->y;
-	int32 distance= isqrt(dx*dx + dy*dy);
-	
+	const int32 distance = m2_distance2d_int32(p0, p1);
 	return distance>INT16_MAX ? INT16_MAX : distance;
 }
 
@@ -610,10 +614,9 @@ world_distance distance2d(
  *              r++;
  */
 
-int32 isqrt(
-	register uint32 x)
+int32 isqrt(uint32 x)
 {
-	register uint32 r, nr, m;
+	uint32 r, nr, m;
 
 	r= 0;
 	m= 0x40000000;
@@ -683,7 +686,7 @@ world_point2d *transform_overflow_point2d(
 {
 	// LP change: lengthening the values for more precise calculations
 	long_vector2d temp, tempr;
-  
+	
 	theta = normalize_angle(theta);
 	fc_assert(cosine_table[0]==TRIG_MAGNITUDE);
 	
@@ -692,31 +695,8 @@ world_point2d *transform_overflow_point2d(
 		
 	tempr.i= ((temp.i*cosine_table[theta])>>TRIG_SHIFT) + ((temp.j*sine_table[theta])>>TRIG_SHIFT);
 	tempr.j= ((temp.j*cosine_table[theta])>>TRIG_SHIFT) - ((temp.i*sine_table[theta])>>TRIG_SHIFT);
-
+	
 	long_to_overflow_short_2d(tempr,*point,*flags);
 	
 	return point;
-}
-
-world_point2d *transform_overflow_point2d_smoothed(
-                                          world_point2d *point,
-                                          world_point2d *origin,
-                                          angle theta,
-                                          uint16 *flags)
-{
-  // LP change: lengthening the values for more precise calculations
-  long_vector2d temp, tempr;
-  
-  theta = normalize_angle(theta);
-  fc_assert(cosine_table[0]==TRIG_MAGNITUDE);
-  
-  temp.i= int32(point->x)-int32(origin->x);
-  temp.j= int32(point->y)-int32(origin->y);
-  
-  tempr.i= ((temp.i*(int)cosine_table_calculated(theta + lostMousePrecisionX()) )>>TRIG_SHIFT) + ((temp.j*(int)sine_table_calculated(theta + lostMousePrecisionX()))>>TRIG_SHIFT);
-  tempr.j= ((temp.j*(int)cosine_table_calculated(theta + lostMousePrecisionX()) )>>TRIG_SHIFT) - ((temp.i*(int)sine_table_calculated(theta + lostMousePrecisionX()))>>TRIG_SHIFT);
-  
-  long_to_overflow_short_2d(tempr,*point,*flags);
-  
-  return point;
 }

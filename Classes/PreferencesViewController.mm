@@ -12,7 +12,7 @@
 #import "AlephOneAppDelegate.h"
 #import "Effects.h"
 #include "preferences.h"
-#include "Mixer.h"
+//Still needed for iOS 6-19-24?#include "Mixer.h"
 #import "KeychainItemWrapper.h"
 
 #include "AlephOneHelper.h"
@@ -304,6 +304,9 @@
   MLog ( @"Set preferences from device back to engine" );
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
   
+	//Still needed for iOS 6-19-24?
+	//TODO: fix for iOS
+	/*
   sound_preferences->music = ceil ( (double)[defaults floatForKey:kMusicVolume] * (NUMBER_OF_SOUND_VOLUME_LEVELS-1) );
   sound_preferences->volume = ceil ( (double)[defaults floatForKey:kSfxVolume] * (NUMBER_OF_SOUND_VOLUME_LEVELS-1) );
   
@@ -316,7 +319,8 @@
 
   SoundManager::instance()->parameters.music = sound_preferences->music;
   SoundManager::instance()->parameters.volume = sound_preferences->volume;
-  
+*/
+	
   KeychainItemWrapper *keychain = [[[KeychainItemWrapper alloc] initWithIdentifier:@"metaserver" accessGroup:nil] autorelease];
   NSString *loginName=[keychain objectForKey:(id)kSecAttrAccount];
   NSString *pass=[keychain objectForKey:(id)kSecValueData];
@@ -375,12 +379,16 @@
     int MAXIMUM_OUTPUT_SOUND_VOLUME = 2 * MAXIMUM_SOUND_VOLUME; // 2*256
     int SOUND_VOLUME_DELTA = MAXIMUM_OUTPUT_SOUND_VOLUME / NUMBER_OF_SOUND_VOLUME_LEVELS; //(512/8)
 
+		//Still needed for iOS 6-19-24?
+		//TODO: fix for iOS
+		/*
     // Sound ranges from 0-255, but is stored in 8 levels... go figure...
     Mixer::instance()->SetVolume ( sound_preferences->volume * SOUND_VOLUME_DELTA );
     if ( Mixer::instance()->MusicPlaying() ) {
       //Mixer::instance()->SetMusicChannelVolume ( sound_preferences->music * SOUND_VOLUME_DELTA );
       Mixer::instance()->SetMusicChannelVolume (SoundManager::instance()->parameters.music * MAXIMUM_SOUND_VOLUME / NUMBER_OF_SOUND_VOLUME_LEVELS); //I don't know why this is the startup defaults, but whatever.
     }
+		*/
   }
   
   // DJB This seems to cause flickering...

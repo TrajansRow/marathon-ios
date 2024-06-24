@@ -51,38 +51,6 @@
 
 #include <string>
 
-
-// jkvw: I'm putting this here because we only really want it for find_item_index_in_vecotr,
-//	 and of course we shouldn't be doing that anyway :).
-bool operator==(const prospective_joiner_info &left, const prospective_joiner_info &right)
-{ return left.stream_id == right.stream_id; }
-
-
-////// helper functions //////
-// Actually, as it turns out, there should be a generic STL algorithm that does this, I think.
-// Well, w_found_players ought to be using a set<> or similar anyway, much more natural.
-// Shrug, this was what I came up with before I knew anything about STL, and I'm too lazy to change it.
-template<class T>
-static const size_t
-find_item_index_in_vector(const T& inItem, const vector<T>& inVector) {
-    typename vector<T>::const_iterator 	i	= inVector.begin();
-    typename vector<T>::const_iterator 	end	= inVector.end();
-    size_t				index	= 0;
-
-    while(i != end) {
-        if(*i == inItem)
-            return index;
-        
-        index++;
-        i++;
-    }
-    
-    // Didn't find it
-    return -1;
-}
-
-
-
 ////// w_found_players //////
 void
 w_found_players::found_player(prospective_joiner_info &player) {
@@ -118,11 +86,12 @@ void w_found_players::update_player(prospective_joiner_info &player) {
 
 void
 w_found_players::unlist_player(const prospective_joiner_info &player) {
-    size_t theIndex = find_item_index_in_vector(player, listed_players);
-    if(theIndex == -1)
+
+    auto player_index = std::distance(listed_players.begin(), std::find(listed_players.begin(), listed_players.end(), player));
+    if (player_index >= listed_players.size())
         return;
 
-    listed_players.erase(listed_players.begin() + theIndex);
+    listed_players.erase(listed_players.begin() + player_index);
     
     size_t old_top_item = top_item;
     
@@ -130,7 +99,7 @@ w_found_players::unlist_player(const prospective_joiner_info &player) {
     new_items();
     
     // If the element deleted was the top item or before the top item, shift view up an item to compensate (if there is anything "up").
-    if(theIndex <= old_top_item && old_top_item > 0)
+    if(player_index <= old_top_item && old_top_item > 0)
         old_top_item--;
     
     // Reconcile overhang, if needed.
@@ -161,26 +130,11 @@ w_found_players::callback_on_all_items() {
 
 void
 w_found_players::draw_item(vector<prospective_joiner_info>::const_iterator i, SDL_Surface *s, int16 x, int16 y, uint16 width, bool selected) const {
-	char	theNameBuffer[SSLP_MAX_NAME_LENGTH + 12];
-
-	strncpy(theNameBuffer, (*i).name, SSLP_MAX_NAME_LENGTH - 1);
-	if ((*i).gathering) {
-	  strncat(theNameBuffer, " (gathering)", 12);
-	}
-	
-	int computed_x = x + (width - text_width(theNameBuffer, font, style)) / 2;
+	auto text = std::string(i->name) + (i->gathering ? " (gathering)" : "");
+	int computed_x = x + (width - text_width(text.c_str(), font, style)) / 2;
 	int computed_y = y + font->get_ascent();
-	
-	//unsigned char text_length = (*i)->sslps_name[0];
-	
-	//if(text_length > SSLP_MAX_NAME_LENGTH - 1)
-	//    text_length = SSLP_MAX_NAME_LENGTH - 1;
-	if ((*i).gathering) {
-		draw_text(s, theNameBuffer, computed_x, computed_y, get_theme_color(ITEM_WIDGET, DISABLED_STATE), font, style);
-	} else {
-	  draw_text(s, /*&((*i)->sslps_name[1]), text_length,*/ theNameBuffer, computed_x, computed_y,
-		    selected ? get_theme_color(ITEM_WIDGET, ACTIVE_STATE) : get_theme_color(ITEM_WIDGET, DEFAULT_STATE), font, style);
-	}
+	int text_state = i->gathering ? DISABLED_STATE : selected ? ACTIVE_STATE : DEFAULT_STATE;
+	draw_text(s, text.c_str(), computed_x, computed_y, get_theme_color(ITEM_WIDGET, text_state), font, style);
 }
 
 ////// w_players_in_game2 //////
@@ -359,7 +313,7 @@ w_players_in_game2::click(int x, int) {
 
         if(clump_players_by_team) {
             for(size_t i = 0; i < num_valid_net_rankings; i++) {
-                if(ABS(x - get_wide_spaced_center_offset(rect.x, rect.w, i, num_valid_net_rankings))
+                if(std::abs(x - get_wide_spaced_center_offset(rect.x, rect.w, i, num_valid_net_rankings))
                         < (get_wide_spaced_width(rect.w, num_valid_net_rankings) / 2))
                 {
                     if(element_clicked_callback != NULL)
@@ -373,7 +327,7 @@ w_players_in_game2::click(int x, int) {
         
         else {
             for(size_t i = 0; i < num_valid_net_rankings; i++) {
-                if(ABS(x - get_close_spaced_center_offset(rect.x, rect.w, i, num_valid_net_rankings))
+                if(std::abs(x - get_close_spaced_center_offset(rect.x, rect.w, i, num_valid_net_rankings))
                         < (get_close_spaced_width(rect.w, num_valid_net_rankings) / 2))
                 {
                     if(element_clicked_callback != NULL)
@@ -552,13 +506,21 @@ w_players_in_game2::find_maximum_bar_value() const {
             }
         }
     }
-    
+
     // If all values were nonpositive, and we had at least one negative, we
     // return the (negative) value furthest from 0.
     // The Mac version seems to do nothing of the sort - how can it possibly
     // display correct bars for games with negative scores like "Tag"??
     if(theMaxValue <= 0 && theMinValue < 0)
+	{
         theMaxValue = theMinValue;
+	}
+	// if there is a mix of positive and negative, draw two different colored
+	// bars
+	else if (theMinValue < 0)
+	{
+		theMaxValue = std::max(std::abs(theMinValue), std::abs(theMaxValue));
+	}
 
     return theMaxValue;
 }
@@ -580,12 +542,23 @@ w_players_in_game2::draw_bar_or_bars(SDL_Surface* s, size_t rank_index, int cent
         calculate_ranking_text_for_post_game(temporary, theScore);
         theBarInfo.label_text = temporary;  // this makes a copy
 
-        draw_bar(s, center_x, _score_color, theScore, maximum_value, theBarInfo);
+		if ((theScore < 0) == (maximum_value <= 0))
+		{
+			draw_bar(s, center_x, _score_color, theScore, maximum_value, theBarInfo);
+		}
+		else if (theScore >= 0)
+		{
+			draw_bar(s, center_x, _score_color, theScore, maximum_value, theBarInfo);
+		}
+		else
+		{
+			draw_bar(s, center_x, _kill_color, -theScore, maximum_value, theBarInfo);
+		}
 
-        // Don't draw a "0" score label
-        if(theScore != 0)
-            outBarInfos.push_back(theBarInfo);
-    }
+		// Don't draw a "0" score label
+		if(theScore != 0)
+			outBarInfos.push_back(theBarInfo);
+	}
     else {
         // Draw carnage bar(s)
         if(rank_index == selected_player) {
@@ -1010,7 +983,7 @@ w_entry_point_selector::gotSelected() {
 
         placer->add(new w_spacer(), true);
 
-        sprintf(temporary, "%lu %s levels available",
+        sprintf(temporary, "%zu %s levels available",
             mEntryPoints.size(),
             TS_GetCString(kNetworkGameTypesStringSetID, mGameType)
         );
