@@ -36,6 +36,8 @@
 #include "preferences.h"
 #include "screen.h"
 
+#import "AlephOneHelper.h"
+
 // Global variables
 static bool mouse_active = false;
 static uint8 button_mask = 0;		// Mask of enabled buttons
@@ -52,6 +54,10 @@ void enter_mouse(short type)
 {
 	if (type != _keyboard_or_game_pad) {
 		MainScreenCenterMouse();
+		
+		//DCW clear mouse deltas to avoid a large initial jump.
+		float dx, dy;
+		slurpMouseDelta(&dx, &dy);
 		
 		SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_WARP, input_preferences->raw_mouse_input ? "0" : "1");
 		SDL_SetRelativeMouseMode(SDL_TRUE);
@@ -112,6 +118,14 @@ void mouse_idle(short type)
 		float dy = -snapshot_delta_y;
 		snapshot_delta_x = 0;
 		snapshot_delta_y = 0;
+		
+			//iOS touch input bypass
+		slurpMouseDelta(&dx, &dy);
+		if(dx>0 || dy>0)
+		{
+			snapshot_delta_x = 0;
+			snapshot_delta_y = 0;
+		}
 		
 		// Mouse inversion
 		if (TEST_FLAG(input_preferences->modifiers, _inputmod_invert_mouse))

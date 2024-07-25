@@ -1647,11 +1647,7 @@ void render_screen(short ticks_elapsed)
 		{
 			darken_world_window();
 		}
-
-		//dcw shit test - just for debugging!
-		//glClearColor(1,0,0,0);
-		//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
+			
 		OGL_SwapBuffers();
 	}
 #endif

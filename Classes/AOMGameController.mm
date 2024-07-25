@@ -50,44 +50,7 @@ extern "C" {
 
 -(id)init {
   self = [super init];
-  
-  key_definition *key = standard_key_definitions;
-  for (unsigned i=0; i<NUMBER_OF_STANDARD_KEY_DEFINITIONS; i++, key++) {
-    if ( key->action_flag == _moving_forward ) {
-      moveForward = key->offset;
-    }
-    if ( key->action_flag == _moving_backward ) {
-      moveBack = key->offset;
-    }
-    if ( key->action_flag == _sidestepping_left ){
-      moveLeft = key->offset;
-    }
-    if ( key->action_flag == _sidestepping_right ) {
-      moveRight = key->offset;
-    }
-    if ( key->action_flag == _run_dont_walk ) {
-      runKey = key->offset;
-    }
-    if ( key->action_flag == _left_trigger_state ){
-      primaryFire = key->offset;
-    }
-    if ( key->action_flag == _right_trigger_state ){
-      secondaryFire = key->offset;
-    }
-    if ( key->action_flag == _action_trigger_state ){
-      actionKey = key->offset;
-    }
-    if ( key->action_flag == _toggle_map ){
-      mapKey = key->offset;
-    }
-    if ( key->action_flag == _cycle_weapons_forward ) {
-      nextWeapon = key->offset;
-    }
-    if ( key->action_flag == _cycle_weapons_backward ) {
-      previousWeapon = key->offset;
-    }
-    
-  }
+
   
   [[UIApplication sharedApplication]setIdleTimerDisabled:YES];
   
@@ -98,6 +61,18 @@ extern "C" {
 }
 - (void)controllerConnected:(NSNotification *)notification {
 
+	moveForward = findKeyCodeInPrefs(_moving_forward);
+	moveBack = findKeyCodeInPrefs(_moving_backward);
+	moveLeft = findKeyCodeInPrefs(_sidestepping_left);
+	moveRight = findKeyCodeInPrefs(_sidestepping_right);
+	runKey = findKeyCodeInPrefs(_run_dont_walk);
+	primaryFire = findKeyCodeInPrefs(_left_trigger_state);
+	secondaryFire = findKeyCodeInPrefs(_right_trigger_state);
+	mapKey = findKeyCodeInPrefs(_toggle_map);
+	actionKey	= findKeyCodeInPrefs(_action_trigger_state);
+	nextWeapon = findKeyCodeInPrefs(_cycle_weapons_forward);
+	previousWeapon = findKeyCodeInPrefs(_cycle_weapons_backward);
+	
   GCController *newController = (GCController *)notification.object;
   
   NSLog(@"Controller Connected: %@", newController.vendorName);

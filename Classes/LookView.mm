@@ -307,7 +307,7 @@ extern "C" {
   dx = currentPoint.x - lastPanPoint.x;
   dy = currentPoint.y - lastPanPoint.y;
 
-  dy *=4; //DCW Lets bump up the vertical sensitivity.
+  //dy *=4; //DCW Lets bump up the vertical sensitivity. May not be needed in modern A1
   //NSLog(@"touches moved %f", dx );
 
   moveMouseRelativeAtInterval(dx, dy, touch.timestamp);

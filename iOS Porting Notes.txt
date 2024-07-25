@@ -121,6 +121,25 @@ In OGL_FBO.cpp in deactive():
 			glBindFramebuffer(_fboTarget, prev_fbo);
 		}
 
+In mouse_sdl.cpp, #import "AlephOneHelper.h". Also add this to enter_mouse:
+//DCW clear mouse deltas to avoid a large initial jump.
+		float dx, dy;
+		slurpMouseDelta(&dx, &dy);
+
+And add this to mouse_idle:    
+    slurpMouseDelta(&dx, &dy);
+    if(dx>0 || dy>0)
+    {
+      snapshot_delta_x = 0;
+      snapshot_delta_y = 0;
+    }
+
+In vbl.cpp, add #include "AlephOneHelper.h" and also add to the Parse Keymap section.
+if (key_map[code] || fake_key_map[code]) //iOS virtual input uses fake_key_map
+
+In vbl.cpp, change to:
+flags = build_terminal_action_flags((char *)/*key_map*/fake_key_map); //iOS changed to fake_key_map
+
 
 *****NEXT UP!*****
 Fix weapons reticle refresh check

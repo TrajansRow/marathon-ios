@@ -7281,9 +7281,13 @@
 				GCC_THUMB_SUPPORT = NO;
 				"GCC_THUMB_SUPPORT[arch=armv7]" = YES;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
+				"HEADER_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
+				"HEADER_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/include";
 				INFOPLIST_FILE = Info3.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
+				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/lib";
 				MARKETING_VERSION = 6.0;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CFLAGS = "";

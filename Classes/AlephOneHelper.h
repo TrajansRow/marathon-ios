@@ -70,6 +70,7 @@ extern bool shouldAllowDoubleClick ();
 extern int helperAlwaysPlayIntro();
 extern int helperAutocenter();
 extern void setKey(SDL_Keycode key, bool down);
+extern SDL_Keycode findKeyCodeInPrefs(unsigned actionFlagIndex);
 extern void moveMouseRelativeAtInterval(float dx, float dy, double movedInterval); //Move mouse at a NSTimeInterval.
 extern void moveMouseRelative(float dx, float dy);
 extern void grabMovementDeltasForCurrentFrameAtInterval(double timeStamp); //Cache accumulated deltas for future slurp. Call this immediately at frame start.

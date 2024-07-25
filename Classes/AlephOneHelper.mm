@@ -9,15 +9,19 @@
 #import "GameViewController.h"
 #import "AlephOneHelper.h"
 #include "interface.h"
+#include "player.h"
 #import "AlephOneAppDelegate.h"
 #include "projectiles.h"
-#include "player.h"
 #import "Prefs.h"
 #include "screen.h"
 #include <ifaddrs.h>
 #include <arpa/inet.h>
 #include "computer_interface.h" //Used for player in terminal check
 #include "SDL2/SDL_syswm.h"
+
+#include "player.h"
+#include "preferences.h"
+#include "key_definitions.h"
 
 #import "PreferencesViewController.h"
 
@@ -399,10 +403,25 @@ void setKey(SDL_Keycode key, bool down) {
   /*SDL_Event sdlevent;
   sdlevent.type = down?SDL_KEYDOWN:SDL_KEYUP;
   sdlevent.key.keysym.sym = key;
-  
   SDL_PushEvent(&sdlevent);*/
+	
+	//NSLog(@"Setting SDL key code %d to %d", key, down);
   
   fake_key_map[key] = down;
+}
+
+SDL_Keycode findKeyCodeInPrefs(unsigned actionFlagIndex)
+{
+	key_definition *key = standard_key_definitions;
+	for (unsigned i=0; i<NUMBER_OF_STANDARD_KEY_DEFINITIONS; i++, key++) {
+		for (const SDL_Scancode& code : input_preferences->key_bindings[i])
+		{
+			if ( key->action_flag == actionFlagIndex ){
+				return code; //Return the first code we find; don't probably want the second.
+			}
+		}
+	}
+	return 0; //Key not found. Uh oh...
 }
 
 //DCW

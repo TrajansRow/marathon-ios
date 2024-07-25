@@ -69,37 +69,18 @@ static int counter = 0;
     [customLayout release];
     [config release];
     
-    key_definition *key = standard_key_definitions;
-    for (unsigned i=0; i<NUMBER_OF_STANDARD_KEY_DEFINITIONS; i++, key++) {
-      if ( key->action_flag == _moving_forward ) {
-        forwardKey = key->offset;
-      }
-      if ( key->action_flag == _moving_backward ) {
-        backwardKey = key->offset;
-      }
-      if ( key->action_flag == _sidestepping_left ){
-        leftKey = key->offset;
-      }
-      if ( key->action_flag == _sidestepping_right ) {
-        rightKey = key->offset;
-      }
-      if ( key->action_flag == _run_dont_walk ) {
-        runKey = key->offset;
-      }
-      if ( key->action_flag == _left_trigger_state ){
-        primaryFire = key->offset;
-      } else if ( key->action_flag == _right_trigger_state ){
-        secondaryFire = key->offset;
-      } else if ( key->action_flag == _toggle_map ){
-        mapKey = key->offset;
-      } else if ( key->action_flag == _action_trigger_state ) {
-        actionKey = key->offset;
-      } else if ( key->action_flag == _cycle_weapons_forward ) {
-        nextWeapon = key->offset;
-      } else if ( key->action_flag == _cycle_weapons_backward ) {
-        previousWeapon = key->offset;
-      }
-    }
+		forwardKey = findKeyCodeInPrefs(_moving_forward);
+		backwardKey = findKeyCodeInPrefs(_moving_backward);
+		leftKey = findKeyCodeInPrefs(_sidestepping_left);
+		rightKey = findKeyCodeInPrefs(_sidestepping_right);
+		runKey = findKeyCodeInPrefs(_run_dont_walk);
+		primaryFire = findKeyCodeInPrefs(_left_trigger_state);
+		secondaryFire = findKeyCodeInPrefs(_right_trigger_state);
+		mapKey = findKeyCodeInPrefs(_toggle_map);
+		actionKey	= findKeyCodeInPrefs(_action_trigger_state);
+		nextWeapon = findKeyCodeInPrefs(_cycle_weapons_forward);
+		previousWeapon = findKeyCodeInPrefs(_cycle_weapons_backward);
+		
     findingDevice = NO;
     connectedWithDevice = NO;
   }

@@ -43,22 +43,11 @@ extern "C" {
 	//Still needed for iOS 6-19-24?(void)all_key_definitions;
 
   // Initialization code
-	key_definition *key = standard_key_definitions;
-	for (unsigned i=0; i<NUMBER_OF_STANDARD_KEY_DEFINITIONS; i++, key++) {
-		if ( key->action_flag == _left_trigger_state ){
-			primaryFireKey = key->offset;
-		}
-		if ( key->action_flag == _right_trigger_state ){
-			secondaryFireKey = key->offset;
-		}
-    if ( key->action_flag == _cycle_weapons_forward ){
-			nextWeaponKey = key->offset;
-		}
-    if ( key->action_flag == _cycle_weapons_backward ){
-      previousWeaponKey = key->offset;
-    }
-  }
-	
+	primaryFireKey = findKeyCodeInPrefs(_left_trigger_state);
+	secondaryFireKey = findKeyCodeInPrefs(_right_trigger_state);
+	nextWeaponKey = findKeyCodeInPrefs(_cycle_weapons_forward);
+	previousWeaponKey = findKeyCodeInPrefs(_cycle_weapons_backward);
+
 	//Still needed for iOS 6-19-24?SDL_MouseInit();
   [self unPauseGyro];
 	specialGyroModeActive = 0;

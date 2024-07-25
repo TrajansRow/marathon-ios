@@ -42,13 +42,6 @@
          "name":"zziplib"
       },
       {
-         "name":"ffmpeg",
-         "features":[
-            "vorbis",
-            "vpx"
-         ]
-      },
-      {
          "name":"miniupnpc"
       },
       {

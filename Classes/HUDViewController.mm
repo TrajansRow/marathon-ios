@@ -42,42 +42,22 @@ extern "C" {
 {
     self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil];
     if (self) {
-      key_definition *key = standard_key_definitions;
-      for (unsigned i=0; i<NUMBER_OF_STANDARD_KEY_DEFINITIONS; i++, key++) {
-        if ( key->action_flag == _left_trigger_state ){
-          primaryFireKey = key->offset;
-        } else if ( key->action_flag == _right_trigger_state ){
-          secondaryFireKey = key->offset;
-        } else if ( key->action_flag == _toggle_map ){
-          mapKey = key->offset;
-        } else if ( key->action_flag == _action_trigger_state ) {
-          actionKey = key->offset;
-        } else if ( key->action_flag == _cycle_weapons_forward ) {
-          nextWeaponKey = key->offset;
-        } else if ( key->action_flag == _cycle_weapons_backward ) {
-          previousWeaponKey = key->offset;
-        } else if ( key->action_flag == _moving_forward ) {
-          forwardKey = key->offset;
-        } else if ( key->action_flag == _moving_backward ) {
-          backwardKey = key->offset;
-        } else if ( key->action_flag == _sidestepping_left ){
-          leftKey = key->offset;
-        } else if ( key->action_flag == _sidestepping_right ) {
-          rightKey = key->offset;
-        } else if ( key->action_flag == _run_dont_walk ) {
-          runKey = key->offset;
-        } else if ( key->action_flag == _looking_up ) {
-          lookUpKey = key->offset;
-        } else if ( key->action_flag == _looking_down ) {
-          lookDownKey = key->offset;
-        } else if ( key->action_flag == _looking_left ) {
-          lookLeftKey = key->offset;
-        } else if ( key->action_flag == _looking_right ) {
-          lookRightKey = key->offset;
-        } else if ( key->action_flag == _key_activate_console ) {
-          consoleKey = key->offset;
-        }
-      }
+			forwardKey = findKeyCodeInPrefs(_moving_forward);
+			backwardKey = findKeyCodeInPrefs(_moving_backward);
+			leftKey = findKeyCodeInPrefs(_sidestepping_left);
+			rightKey = findKeyCodeInPrefs(_sidestepping_right);
+			runKey = findKeyCodeInPrefs(_run_dont_walk);
+			primaryFireKey = findKeyCodeInPrefs(_left_trigger_state);
+			secondaryFireKey = findKeyCodeInPrefs(_right_trigger_state);
+			mapKey = findKeyCodeInPrefs(_toggle_map);
+			actionKey	= findKeyCodeInPrefs(_action_trigger_state);
+			nextWeaponKey = findKeyCodeInPrefs(_cycle_weapons_forward);
+			previousWeaponKey = findKeyCodeInPrefs(_cycle_weapons_backward);
+			lookUpKey = findKeyCodeInPrefs(_looking_up);
+			lookDownKey = findKeyCodeInPrefs(_looking_down);
+			lookLeftKey = findKeyCodeInPrefs(_looking_left);
+			lookRightKey = findKeyCodeInPrefs(_looking_right);
+			consoleKey = findKeyCodeInPrefs(_key_activate_console);
     }
     return self;
 }
@@ -221,7 +201,7 @@ extern "C" {
 }
 
 - (IBAction)escapeDown:(id)sender {
-  setKey(SDL_SCANCODE_ESCAPE, 1);
+	setKey(SDL_SCANCODE_ESCAPE, 1);
 }
 - (IBAction)escapeUp:(id)sender{
   setKey(SDL_SCANCODE_ESCAPE, 0);

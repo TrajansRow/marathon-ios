@@ -101,6 +101,8 @@ Feb 20, 2002 (Woody Zenfell):
 #include "Movie.h"
 #include "InfoTree.h"
 
+#include "AlephOneHelper.h"
+
 /* ---------- constants */
 
 #define RECORD_CHUNK_SIZE            (MAXIMUM_QUEUE_SIZE/2)
@@ -1146,7 +1148,7 @@ uint32 parse_keymap(void)
 		{
 			for (const SDL_Scancode& code : input_preferences->key_bindings[i])
 			{
-				if (key_map[code])
+				if (key_map[code] || fake_key_map[code]) //iOS virtual input uses fake_key_map
 					flags |= standard_key_definitions[i].action_flag;
 			}
 		}
@@ -1267,7 +1269,7 @@ uint32 parse_keymap(void)
 		
       
       if (player_in_terminal_mode(local_player_index))
-	flags = build_terminal_action_flags((char *)key_map);
+				flags = build_terminal_action_flags((char *)/*key_map*/fake_key_map); //iOS changed to fake_key_map
     } // if(get_keyboard_controller_status())
   
   return flags;

@@ -56,33 +56,14 @@ extern "C" {
   moveRadius2 = moveRadius * moveRadius;
   runRadius = moveRadius / 2.0;
   deadSpaceRadius = moveRadius / 5.0;
-  key_definition *key = standard_key_definitions;
-  for (unsigned i=0; i<NUMBER_OF_STANDARD_KEY_DEFINITIONS; i++, key++) {
-    if ( key->action_flag == _moving_forward ) {
-      forwardKey = key->offset;
-    }
-    if ( key->action_flag == _moving_backward ) {
-      backwardKey = key->offset;
-    }
-    if ( key->action_flag == _sidestepping_left ){
-      leftKey = key->offset;
-    }
-    if ( key->action_flag == _sidestepping_right ) {
-      rightKey = key->offset;
-    }
-    if ( key->action_flag == _run_dont_walk ) {
-      runKey = key->offset;
-    }
-		
-		//DCW
-		if ( key->action_flag == _right_trigger_state ){
-			secondaryFireKey = key->offset;
-		}
-		if ( key->action_flag == _action_trigger_state ){
-			actionKey = key->offset;
-		}
-		
-  }
+
+	forwardKey = findKeyCodeInPrefs(_moving_forward);
+	backwardKey = findKeyCodeInPrefs(_moving_backward);
+	leftKey = findKeyCodeInPrefs(_sidestepping_left);
+	rightKey = findKeyCodeInPrefs(_sidestepping_right);
+	runKey = findKeyCodeInPrefs(_run_dont_walk);
+	secondaryFireKey = findKeyCodeInPrefs(_right_trigger_state);
+	actionKey = findKeyCodeInPrefs(_action_trigger_state);
 }
 
 	//DCW
