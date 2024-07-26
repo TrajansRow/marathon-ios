@@ -141,6 +141,31 @@ In vbl.cpp, change to:
 flags = build_terminal_action_flags((char *)/*key_map*/fake_key_map); //iOS changed to fake_key_map
 
 
+
+In preprocess_map_sdl.cpp, att the #include "AlephOneHelper.h" header and override save_game with:
+bool save_game(void)
+{
+	//On iOS, just save with current saved game by calling the helper
+	helperSaveGame();
+	return true;
+
+
+In interface.cpp, override handle_load_game with:
+void handle_load_game(
+	void)
+{
+  // On iOS, just call helper function
+  helperHandleLoadGame();
+  return;
+
+In Interface.cpp, override dialog in should_restore_game_networked (before d.run) with:
+	//iOS TODO: Test enable multiplayer restore. Currently, the dialog may not be shown.
+	if(dynamic_world->player_count != 0) {
+		switchToSDLMenu();
+	}
+	return theRestoreAsNetgameToggle->get_selection(); //iOS restore override
+
+
 *****NEXT UP!*****
 Fix weapons reticle refresh check
 Add in switchToSDLMenu(); and display_net_game_stats_helper() stuff!

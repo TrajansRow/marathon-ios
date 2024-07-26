@@ -2414,6 +2414,10 @@ static void start_game(
 void handle_load_game(
 	void)
 {
+	// On iOS, just call helper function
+	helperHandleLoadGame();
+	return;
+	
 	FileSpecifier FileToLoad;
 	bool success= false;
 
@@ -3402,6 +3406,12 @@ size_t should_restore_game_networked(FileSpecifier& file)
 
 	d.set_widget_placer(placer);
 
+	//iOS TODO: Test enable multiplayer restore. Currently, the dialog may not be shown.
+	if(dynamic_world->player_count != 0) {
+		switchToSDLMenu();
+	}
+	return theRestoreAsNetgameToggle->get_selection(); //iOS restore override
+	
         if(d.run() == 0)
         {
                 theResult = theRestoreAsNetgameToggle->get_selection();
