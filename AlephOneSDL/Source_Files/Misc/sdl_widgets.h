@@ -187,9 +187,10 @@ public:
 	bool is_selectable(void) const {return false;}
 
         ~w_static_text();
-
+	
+	char *text; // Make not protected for iOS
 protected:
-	char *text;
+	//char *text; // Make not protected for iOS
 	int theme_type;
 };
 

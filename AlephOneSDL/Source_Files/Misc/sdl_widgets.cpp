@@ -66,6 +66,8 @@
 #include <functional>
 #include <sstream>
 
+#include "AlephOneHelper.h"
+
 /*
  *  Widget base class
  */
@@ -1200,7 +1202,7 @@ void w_text_entry::draw(SDL_Surface *s) const
 void w_text_entry::set_active(bool new_active) {
 	if (new_active && !active) {
 		cursor_position = num_chars;
-		SDL_StartTextInput();
+		//SDL_StartTextInput(); //When using the iOS keyboard input helper, we only want to listen for input here and not display the keyboard (which SDL_StartTextInput does).
 	} else if (!new_active && active) {
 		SDL_StopTextInput();
 	}
@@ -1371,6 +1373,18 @@ end:			if (cursor_position < num_chars) {
 
 void w_text_entry::click(int x, int y)
 {
+	//This might be a good place to handle text input differently on iOS.
+	char *label = this->associated_label->text;
+	const char *currentText = this->get_text();
+	get_owning_dialog()->activate_widget(this);
+		//If this widget can't activate, don't ask for input.
+	if(active) {
+		dirty = true;
+		getSomeTextFromIOS(label, currentText);
+		this->set_text("");
+	}
+	return;
+	
 	bool was_active = active;
 	get_owning_dialog()->activate_widget(this);
 	

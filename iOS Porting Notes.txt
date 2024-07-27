@@ -165,6 +165,42 @@ In Interface.cpp, override dialog in should_restore_game_networked (before d.run
 	}
 	return theRestoreAsNetgameToggle->get_selection(); //iOS restore override
 
+In Console.cpp, add in the "AlephOneHelper.h" header and override the keyboard input in Console::activate_input (before SDL_StartTextInput()) like this:
+	//Alternate iOS Keyboard input.
+	if(game_is_networked)
+		getSomeTextFromIOS("Chat", "");
+	else
+		getSomeTextFromIOS("Console", "");
+	return;
+
+Do the same in sdl_widgits.cpp first thing in w_text_entry::click():
+	//This might be a good place to handle text input differently on iOS.
+	char *label = this->associated_label->text;
+	const char *currentText = this->get_text();
+	get_owning_dialog()->activate_widget(this);
+		//If this widget can't activate, don't ask for input.
+	if(active) {
+		dirty = true;
+		getSomeTextFromIOS(label, currentText);
+		this->set_text("");
+	}
+	return;
+
+For the above to work, modify "class w_static_text : public widget" in sdl_widgits.h:
+	char *text; // Make not protected for iOS
+protected:
+	//char *text; // Make not protected for iOS
+
+Also in sdl_widgets.cpp, in w_text_entry::set_active(bool new_active), disable the SDL keyboard:
+		//SDL_StartTextInput(); //When using the iOS keyboard input helper, we only want to listen for input here and not display the keyboard (which SDL_StartTextInput does).
+
+
+In networkdialogs.cpp, in both JoinDialog::JoinNetworkGameByRunning () and SetupNetgameDialog::SetupNetworkGameByRunning (right after CStringPref namePref (player_preferences->name, MAX_NET_PLAYER_NAME_LENGTH);)...  Add #include "AlephOneHelper.h" to the top and then add this to avoid a generic "mobile' name by adding these lines:
+
+	//On iOS if we get a generic mobile name from the system, replace it with something random.
+	if(strcmp(player_preferences->name, "mobile") == 0){
+		namePref.bind_import(randomName31());
+	}
 
 *****NEXT UP!*****
 Fix weapons reticle refresh check

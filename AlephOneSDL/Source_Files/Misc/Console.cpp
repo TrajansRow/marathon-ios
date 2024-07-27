@@ -41,6 +41,8 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
+#include "AlephOneHelper.h"
+
 using namespace std;
 
 extern bool game_is_networked;
@@ -298,6 +300,13 @@ void Console::activate_input(std::function<void (const std::string&)> callback,
 	m_displayBuffer += " ";
 	m_active = true;
 	m_cursor_position = 0;
+	
+	//Alternate iOS Keyboard input.
+	if(game_is_networked)
+		getSomeTextFromIOS("Chat", "");
+	else
+		getSomeTextFromIOS("Console", "");
+	return;
 	
 	SDL_StartTextInput();
 	SDL_FlushEvent(SDL_TEXTINPUT);

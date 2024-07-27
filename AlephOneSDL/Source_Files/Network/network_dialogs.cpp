@@ -97,6 +97,7 @@ Apr 10, 2003 (Woody Zenfell):
 #include "SoundManager.h"
 #include "progress.h"
 
+#include "AlephOneHelper.h"
 
 extern void NetRetargetJoinAttempts(const IPaddress* inAddress);
 
@@ -589,6 +590,12 @@ const int JoinDialog::JoinNetworkGameByRunning ()
 	binders.insert<bool> (m_joinByAddressWidget, &joinByAddressPref);
 	
 	CStringPref namePref (player_preferences->name, MAX_NET_PLAYER_NAME_LENGTH);
+	
+	//On iOS if we get a generic mobile name from the system, replace it with something random.
+	if(strcmp(player_preferences->name, "mobile") == 0){
+		namePref.bind_import(randomName31());
+	}
+	
 	binders.insert<std::string> (m_nameWidget, &namePref);
 	Int16Pref colourPref (player_preferences->color);
 	binders.insert<int> (m_colourWidget, &colourPref);
@@ -1119,6 +1126,12 @@ bool SetupNetgameDialog::SetupNetworkGameByRunning (
 	BinderSet binders;
 	
 	CStringPref namePref (player_preferences->name, MAX_NET_PLAYER_NAME_LENGTH);
+	
+	//On iOS if we get a generic mobile name from the system, replace it with something random.
+	if(strcmp(player_preferences->name, "mobile") == 0){
+		namePref.bind_import(randomName31());
+	}
+	
 	binders.insert<std::string> (m_nameWidget, &namePref);
 	Int16Pref colourPref (player_preferences->color);
 	binders.insert<int> (m_colourWidget, &colourPref);
