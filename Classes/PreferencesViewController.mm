@@ -138,7 +138,9 @@
   //Crosshairs_SetActive(NO);
   //DCW changed this; now uses engine reticle.
   Crosshairs_SetActive([defaults boolForKey:kCrosshairs]);
-
+	
+	//Finally, refresh the engine prefs:
+	write_preferences();
 }
 
 

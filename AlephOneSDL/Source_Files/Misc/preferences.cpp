@@ -105,6 +105,8 @@ May 22, 2003 (Woody Zenfell):
 #include "resource_manager.h"
 #include "XML_LevelScript.h"
 
+#include "AlephOneHelper.h"
+
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -3604,6 +3606,15 @@ InfoTree graphics_preferences_tree()
 	for (int i = 0; i <= OGL_NUMBER_OF_TEXTURE_TYPES; ++i)
 	{
 		OGL_Texture_Configure& Config = (i == OGL_NUMBER_OF_TEXTURE_TYPES) ? graphics_preferences->OGL_Configure.ModelConfig : graphics_preferences->OGL_Configure.TxtrConfigList[i];
+		
+		//Apply iOS texture filtering
+		if(useClassicVisuals()){
+			Config.FarFilter=2;
+			Config.NearFilter=2;
+		} else {
+			Config.FarFilter=1;
+			Config.NearFilter=1;
+		}
 		
 		InfoTree tex;
 		tex.put_attr("index", i);

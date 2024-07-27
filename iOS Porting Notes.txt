@@ -202,6 +202,56 @@ In networkdialogs.cpp, in both JoinDialog::JoinNetworkGameByRunning () and Setup
 		namePref.bind_import(randomName31());
 	}
 
+
+In Plugins.cpp add "AlephOneHelper.h", and then also add the iOS plugin filters to Plugin::valid():
+//Plugin filters for iOS
+	if(useClassicVisuals()) {
+		if(
+				//M1
+				strcmp(name.c_str(), "TTEP v7") == 0 ||
+				strcmp(name.c_str(), "TTEP") == 0 ||
+				strcmp(name.c_str(), "Updated Starscape") == 0 ||
+				strcmp(name.c_str(), "M1 Hd Weapon Pack") == 0 ||
+			 
+				//M2
+				strcmp(name.c_str(), "HD Monsters") == 0 ||
+				strcmp(name.c_str(), "HD Textures") == 0 ||
+			 
+				//M2&M3
+				strcmp(name.c_str(), "HD Weapons") == 0 ||
+			 
+				//Any CFP
+				strncmp(name.c_str(), "CFP", 3) == 0 ||
+			 
+				//M3
+				strcmp(name.c_str(), "Gorans Highres Landscapes") == 0 ||
+				strcmp(name.c_str(), "Gorans Jjarro Set DDS") == 0 ||
+				strcmp(name.c_str(), "Gorans Lava Set 2.0") == 0 ||
+				strcmp(name.c_str(), "Gorans Pfhor Set DDS") == 0 ||
+				strcmp(name.c_str(), "Gorans Sewage Set DDS") == 0 ||
+				strcmp(name.c_str(), "Gorans Pfhor Set DDS") == 0
+				) {
+			return false;
+		}
+	}
+
+
+In screen.cpp, map_is_translucent(void), add the "AlephOneHelper.h" header and change to:
+return ( (screen_mode.translucent_map || !useClassicVisuals()) && NetAllowOverlayMap()); //iOS automatically enabled translucent map for HD visuals.
+
+In preferences.cpp, add the "AlephOneHelper.h" header. Edit graphics_preferences_tree() so that before any tex.put_attr stuff, we then run:
+	//Apply iOS texture filtering
+			if(useClassicVisuals()){
+				Config.FarFilter=2;
+				Config.NearFilter=2;
+			} else {
+				Config.FarFilter=1;
+				Config.NearFilter=1;
+			}
+
+
+
+
 *****NEXT UP!*****
 Fix weapons reticle refresh check
 Add in switchToSDLMenu(); and display_net_game_stats_helper() stuff!

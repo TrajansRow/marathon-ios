@@ -73,6 +73,8 @@
 
 #include <algorithm>
 
+#include "AlephOneHelper.h"
+
 #if defined(__WIN32__) || (defined(__MACH__) && defined(__APPLE__))
 #define MUST_RELOAD_VIEW_CONTEXT
 #endif
@@ -661,7 +663,7 @@ void ReloadViewContext(void)
 
 bool map_is_translucent(void)
 {
-	return (screen_mode.translucent_map && NetAllowOverlayMap());
+	return ( (screen_mode.translucent_map || !useClassicVisuals()) && NetAllowOverlayMap()); //iOS automatically enabled translucent map for HD visuals.
 }
 
 /*

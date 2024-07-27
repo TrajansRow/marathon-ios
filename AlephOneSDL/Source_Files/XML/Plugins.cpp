@@ -34,6 +34,8 @@
 #include "XML_ParseTreeRoot.h"
 #include "Scenario.h"
 
+#include "AlephOneHelper.h"
+
 #include <boost/algorithm/string/predicate.hpp>
 
 namespace algo = boost::algorithm;
@@ -74,6 +76,37 @@ bool Plugin::allowed() const {
 bool Plugin::valid() const {
 	if (!enabled)
 		return false;
+	
+	//Plugin filters for iOS
+	if(useClassicVisuals()) {
+		if(
+				//M1
+				strcmp(name.c_str(), "TTEP v7") == 0 ||
+				strcmp(name.c_str(), "TTEP") == 0 ||
+				strcmp(name.c_str(), "Updated Starscape") == 0 ||
+				strcmp(name.c_str(), "M1 Hd Weapon Pack") == 0 ||
+			 
+				//M2
+				strcmp(name.c_str(), "HD Monsters") == 0 ||
+				strcmp(name.c_str(), "HD Textures") == 0 ||
+			 
+				//M2&M3
+				strcmp(name.c_str(), "HD Weapons") == 0 ||
+			 
+				//Any CFP
+				strncmp(name.c_str(), "CFP", 3) == 0 ||
+			 
+				//M3
+				strcmp(name.c_str(), "Gorans Highres Landscapes") == 0 ||
+				strcmp(name.c_str(), "Gorans Jjarro Set DDS") == 0 ||
+				strcmp(name.c_str(), "Gorans Lava Set 2.0") == 0 ||
+				strcmp(name.c_str(), "Gorans Pfhor Set DDS") == 0 ||
+				strcmp(name.c_str(), "Gorans Sewage Set DDS") == 0 ||
+				strcmp(name.c_str(), "Gorans Pfhor Set DDS") == 0
+				) {
+			return false;
+		}
+	}
 	
 	if (!environment_preferences->use_solo_lua &&
 		Plugins::instance()->mode() == Plugins::kMode_Solo)
