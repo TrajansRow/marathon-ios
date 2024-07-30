@@ -69,6 +69,8 @@ May 3, 2003 (Br'fin (Jeremy Parsons))
 #include <algorithm>
 #include <boost/container/small_vector.hpp>
 
+#include "monsters.h" //Needed for iOS smart trigger
+
 
 // LP: "recommended" sizes of stuff in growable lists
 #define MAXIMUM_RENDER_OBJECTS 72
@@ -306,6 +308,16 @@ render_object_data *RenderPlaceObjsClass::build_render_object(
 					}
 				}
 				render_object= &RenderObjects[Length];
+				
+				//Set iOS smart trigger hint
+				render_object->rectangle.isLivingMonster= 0;
+				if (GET_OBJECT_OWNER(object) == _object_is_monster)
+				{
+					struct monster_data *monster= get_monster_data(object->permutation);
+					if (monster && !MONSTER_IS_DYING(monster)) {
+						render_object->rectangle.isLivingMonster=1;
+					}
+				}
 				
 				render_object->clipping_windows = nullptr;
 				render_object->rectangle.flags= 0;

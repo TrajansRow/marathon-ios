@@ -173,6 +173,8 @@ struct rectangle_definition
 	GLfloat LightDirection[3];		// To the "light point"
 	short WorldLeft, WorldBottom, WorldRight, WorldTop;
 
+	bool isLivingMonster; //iOS smart trigger hint
+	
 	// Constructor required defaults
 	rectangle_definition() :
 		LowLevelShape(0) {}

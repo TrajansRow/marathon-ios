@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>BuildNumber</key>
-	<string>4194</string>
+	<string>4197</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleDisplayName</key>
@@ -31,7 +31,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Uses the microphone to communicate with other players.</string>
 	<key>SHA1</key>
-	<string>c9e8ce0173b51a7a357d64a18ff249045ea668b5</string>
+	<string>a127fff98e5225c310467869dd0d33b898ccd2df</string>
 	<key>UIInterfaceOrientation</key>
 	<string>UIInterfaceOrientationLandscapeRight</string>
 	<key>UILaunchStoryboardName</key>

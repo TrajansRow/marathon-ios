@@ -1527,6 +1527,8 @@ void render_screen(short ticks_elapsed)
 	else if (software_render_dest.empty() || ViewChangedSize)
 		software_render_dest = bitmap_definition_of_sdl_surface(world_pixels);
     
+	clearSmartTrigger(); //Reset iOS smart trigger
+	
 	// Render world view
 	render_view(world_view, software_render_dest.get());
 
