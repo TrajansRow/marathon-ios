@@ -1782,7 +1782,7 @@ short items[]=
     switch(get_item_kind(items[index]))
     {
       case _ammunition:
-				//The following is no longer supported in Aleph One: AddItemsToPlayer(items[index],10);
+				AddItemsToPlayer(items[index],10);
         break;
       default:
         break;
@@ -1816,10 +1816,10 @@ short items[]=
     {
       case _weapon:
         if(items[index]==_i_shotgun || items[index]==_i_magnum) {
-					//The following is no longer supported in Aleph One: AddOneItemToPlayer(items[index],2);
+					AddOneItemToPlayer(items[index],2);
         }
         else {
-					//The following is no longer supported in Aleph One: AddItemsToPlayer(items[index],1);
+					AddItemsToPlayer(items[index],1);
         }
         break;
       default:

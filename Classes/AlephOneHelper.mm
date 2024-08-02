@@ -23,6 +23,8 @@
 #include "preferences.h"
 #include "key_definitions.h"
 
+#include "items.h"
+
 #import "PreferencesViewController.h"
 
 
@@ -539,6 +541,19 @@ bool getLocalPlayer () {
 
 float extraFieldOfView () {
   return shouldUseExtraFOV ? 20 : 0;
+}
+
+//These functions were cribbed from an older version of Aleph One, and have since been removed from newer versions. Replicated here for cheat capability.
+void AddItemsToPlayer(short ItemType, short MaxNumber)
+{
+	for (int i=0; i<MaxNumber; i++)
+		try_and_add_player_item(local_player_index,ItemType);
+}
+void AddOneItemToPlayer(short ItemType, short MaxNumber)
+{
+	local_player->items[ItemType] = MAX(local_player->items[ItemType],0);
+	if (local_player->items[ItemType] < MaxNumber)
+		try_and_add_player_item(local_player_index,ItemType);
 }
 
 bool headBelowMedia () {

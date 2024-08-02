@@ -332,8 +332,6 @@ Remove AlephOneAcceleration files?
 
 Verify the SDL mouse event works in - (void)handleTapFrom:(UITapGestureRecognizer *)recognizer.
 
-Re-implement cheats using AddItemsToPlayer and AddOneItemToPlayer
-
 Do we need esutils files?
 
 Done?: Check out and see if we need #include "game_window.h"for this line: //Still needed for iOS 6-19-24? mark_shield_display_as_dirty();
