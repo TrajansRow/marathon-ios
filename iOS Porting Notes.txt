@@ -249,6 +249,23 @@ In preferences.cpp, add the "AlephOneHelper.h" header. Edit graphics_preferences
 				Config.NearFilter=1;
 			}
 
+
+		//For iOS, use 3D perspective
+		graphics_preferences->OGL_Configure.Flags &= ~OGL_Flag_MimicSW;
+		
+		//For iOS, always enable blur/bloom. We can still skip the bloom pass later based on prefs.
+		graphics_preferences->OGL_Configure.Flags |= OGL_Flag_Blur;
+		
+		//For iOS, always enable bump mapping.
+		graphics_preferences->OGL_Configure.Flags |= OGL_Flag_BumpMap;
+
+
+In RenderRasterize_shader -> render_tree(), change this line to:
+if (useShaderPostProcessing() && current_player->infravision_duration == 0 &&
+		TEST_FLAG(Get_OGL_ConfigureData().Flags, OGL_Flag_Blur) &&
+		blur.get())
+
+
 Enable smart triggerUsing these steps:
 
 In scottish_textures.h, add this near the end (just before contractor) for rectangle_definition:
@@ -294,8 +311,6 @@ clearSmartTrigger(); //Reset iOS smart trigger
 
 
 *****TODOs!*****
-
-Add preference for look up/down perspective style. Default to modern.
 
 Fix weapons reticle refresh check
 Add in switchToSDLMenu(); and display_net_game_stats_helper() stuff!

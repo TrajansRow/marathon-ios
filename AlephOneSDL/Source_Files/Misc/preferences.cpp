@@ -3616,6 +3616,15 @@ InfoTree graphics_preferences_tree()
 			Config.NearFilter=1;
 		}
 		
+		//For iOS, use 3D perspective
+		graphics_preferences->OGL_Configure.Flags &= ~OGL_Flag_MimicSW;
+		
+		//For iOS, always enable blur/bloom. We can still skip the bloom pass later based on prefs.
+		graphics_preferences->OGL_Configure.Flags |= OGL_Flag_Blur;
+		
+		//For iOS, always enable bump mapping.
+		graphics_preferences->OGL_Configure.Flags |= OGL_Flag_BumpMap;
+		
 		InfoTree tex;
 		tex.put_attr("index", i);
 		tex.put_attr("near_filter", Config.NearFilter);

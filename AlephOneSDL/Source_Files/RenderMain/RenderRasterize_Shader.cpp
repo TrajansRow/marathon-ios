@@ -272,7 +272,7 @@ void RenderRasterize_Shader::render_tree() {
     render_viewer_sprite_layer(kDiffuse);
 	DC()->drawAll(); //Draw and flush buffers
     
-	if (current_player->infravision_duration == 0 &&
+	if (useShaderPostProcessing() && current_player->infravision_duration == 0 &&
 		TEST_FLAG(Get_OGL_ConfigureData().Flags, OGL_Flag_Blur) &&
 		blur.get())
 	{
