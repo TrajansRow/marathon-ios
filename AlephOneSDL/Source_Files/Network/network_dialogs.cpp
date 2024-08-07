@@ -2358,7 +2358,7 @@ send_text_fake(w_text_entry* te) {
 void display_net_game_stats(void)
 {
 //printf("display_net_game_stats\n");
-
+	
 	if (gMetaserverClient) 
 	{
 		gMetaserverClient->announceGameDeleted();
@@ -2440,7 +2440,7 @@ public:
 	
 		horizontal_placer *autogather_placer = new horizontal_placer(get_theme_space(ITEM_WIDGET), true);
 		w_toggle* autogather_w = new w_toggle(false);
-		autogather_placer->dual_add(autogather_w->label("Auto-Gather"), m_dialog);
+		autogather_placer->dual_add(autogather_w->label(LANIP("Local IP: ", "           Auto-Gather:")), m_dialog); //On iOS, inject the local IP also.
 		autogather_placer->dual_add(autogather_w, m_dialog);
 
 		placer->add(autogather_placer, true);
