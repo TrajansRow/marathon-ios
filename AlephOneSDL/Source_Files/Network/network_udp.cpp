@@ -40,6 +40,8 @@
 #include "thread_priority_sdl.h"
 #include "mytm.h" // mytm_mutex stuff
 
+#include <sys/socket.h> //Needed for setting QOS on iOS
+
 // Global variables (most comments and "sSomething" variables are ZZZ)
 // Storage for incoming packet data
 static UDPpacket*		sUDPPacketBuffer	= NULL;
@@ -67,6 +69,9 @@ static volatile bool		sKeepListening		= false;
 // packet handler when it gets something.
 static int
 receive_thread_function(void*) {
+	
+		pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0); //Set interactive QoS for iOS
+	
     while(true) {
         // We listen with a timeout so we can shut ourselves down when needed.
         int theResult = SDLNet_CheckSockets(sSocketSet, 1000);
@@ -146,6 +151,11 @@ OSErr NetDDPOpenSocket(short *ioPortNumber, PacketHandlerProcPtr packetHandler)
 		return -1;
 	}
 
+				//Set an appropriate network socket service type vfor iOS. First connection listening when hosting.
+				int	theSocketFD = ((int*)sSocket)[1];
+				int st = NET_SERVICE_TYPE_VO;
+				setsockopt(theSocketFD, SOL_SOCKET, SO_NET_SERVICE_TYPE, (void *)&st, sizeof(st));
+	
         // Set up socket set
         sSocketSet = SDLNet_AllocSocketSet(1);
         SDLNet_UDP_AddSocket(sSocketSet, sSocket);

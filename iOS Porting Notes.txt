@@ -310,7 +310,34 @@ Finally, in screen.cpp -> render_screen(), right before // Render world view, ca
 clearSmartTrigger(); //Reset iOS smart trigger
 
 
+In interface.cpp, Replace both instances of "display_net_game_stats()" with:
+			display_net_game_stats_helper(); //iOS needs to handle hiding the HUD before showing netstats.
+
+In network_dialogs.cpp, in SdlGatherDialog(), replace the line "autogather_placer->dual_add(autogather_w->label("Auto-Gather"), m_dialog);" with:
+
+In network_udp.cpp...
+
+Add the include:
+#include <sys/socket.h> //Needed for setting QOS on iOS
+
+
+At the top of receive_thread_function(void*), add:
+pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0); //Set interactive QoS for iOS
+
+In NetDDPOpenSocket(), right before "// Set up socket set" add this:
+
+				//Set an appropriate network socket service type vfor iOS. First connection listening when hosting.
+				int	theSocketFD = ((int*)sSocket)[1];
+				int st = NET_SERVICE_TYPE_VO;
+				setsockopt(theSocketFD, SOL_SOCKET, SO_NET_SERVICE_TYPE, (void *)&st, sizeof(st));
+
+
+
+
 *****TODOs!*****
+
+
+***Add check for allow local network connections permission in the app, because denying this can cause a silent failure to find net games. '"Infinity" would like to find and connect to devices on your local network.'
 
 Fix weapons reticle refresh check
 Add in switchToSDLMenu(); and display_net_game_stats_helper() stuff!
