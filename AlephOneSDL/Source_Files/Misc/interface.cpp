@@ -1461,7 +1461,7 @@ void do_menu_item_command(
 			switch(menu_item)
 			{
 				case iNewGame:
-					// DJB Start a new game with a dialog!
+					// iOS Start a new game with a dialog!
 					if ( helperNewGame() ) {
 						begin_game(_single_player, cheat);
 					}
@@ -2255,6 +2255,9 @@ static bool begin_game(
 				entry.level_number= 0;
 			}
 	
+			// iOS set custom entry level number
+			entry.level_number = helperGetEntryLevelNumber();
+			
 			// ZZZ: let the user use his behavior modifiers in single-player.
 			restore_custom_player_behavior_modifiers();
 			
