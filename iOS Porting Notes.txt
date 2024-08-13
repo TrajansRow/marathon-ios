@@ -100,6 +100,11 @@ Also, in begin_game(), right before "// ZZZ: let the user use his behavior modif
 			entry.level_number = helperGetEntryLevelNumber();
 
 
+In joystick_sdl.cpp, at the top of joystick_added() add:
+	//On iOS, we handle the joystick elsewhere - double input is not ideal and may cause jitter. Just return.
+	return;
+
+
 In screen.cpp, change initialization resolution to:  if (desktop.w >= 640/2 && desktop.h >= 480/2) //DCW divided original values by two, since retina displays have a smaller dimension in points than the native resolution.
 
 Also do: 

@@ -61,25 +61,13 @@ extern "C" {
 }
 - (void)controllerConnected:(NSNotification *)notification {
 
-	moveForward = findKeyCodeInPrefs(_moving_forward);
-	moveBack = findKeyCodeInPrefs(_moving_backward);
-	moveLeft = findKeyCodeInPrefs(_sidestepping_left);
-	moveRight = findKeyCodeInPrefs(_sidestepping_right);
-	runKey = findKeyCodeInPrefs(_run_dont_walk);
-	primaryFire = findKeyCodeInPrefs(_left_trigger_state);
-	secondaryFire = findKeyCodeInPrefs(_right_trigger_state);
-	mapKey = findKeyCodeInPrefs(_toggle_map);
-	actionKey	= findKeyCodeInPrefs(_action_trigger_state);
-	nextWeapon = findKeyCodeInPrefs(_cycle_weapons_forward);
-	previousWeapon = findKeyCodeInPrefs(_cycle_weapons_backward);
+	[self setupControllerKeys];
 	
   GCController *newController = (GCController *)notification.object;
   
   NSLog(@"Controller Connected: %@", newController.vendorName);
   
-  [self setMainController: newController];
-
-  
+  [self setMainController: newController];  
   [self.mainController setControllerPausedHandler: ^(GCController *controller) {
     //Note: don't let the AO SDL joystick event handler initialize, otherwise it will override this callback.
     
@@ -93,7 +81,21 @@ extern "C" {
   [self handleControllerInput];
 }
 
+- (void)setupControllerKeys {
+	moveForward = findKeyCodeInPrefs(_moving_forward);
+	moveBack = findKeyCodeInPrefs(_moving_backward);
+	moveLeft = findKeyCodeInPrefs(_sidestepping_left);
+	moveRight = findKeyCodeInPrefs(_sidestepping_right);
+	runKey = findKeyCodeInPrefs(_run_dont_walk);
+	primaryFire = findKeyCodeInPrefs(_left_trigger_state);
+	secondaryFire = findKeyCodeInPrefs(_right_trigger_state);
+	mapKey = findKeyCodeInPrefs(_toggle_map);
+	actionKey	= findKeyCodeInPrefs(_action_trigger_state);
+	nextWeapon = findKeyCodeInPrefs(_cycle_weapons_forward);
+	previousWeapon = findKeyCodeInPrefs(_cycle_weapons_backward);
+}
 
+	
 - (void)controllerDisconnected:(NSNotification *)notification {
   GCController *controller = (GCController *)notification.object;
   

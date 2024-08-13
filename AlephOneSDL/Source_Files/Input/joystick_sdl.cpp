@@ -58,6 +58,10 @@ void exit_joystick(void) {
 }
 
 void joystick_added(int device_index) {
+	
+	//On iOS, we handle the joystick elsewhere - double input is not ideal and may cause jitter. Just return.
+	return;
+	
 	if (!SDL_IsGameController(device_index)) {
 		SDL_Joystick *joystick = SDL_JoystickOpen(device_index);
 		char guidStr[255] = "";

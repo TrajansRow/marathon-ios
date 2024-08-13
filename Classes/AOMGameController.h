@@ -49,6 +49,7 @@
 @property (nonatomic) float lefttYAxis;
 
 - (void)controllerConnected:(NSNotification *)notification;
+- (void)setupControllerKeys;
 - (void)controllerDisconnected:(NSNotification *)notification;
 - (void)handleControllerState;
 - (void)handleControllerInput;
