@@ -17,6 +17,8 @@ Remove references to the Shaders directory in code, and drop the real Shaders di
 
 Code changes:
 
+We need a copy of of the main event loop to run without the enclosing infinite while loop. Look in shell.cpp->void main_event_loop(void), and grab the inner contents of the "while ((game_state = get_game_state()) != _quit_game)" loop, and paste it into the void AlephOneMainLoop() function in AlephOneShell.cpp
+
 If not using ANGLE, swap in the needed OpenGL and GLES headers in OGL_Headers.h
 
 In lauxlib.c, set this in "int luai_system(const char* command) {":

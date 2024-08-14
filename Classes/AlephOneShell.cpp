@@ -124,85 +124,106 @@ void AlephOneMainLoop()
   uint32 last_event_poll = 0;
   short game_state;
   
-  game_state = get_game_state();
-  uint32 cur_time = SDL_GetTicks();
-  bool yield_time = false;
-  bool poll_event = false;
-    
-  switch (game_state) {
-    case _game_in_progress:
-    case _change_level:
-      if (Console::instance()->input_active() || cur_time - last_event_poll >=
-          TICKS_BETWEEN_EVENT_POLL) {
-        poll_event = true;
-        last_event_poll = cur_time;
-      }
-      else {
-        SDL_PumpEvents ();                                      // This ensures a responsive keyboard control
-      }
-      break;
-        
-    case _display_intro_screens:
-    case _display_main_menu:
-    case _display_chapter_heading:
-    case _display_prologue:
-    case _display_epilogue:
-    case _begin_display_of_epilogue:
-    case _display_credits:
-    case _display_intro_screens_for_demo:
-    case _display_quit_screens:
-    case _displaying_network_game_dialogs:
-      yield_time = interface_fade_finished();
-      poll_event = true;
-      break;
-      
-    case _close_game:
-    case _switch_demo:
-    case _revert_game:
-      yield_time = poll_event = true;
-      break;
-  }
-  
-  if (poll_event) {
-    global_idle_proc();
-    
-    while (true) {
-      SDL_Event event;
-      bool found_event = SDL_PollEvent(&event);
-      
-      if (yield_time) {
-        // The game is not in a "hot" state, yield time to other
-        // processes by calling SDL_Delay() but only try for a maximum
-        // of 30ms
-        int num_tries = 0;
-        while (!found_event && num_tries < 3) {
-          SDL_Delay(10);
-          found_event = SDL_PollEvent(&event);
-          num_tries++;
-        }
-        yield_time = false;
-      } else if (!found_event)
-        break;
-      
-      if (found_event)
-        process_event(event); 
-    }
-    
-  }
-  
-  execute_timer_tasks(SDL_GetTicks());
-    idle_game_state(SDL_GetTicks());
-  
-  if (game_state == _game_in_progress &&
-      /*!graphics_preferences->hog_the_cpu &&*/
-      (TICKS_PER_SECOND - (SDL_GetTicks() - cur_time)) > 10) {
-    SDL_Delay(1);
-  }
+	uint32 cur_time = machine_tick_count();
+	bool yield_time = false;
+	bool poll_event = false;
 
-  
-  if ( cur_time - lastTimeThroughLoop > 1000 ) {
-    // printf( "This time took %d ticks\n", SDL_GetTicks() - cur_time );
-    lastTimeThroughLoop = cur_time;
-  }
+	switch (game_state) {
+		case _game_in_progress:
+		case _change_level:
+			if ((get_fps_target() == 0 && get_keyboard_controller_status()) || Console::instance()->input_active() || cur_time - last_event_poll >= TICKS_BETWEEN_EVENT_POLL) {
+				poll_event = true;
+				last_event_poll = cur_time;
+			} else {
+				SDL_PumpEvents ();	// This ensures a responsive keyboard control
+			}
+			break;
+
+		case _display_intro_screens:
+		case _display_main_menu:
+		case _display_chapter_heading:
+		case _display_prologue:
+		case _display_epilogue:
+		case _begin_display_of_epilogue:
+		case _display_credits:
+		case _display_intro_screens_for_demo:
+		case _display_quit_screens:
+		case _displaying_network_game_dialogs:
+			yield_time = interface_fade_finished();
+			poll_event = true;
+			break;
+
+		case _close_game:
+		case _switch_demo:
+		case _revert_game:
+			yield_time = poll_event = true;
+			break;
+	}
+
+	if (poll_event) {
+		global_idle_proc();
+
+		SDL_Event event;
+		if (yield_time)
+		{
+			// The game is not in a "hot" state, yield time to other
+			// processes but only try for a maximum of 30ms
+			if (SDL_WaitEventTimeout(&event, 30))
+			{
+				process_event(event);
+			}
+		}
+
+		while (SDL_PollEvent(&event))
+		{
+			process_event(event);
+		}
+
+#ifdef HAVE_STEAM
+		while (auto steam_event = STEAMSHIM_pump()) {
+			switch (steam_event->type) {
+				case SHIMEVENT_ISOVERLAYACTIVATED:
+					if (steam_event->okay && get_game_state() == _game_in_progress && !game_is_networked)
+					{
+						pause_game();
+					}
+					break;
+
+				default:
+					break;
+			}
+		}
+#endif
+	}
+
+	execute_timer_tasks(machine_tick_count());
+	idle_game_state(machine_tick_count());
+
+	auto fps_target = get_fps_target();
+	if (!get_keyboard_controller_status())
+	{
+		fps_target = 30;
+	}
+
+	if (game_state == _game_in_progress && fps_target != 0)
+	{
+		int elapsed_machine_ticks = machine_tick_count() - cur_time;
+		int desired_elapsed_machine_ticks = MACHINE_TICKS_PER_SECOND / fps_target;
+
+		if (desired_elapsed_machine_ticks - elapsed_machine_ticks > desired_elapsed_machine_ticks / 3)
+		{
+			sleep_for_machine_ticks(1);
+		}
+	}
+	else if (game_state != _game_in_progress)
+	{
+		static auto last_redraw = 0;
+		if (machine_tick_count() > last_redraw + TICKS_PER_SECOND / 30)
+		{
+			update_game_window();
+			last_redraw = machine_tick_count();
+		}
+	}
+
 }
 
