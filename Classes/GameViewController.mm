@@ -500,7 +500,7 @@ short localFindActionTarget(
 - (void)setDisplaylinkPaused:(bool)paused {
   
   if(displayLink) {
-    ((CADisplayLink*)displayLink).paused = paused; //dcw shit test
+    ((CADisplayLink*)displayLink).paused = paused; //Is this really what we want?
   }
 }
 
@@ -595,18 +595,6 @@ short localFindActionTarget(
   showControlsOverview = NO;
   [self cancelNewGame];
   self.viewGL.userInteractionEnabled = YES; //This must be disabled after the game starts or dialog is cancelled!
-  
-  //dcw shit test
-  /*[self.hud removeFromSuperview];
-  [self.view setNeedsLayout];
-  [self.view setNeedsDisplay];
-  [self.view layoutSubviews];
-  [self.view layoutIfNeeded];
-  [self.hud setNeedsLayout];
-  [self.hud setNeedsDisplay];
-  [self.hud layoutSubviews];
-  [self.hud layoutIfNeeded];*/
-   
   
     //Enable gamepad navigation
   SDL_GameControllerEventState(SDL_ENABLE);
@@ -713,6 +701,8 @@ short localFindActionTarget(
   [self menuHideReplacementMenu];
   [self updateReticule:get_player_desired_weapon(current_player_index)];
   
+	[gameController setupControllerKeys]; //Make sure the keys are configured. since it can't always be done before engine init (this can go almost anywhere after that).
+	
   /*
   key_definition *key = current_key_definitions;
   for (unsigned i=0; i<NUMBER_OF_STANDARD_KEY_DEFINITIONS; i++, key++) {
@@ -1850,8 +1840,8 @@ short items[]=
       // if the system version runtime check for CADisplayLink exists in -initWithCoder:. The runtime check ensures this code will
       // not be called in system versions earlier than 3.1.
         displayLink = [NSClassFromString(@"CADisplayLink") displayLinkWithTarget:self selector:@selector(runMainLoopOnce:)];
-        //dcw changing this to an alternative... [displayLink setFrameInterval:animationFrameInterval];
-        [displayLink setPreferredFramesPerSecond:30]; //DCW changed from deprecated setFrameInterval
+
+				[self setFPSFromPrefs];
         [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
     } else {
       animationTimer = [NSTimer scheduledTimerWithTimeInterval:(NSTimeInterval)((1.0 / 60.0) * animationFrameInterval) target:self selector:@selector(runMainLoopOnce:) userInfo:nil repeats:TRUE];
@@ -1880,6 +1870,23 @@ short items[]=
   }
 }
 
+- (void)setFPSFromPrefs {
+	//As long as the game engine runs at unlimited fps, displayLink fps can be set to anything.
+	
+	int preferredFPS = [[NSUserDefaults standardUserDefaults] integerForKey:kFPSTarget];
+	if( preferredFPS < 30 ) { preferredFPS = 60; }
+	[displayLink setPreferredFrameRateRange:CAFrameRateRangeMake(30, 120, preferredFPS)]; //Min. Max, Preferred
+}
+
+- (double)currentRefreshRate {
+	
+	if(displayLink == nil) return 0;
+	
+	CADisplayLink *dl = (CADisplayLink*)displayLink;
+	double actualFramesPerSecond = 1 / (dl.targetTimestamp - dl.timestamp);
+	return actualFramesPerSecond;
+}
+
 - (void)runMainLoopOnce:(id)sender {
       //Capture touch movement deltas immediately!
     grabMovementDeltasForCurrentFrameAtInterval( (NSTimeInterval)[(CADisplayLink*)displayLink timestamp] ); //This will probably crash if displayLink is not supported.
@@ -1892,7 +1899,7 @@ short items[]=
         self.zoomInButton.hidden = YES;
         self.zoomOutButton.hidden = YES;
     }
-//dcw shit test    [self updateReticule:get_player_desired_weapon(current_player_index)];
+		
     if ( get_game_state() == _display_main_menu && ( mode == SDLMenuMode || mode == MenuMode || mode == CutSceneMode ) ) {
         //[self menuShowReplacementMenu];
       [self switchBackToGameView];
@@ -1914,10 +1921,10 @@ short items[]=
         } else {
             [self.HUDViewController lightActionKeyWithTarget:target_type objectIndex:object_index];    
         }
-      
+						
       if(gameController.mainController != nil) {
         moveMouseRelative(gameController.rightXAxis, gameController.rightYAxis);
-        
+				
         if (gameController.rightXAxis != 0.0 || gameController.rightYAxis != 0.0) {
           [[GameViewController sharedInstance].HUDViewController.lookPadView unPauseGyro]; //Any movement unpauses gyro.
         }

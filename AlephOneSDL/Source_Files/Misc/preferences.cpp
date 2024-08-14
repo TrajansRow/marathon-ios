@@ -3622,8 +3622,20 @@ InfoTree graphics_preferences_tree()
 		//For iOS, always enable blur/bloom. We can still skip the bloom pass later based on prefs.
 		graphics_preferences->OGL_Configure.Flags |= OGL_Flag_Blur;
 		
-		//For iOS, always enable bump mapping.
-		graphics_preferences->OGL_Configure.Flags |= OGL_Flag_BumpMap;
+		//For iOS, enable bump mapping as desired
+		if (useBumpMapping()) {
+			graphics_preferences->OGL_Configure.Flags |= OGL_Flag_BumpMap;
+		} else {
+			graphics_preferences->OGL_Configure.Flags &= ~OGL_Flag_BumpMap;
+		}
+		
+		//for iOS, set FPS target higher
+		graphics_preferences->fps_target = iOSFPSTarget();
+		graphics_preferences->OGL_Configure.WaitForVSync = 1;
+		
+		//Show iOS FPS if desired.
+		extern bool displaying_fps;
+		displaying_fps = showiOSFPS();
 		
 		InfoTree tex;
 		tex.put_attr("index", i);

@@ -154,8 +154,10 @@ typedef enum {
 - (HUDMode)mode;
 - (void)startAnimation;
 - (void)stopAnimation;
+- (void)setFPSFromPrefs;
 - (void)runMainLoopOnce:(id)sender;
 - (void)setDialogOk;
+- (double)currentRefreshRate;
 
 - (IBAction)pause:(id)from;
 - (IBAction)pauseForBackground:(id)from;

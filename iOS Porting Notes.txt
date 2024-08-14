@@ -277,6 +277,7 @@ In preferences.cpp, add the "AlephOneHelper.h" header. Edit graphics_preferences
 		
 		//for iOS, set FPS target higher
 		graphics_preferences->fps_target = iOSFPSTarget();
+		graphics_preferences->OGL_Configure.WaitForVSync = 1;
 		
 		//Show iOS FPS if desired.
 		extern bool displaying_fps;

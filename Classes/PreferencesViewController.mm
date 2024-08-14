@@ -48,6 +48,9 @@
 @synthesize bloom;
 @synthesize extraFOV;
 @synthesize rendererButton, rendererNote;
+@synthesize preferredFPS, fpsNote;
+@synthesize showFPS;
+@synthesize bumpMapping;
 
 - (IBAction)closePreferences:(id)sender {
   // Save the back to defaults
@@ -124,6 +127,13 @@
 
   [defaults setBool:![self.rendererButton isSelected] forKey:kUseClassicRenderer];
   
+	int selectedFPS = [[preferredFPS titleForSegmentAtIndex:[preferredFPS selectedSegmentIndex]] intValue];
+	[defaults setInteger:selectedFPS forKey:kFPSTarget];
+	[[GameViewController sharedInstance] setFPSFromPrefs];
+	
+	[defaults setBool:[self.showFPS isSelected] forKey:kShowFPS];
+	[defaults setBool:[self.bumpMapping isSelected] forKey:kUseBumpMapping];
+	
   [defaults synchronize];
   [PreferencesViewController setAlephOnePreferences:YES checkPurchases:inMainMenu];
   [[GameViewController sharedInstance] updateReticule:-1];
@@ -143,13 +153,25 @@
 	write_preferences();
 }
 
+- (IBAction)fpsSelectorChanged:(id)sender {
+	int selectedFPS = [[preferredFPS titleForSegmentAtIndex:[preferredFPS selectedSegmentIndex]] intValue];
+	if ( selectedFPS == 30 ) {
+		[fpsNote setText:@"Classic"];
+	} else if ( selectedFPS == 60 ) {
+		[fpsNote setText:@"Recommended"];
+	} else if ( selectedFPS == 120 ) {
+		[fpsNote setText:@"NOT Recommended"];
+	} else {
+		[fpsNote setText:@""];
+	}
+}
 
 - (void)setupUI:(BOOL)inMainMenuFlag {
   
   if (prefsScrollView && prefsScrollContents) {
     
       //Adjust height of contents to fit the subviews, plus a little extra for padding.
-    float h;
+    float h = 0;
     for (UIView *v in prefsScrollContents.subviews) {
         float fh = v.frame.origin.y + v.frame.size.height;
         h = MAX(fh, h);
@@ -206,6 +228,26 @@
   }
   [self setVisualStyleButton];
   
+		//Select the segment based on preferences, or default to middle item.
+	int targetFPS = [[NSUserDefaults standardUserDefaults] integerForKey:kFPSTarget];
+	NSString *targetFPSString = [NSString stringWithFormat:@"%d", targetFPS];
+	NSInteger selectedIndex = -1; // Default to an invalid index
+	for (int i = 0; i < [preferredFPS numberOfSegments]; i++) { //Find match, if possible
+			if ([[preferredFPS titleForSegmentAtIndex:i] isEqualToString:targetFPSString]) {
+					selectedIndex = i;
+					break;
+			}
+	}
+	if (selectedIndex == -1) { // If no matching segment found, select the middle segment
+			selectedIndex = [preferredFPS numberOfSegments] / 2;
+	}
+	[preferredFPS setSelectedSegmentIndex:selectedIndex]; //Select segment
+	[self fpsSelectorChanged:self]; //Update FPS selection note
+	
+	[self.showFPS setSelected:[defaults boolForKey:kShowFPS]];
+
+	[self.bumpMapping setSelected:[defaults boolForKey:kUseBumpMapping]];
+	
   [self.dPadAction setSelected:[defaults boolForKey:kDPadAction]];
   [self.threeDTouchFires setSelected:[defaults boolForKey:kThreeDTouchFires]];
   if ( self.traitCollection.forceTouchCapability == UIForceTouchCapabilityAvailable ) {

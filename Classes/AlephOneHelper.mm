@@ -414,6 +414,11 @@ void setKey(SDL_Keycode key, bool down) {
 
 SDL_Keycode findKeyCodeInPrefs(unsigned actionFlagIndex)
 {
+		//If input not initialized yet, return 0. Try again later.
+	if (!input_preferences) {
+		return 0;
+	}
+	
 	key_definition *key = standard_key_definitions;
 	for (unsigned i=0; i<NUMBER_OF_STANDARD_KEY_DEFINITIONS; i++, key++) {
 		for (const SDL_Scancode& code : input_preferences->key_bindings[i])
@@ -541,6 +546,22 @@ bool getLocalPlayer () {
 
 float extraFieldOfView () {
   return shouldUseExtraFOV ? 20 : 0;
+}
+
+int iOSFPSTarget() {
+	return 0; //Set to unlimited so that we control the frame rate using CADisplayLink settings.
+}
+
+float CAFrameRate() {
+	return [[GameViewController sharedInstance] currentRefreshRate];
+}
+
+bool showiOSFPS() {
+	return [[NSUserDefaults standardUserDefaults] boolForKey:kShowFPS];
+}
+
+bool useBumpMapping() {
+	return [[NSUserDefaults standardUserDefaults] boolForKey:kUseBumpMapping];
 }
 
 //These functions were cribbed from an older version of Aleph One, and have since been removed from newer versions. Replicated here for cheat capability.

@@ -39,6 +39,10 @@
   UIButton *extraFOV;
   UIButton *rendererButton;
   UILabel *rendererNote;
+	UISegmentedControl *preferredFPS;
+	UILabel *fpsNote;
+	UIButton *showFPS;
+	UIButton *bumpMapping;
 }
 
 @property (nonatomic, retain) IBOutlet UIScrollView *prefsScrollView;
@@ -70,6 +74,10 @@
 @property (nonatomic, retain) IBOutlet UIButton *extraFOV;
 @property (nonatomic, retain) IBOutlet UIButton *rendererButton;
 @property (nonatomic, retain) IBOutlet UILabel *rendererNote;
+@property (nonatomic, retain) IBOutlet UISegmentedControl *preferredFPS;
+@property (nonatomic, retain) IBOutlet UILabel *fpsNote;
+@property (nonatomic, retain) IBOutlet UIButton *showFPS;
+@property (nonatomic, retain) IBOutlet UIButton *bumpMapping;
 
 
 
@@ -80,13 +88,14 @@
 @property (nonatomic, retain) IBOutlet UIView *settingPrefsView;
 
 + (void)setAlephOnePreferences:(BOOL)notifySoundManager checkPurchases:(BOOL)check;
+- (IBAction)fpsSelectorChanged:(id)sender;
 - (void)setupUI:(BOOL)inMainMenu;
 - (void)setVisualStyleButton;
 - (IBAction)updatePreferences:(id)sender;
 - (IBAction)closePreferences:(id)sender;
 - (IBAction)notifyOfChanges;
 - (IBAction)resetAchievements:(id)sender;
--(IBAction) toggleButton:(id)sender;
+- (IBAction)toggleButton:(id)sender;
 - (void)appear;
 - (void)disappear;
 

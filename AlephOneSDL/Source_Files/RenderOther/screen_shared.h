@@ -59,6 +59,8 @@ extern SDL_Surface *world_pixels;
 #include "Image_Blitter.h"
 #include "OGL_Blitter.h"
 
+#include "AlephOneHelper.h"
+
 /* ---------- globals */
 
 struct color_table *uncorrected_color_table; /* the pristine color environment of the game (can be 16bit) */
@@ -536,7 +538,7 @@ static void update_fps_display(SDL_Surface *s)
 {
 	if (displaying_fps && !player_in_terminal_mode(current_player_index))
 	{
-		char fps[sizeof("1000 fps (10000 ms)")];
+		char fps[sizeof("1000 fps (10000 ms)                        ")];
 		char ms[sizeof("(10000 ms)")];
 
 		fps_counter.update();
@@ -554,7 +556,7 @@ static void update_fps_display(SDL_Surface *s)
 			else
 				ms[0] = '\0';
 			
-			sprintf(fps, "%0.f fps %s", fps_counter.get(), ms);
+			sprintf(fps, "        %0.f/%0.f fps %s", fps_counter.get(), CAFrameRate(), ms);
 		}
 
 		FontSpecifier& Font = GetOnScreenFont();

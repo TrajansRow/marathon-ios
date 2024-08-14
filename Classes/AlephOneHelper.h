@@ -52,6 +52,10 @@ extern void switchToSDLMenu(); //DCW
 extern void getSomeTextFromIOS(char *label, const char *currentText); //DCW
 extern bool getLocalPlayer ();
 extern float extraFieldOfView ();
+extern int iOSFPSTarget();
+extern float CAFrameRate();
+extern bool showiOSFPS();
+extern bool useBumpMapping();
 extern void AddItemsToPlayer(short ItemType, short MaxNumber);
 extern void AddOneItemToPlayer(short ItemType, short MaxNumber);
 extern bool headBelowMedia ();

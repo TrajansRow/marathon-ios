@@ -180,6 +180,9 @@ SDL_IdleTimerDisabledChanged(void *userdata, const char *name, const char *oldVa
                                @"YES", kUseTransparentLiquids,
                                @"NO", kUseBloom,
                                @"NO", kUseExtraFOV,
+															 [NSNumber numberWithInt:60], kFPSTarget,
+															 @"YES", kUseBumpMapping,
+															 @"NO", kShowFPS,
                                nil];
   [defaults registerDefaults:appDefaults];
   [defaults synchronize];  

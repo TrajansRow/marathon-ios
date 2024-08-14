@@ -7622,7 +7622,7 @@
 					"$(SRCROOT)/AlephOneSDL/Source_Files/CSeries",
 					"$(SRCROOT)/submodules/Libraries/glm",
 				);
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = (
 					"$(SRCROOT)/submodules//Libraries/GoogleAnalytics",
 					"$(SRCROOT)/submodules//Libraries/JoypadCocoaTouchSDK",
@@ -8023,7 +8023,7 @@
 					"$(SRCROOT)/AlephOneSDL/Source_Files/CSeries",
 					"$(SRCROOT)/submodules/Libraries/glm",
 				);
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = (
 					"$(SRCROOT)/submodules//Libraries/GoogleAnalytics",
 					"$(SRCROOT)/submodules//Libraries/JoypadCocoaTouchSDK",
@@ -8225,7 +8225,7 @@
 					"$(SRCROOT)/AlephOneSDL/Source_Files/CSeries",
 					"$(SRCROOT)/submodules/Libraries/glm",
 				);
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = (
 					"$(SRCROOT)/submodules//Libraries/GoogleAnalytics",
 					"$(SRCROOT)/submodules//Libraries/JoypadCocoaTouchSDK",
@@ -8325,7 +8325,7 @@
 					"$(SRCROOT)/AlephOneSDL/Source_Files/CSeries",
 					"$(SRCROOT)/submodules/Libraries/glm",
 				);
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = (
 					"$(SRCROOT)/submodules//Libraries/GoogleAnalytics",
 					"$(SRCROOT)/submodules//Libraries/JoypadCocoaTouchSDK",

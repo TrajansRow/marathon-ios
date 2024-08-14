@@ -51,7 +51,9 @@
 #define kUseTransparentLiquids @"useTransparentLiquids"
 #define kUseBloom @"useBloom"
 #define kUseExtraFOV @"useExtraFOV"
-
+#define kFPSTarget @"FPSTarget"
+#define kUseBumpMapping @"useBumpMapping"
+#define kShowFPS @"showFPS"
 
 // Tap to shoot timeout in seconds
 #define TapToShootDelta 0.2 //DCW was originally 0.1
