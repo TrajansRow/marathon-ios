@@ -37,6 +37,7 @@
 #include "OGL_Headers.h"
 #include "OGL_Blitter.h"
 #include "OGL_Faders.h"
+#include "OGL_Textures.h"
 #include "MatrixStack.hpp"
 #endif
 
@@ -73,7 +74,7 @@
 
 #include <algorithm>
 
-#include "AlephOneHelper.h"
+#include "AlephOneHelper.h" //Needed for iOS port
 
 #if defined(__WIN32__) || (defined(__MACH__) && defined(__APPLE__))
 #define MUST_RELOAD_VIEW_CONTEXT
@@ -902,11 +903,11 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
         SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_EGL, 1);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-
-        // DCW force OpenGL ES 3.x. The default would otherwise be ES 2.
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-
+		
+				// For iOS, force OpenGL ES 3.x. The default would otherwise be ES 2.
+				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+		
         // Explicitly set channel depths, otherwise we might get some < 8
         SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
         SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
@@ -1354,6 +1355,8 @@ void update_world_view_camera()
 	}
 }
 
+extern bool is_network_pregame;
+
 void render_screen(short ticks_elapsed)
 {
 	// Make whatever changes are necessary to the world_view structure based on whichever player is frontmost
@@ -1438,7 +1441,7 @@ void render_screen(short ticks_elapsed)
 	}
 	
 	static bool PrevHighRes = true;
-	bool HighResolution = mode->high_resolution;
+	bool HighResolution = mode->high_resolution || is_network_pregame;
 	if (PrevHighRes != HighResolution)
 	{
 		ViewChangedSize = true;
@@ -1478,7 +1481,7 @@ void render_screen(short ticks_elapsed)
 		if (!OGL_IsActive() && DrawEveryOtherLine)
 			clear_screen();
 		update_full_screen = true;
-		if (Screen::instance()->hud() && !Screen::instance()->lua_hud())
+		if (Screen::instance()->hud() && !Screen::instance()->lua_hud() && !is_network_pregame)
 			draw_interface();
 
 		// Reallocate the drawing buffer
@@ -1493,7 +1496,7 @@ void render_screen(short ticks_elapsed)
 	{
 		clear_screen(false);
 		update_full_screen = true;
-		if (Screen::instance()->hud() && !Screen::instance()->lua_hud())
+		if (Screen::instance()->hud() && !Screen::instance()->lua_hud() && !is_network_pregame)
 			draw_interface();
 
 		clear_next_screen = false;
@@ -1526,7 +1529,7 @@ void render_screen(short ticks_elapsed)
 		software_render_dest.clear();
 	else if (software_render_dest.empty() || ViewChangedSize)
 		software_render_dest = bitmap_definition_of_sdl_surface(world_pixels);
-    
+
 	clearSmartTrigger(); //Reset iOS smart trigger
 	
 	// Render world view
@@ -1538,6 +1541,28 @@ void render_screen(short ticks_elapsed)
 		(MapIsTranslucent || Screen::instance()->lua_hud()))
         clear_screen_margin();
     
+	if (game_is_networked && is_network_pregame)
+	{
+		clear_screen(false);
+
+#ifdef HAVE_OPENGL
+		if (OGL_IsActive())
+		{
+			Screen::instance()->bound_screen();
+			OGL_SetWindow(sr, sr, true);
+			DisplayNetLoadingScreen(MainScreenSurface());
+			OGL_SwapBuffers();
+			return;
+		}
+#endif
+		SDL_Rect rect = { (Screen::instance()->window_rect().w - ViewRect.w) / 2, (Screen::instance()->window_rect().h - ViewRect.h) / 2, 0, 0 };
+		SDL_FillRect(world_pixels, NULL, SDL_MapRGB(world_pixels->format, 0, 0, 0));
+		DisplayNetLoadingScreen(world_pixels);
+		update_screen(rect, rect, true, false);
+		MainScreenUpdateRect(0, 0, 0, 0);
+		return;
+	}
+	
 	// Render crosshairs
 	if (!world_view->overhead_map_active && !world_view->terminal_mode_active)
 	  if (NetAllowCrosshair())
@@ -1591,6 +1616,7 @@ void render_screen(short ticks_elapsed)
 				Term_Blitter.Load(*Term_Buffer);
 				Term_RenderRequest = false;
 			}
+			Term_Blitter.nearFilter = TxtrTypeInfoList[OGL_Txtr_HUD].NearFilter;
 			Term_Blitter.Draw(TermRect);
 		}
 
@@ -1642,7 +1668,7 @@ void render_screen(short ticks_elapsed)
 			MainScreenUpdateRects(1, &ViewRect);
 		}
 	}
-	
+
 #ifdef HAVE_OPENGL
 	// Swap OpenGL double-buffers
 	if (screen_mode.acceleration != _no_acceleration)
@@ -1651,7 +1677,7 @@ void render_screen(short ticks_elapsed)
 		{
 			darken_world_window();
 		}
-			
+
 		OGL_SwapBuffers();
 	}
 #endif

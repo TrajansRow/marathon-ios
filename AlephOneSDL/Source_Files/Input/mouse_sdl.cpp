@@ -36,7 +36,7 @@
 #include "preferences.h"
 #include "screen.h"
 
-#import "AlephOneHelper.h"
+#include "AlephOneHelper.h" //Needed for iOS port
 
 // Global variables
 static bool mouse_active = false;
@@ -55,10 +55,10 @@ void enter_mouse(short type)
 	if (type != _keyboard_or_game_pad) {
 		MainScreenCenterMouse();
 		
-		//DCW clear mouse deltas to avoid a large initial jump.
+		//Clear mouse deltas to avoid a large initial jump on iOS.
 		float dx, dy;
 		slurpMouseDelta(&dx, &dy);
-		
+
 		SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_WARP, input_preferences->raw_mouse_input ? "0" : "1");
 		SDL_SetRelativeMouseMode(SDL_TRUE);
 		mouse_active = true;
@@ -119,7 +119,7 @@ void mouse_idle(short type)
 		snapshot_delta_x = 0;
 		snapshot_delta_y = 0;
 		
-			//iOS touch input bypass
+		//iOS touch input bypass
 		slurpMouseDelta(&dx, &dy);
 		if(dx>0 || dy>0)
 		{

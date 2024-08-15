@@ -1,25 +1,71 @@
-A list of hacks and modifications needed to port Aleph One source files to iOS.
+----- A list of hacks and modifications needed to port Aleph One source files to iOS. -----
 
 These are the steps followed to rebase the entire engine from Aleph One into a form that will run as the iOS port.
 
+
+***Prep Dependencies***
+
 Resync vcpkg.json, and build dependencies with the iOS arm community triplet.
 
+
+~~~~~ Update the Xcode project with new source ~~~~~
+
 Remove folder references to Source_Files from the Xcode project
-Replace AlephOneSDL/Source_Files with the latest from the Aleph One project using the opengl-es-renderer branch!
+Replace AlephOneSDL/Source_Files with the latest from the Aleph One project, and switch to the OGL ES branch with "git checkout opengl-es-renderer"
 
 Drop the new Source_Files into the Xcode project sidebar. DO NOT create an external build system!
 
 Use "Create Groups", and check all targets.
 
-From the new source tree, remove references to these files from everywhere: Makefile.am, COPYING, README, COPYRIGHT, buildprogram, thread_priority_sdl_win32,  thread_priority_sdl_posix, thread_priority_sdl_dummy, network_dummy.cpp, csalerts.mm, main.cpp (Make sure nothing new and important is in here)
+Remove References to the RenderMain/Shaders directory in the Xcode sidebar, and drop the real Shaders directly in as a Folder Reference. Do not add to any targets!
 
-Remove references to the Shaders directory in code, and drop the real Shaders directly in as a folder. Do not add to any targets.
 
-Code changes:
+***Remove unwanted source files***
 
-We need a copy of of the main event loop to run without the enclosing infinite while loop. Look in shell.cpp->void main_event_loop(void), and grab the inner contents of the "while ((game_state = get_game_state()) != _quit_game)" loop, and paste it into the void AlephOneMainLoop() function in AlephOneShell.cpp
+From the new source tree, sort all of the subfolders by name. Then Remove References to these files from everywhere: 
+	- Makefile.am
+	- COPYING
+	- README
+	- COPYRIGHT
+	- buildprogram
+	- thread_priority_sdl_win32
+	- thread_priority_sdl_posix
+	- thread_priority_sdl_dummy
+	- network_dummy.cpp
+	- csalerts.mm
+	- StandaloneHub (the entire folder)
+	- main.cpp (Make sure nothing new and important is in here)
 
-If not using ANGLE, swap in the needed OpenGL and GLES headers in OGL_Headers.h
+
+~~~~~ Code changes to enable build ~~~~~
+
+***Crib main event loop***
+
+We need a copy of the main event loop to run without the enclosing infinite while loop. Look in shell.cpp->void main_event_loop(void), and grab the inner contents of the "while ((game_state = get_game_state()) != _quit_game)" loop, and paste it into the void AlephOneMainLoop() function in AlephOneShell.cpp
+
+***Update OpenGL Headers for ES
+
+If not using ANGLE, swap in the needed OpenGL and GLES headers in OGL_Headers.h for "__APPLE__". Should look something like this:
+
+#ifdef __APPLE__
+#ifndef GL_GLEXT_PROTOTYPES
+#define GL_GLEXT_PROTOTYPES 1
+#endif
+
+#include "SDL2/SDL_opengl.h"
+
+	//OpenGL ES headers needed on iOS
+#include <OpenGLES/ES1/gl.h>
+#include <OpenGLES/ES2/gl.h>
+#include <OpenGLES/ES3/gl.h>
+typedef double GLdouble; //Added for iOS by SDL_opengl_glext.h
+typedef double GLclampd; //Added for iOS by SDL_opengl_glext.h
+#include "SDL2/SDL_opengl_glext.h" //Added for iOS
+#include "SDL2/SDL_opengles.h"
+#endif
+
+
+***Tweak luai_system() function
 
 In lauxlib.c, set this in "int luai_system(const char* command) {":
 #ifdef __APPLE__
@@ -31,7 +77,10 @@ In lauxlib.c, set this in "int luai_system(const char* command) {":
 		#endif
 #endif
 
-In cspaths, csalerts or anywhere that includes cocoa.h:
+
+***Replace Cocoa.h imports
+
+In cspaths, csalerts or anywhere that includes Cocoa.h, replace the #import with::
 #ifdef __APPLE__
 		#include "TargetConditionals.h"
 		#ifdef TARGET_OS_IOS
@@ -41,51 +90,96 @@ In cspaths, csalerts or anywhere that includes cocoa.h:
 		#endif
 #endif
 
-Replace alerts with stuff like (returning 0 or void as needed:
+
+***Return a workable application name
+
+In cspaths.mm, return a static name for now:std::string get_application_name() like this:
 #ifdef TARGET_OS_IOS
-	//NOT IMPLEMENTED!
-	return 0;
+	return A1_DISPLAY_NAME;
 #else
-	...
+	***Leave existing code here!
 #endif
 
-Before any checks for useSGISMipmaps, add:
+Also, add #include "alephversion.h" to the top of that file.
+
+
+***Add version import to shell?
+
+Add this to the top of shell.cpp:
+#include "alephversion.h"
+
+
+***Fix #include in Pinger
+
+Change the AStream.h include to quotes, like this:
+#include "AStream.h"
+
+
+***Add definition for useSGISMipmaps
+
+Before any checks for useSGISMipmaps in OGL_Textures.cpp (about six places), add:
 #ifdef TARGET_OS_IOS
 				bool useSGISMipmaps=0;
 #endif
 
-Deleted the iOS image loader! 
 
-Changed ofstream thumbFile; to boost_swap_impl::ofstream thumbFile; for save game thumbnails
+***Add game saving declarations
 
-In QuickSave.h, add these:
+In QuickSave.h, add these before the final #endif:
+//Used for iOS port
 std::string build_save_metadata(QuickSave& save);
 bool build_map_preview(std::ostringstream& ostream);
 
 In QuickSaver.cpp, change this to non-static:
 bool build_map_preview(std::ostringstream& ostream)
 
-Make this non-static in shell.cpp:
-void process_event(const SDL_Event &event);
 
-In devices.cpp, change line_is_within_range to non-static
+***Fix other missing static symbols
 
-In, return a static name for now:std::string get_application_name()
-Also need to add #include "alephversion.h" To the top of shell.cpp
+Make BOTH of these non-static in shell.cpp:
+//Changed to non-static for iOS port
+void process_event(const SDL_Event &event)
 
-In shell.cpp, right before const string data_env = a1_getenv("ALEPHONE_DATA");, change default_data_dir using (also include the healer header file): 
+In devices.cpp, change BOTH line_is_within_range to non-static:
+//Changed to non-static for iOS port
+bool line_is_within_range(
+
+
+
+~~~~~ Code changes to enable iOS interface hooks and capabilities ~~~~~
+
+***Know how to add the Helper header.
+Many of the following changes need the AlephOneHelper.h header for various hooks. When needed, simply add this to the top of relevant files:
+#include "AlephOneHelper.h" //Needed for iOS port
+
+
+***Change default Data Directory
+
+In shell.cpp, add the Helper header and then right before "const string data_env = a1_getenv("ALEPHONE_DATA");", change default_data_dir using (also include the healer header file): 
 #if TARGET_OS_IPHONE
   default_data_dir = getDataDir();
   local_data_dir = getLocalDataDir();
   //log_dir = getLocalTmpDir(); //DCW ok, this is not great because the log file grows forever. Commenting out.
 #endif
 
-Add these in screen.cpp:
-		// DCW force OpenGL ES 3.x. The default would otherwise be ES 2.
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 
-In void start_game() in interface.cpp, add helperBringUpHUD(); to the end of the function. Also add #import "AlephOneHelper.h" to the top of the file.
+***Force OpenGL ES 3.0
+
+Add these in screen.cpp->change_screen_mode() for __APPLE__ right after "SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);":
+
+				// For iOS, force OpenGL ES 3.x. The default would otherwise be ES 2.
+				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+
+
+***Enable HUD overlay
+
+In interface.cpp->start_game(), add the Helper header and then add this to the end of the function:
+	//Bring up the iOS HUD
+	helperBringUpHUD();
+
+
+***Enable starting new games
 
 Apply this in interface.cpp:
 case mInterface:
@@ -102,14 +196,19 @@ Also, in begin_game(), right before "// ZZZ: let the user use his behavior modif
 			entry.level_number = helperGetEntryLevelNumber();
 
 
+***Disable SDL controller init
+
 In joystick_sdl.cpp, at the top of joystick_added() add:
 	//On iOS, we handle the joystick elsewhere - double input is not ideal and may cause jitter. Just return.
 	return;
 
 
-In screen.cpp, change initialization resolution to:  if (desktop.w >= 640/2 && desktop.h >= 480/2) //DCW divided original values by two, since retina displays have a smaller dimension in points than the native resolution.
+***Fix weird resolution limits
 
-Also do: 
+In screen.cpp, change the line "if (desktop.w >= 640 && desktop.h >= 480)" to:  
+			if (desktop.w >= 640/2 && desktop.h >= 480/2) //DCW divided original values by two for iOS, since retina displays have a smaller dimension in points than the native resolution.
+
+Also maybe change: 
 int Screen::window_height()
 {
 	return std::max(static_cast<short>(480/2), screen_mode.height); //DCW added /2 due to this probably being a retina display on iOS
@@ -121,11 +220,11 @@ int Screen::window_width()
 }
 
 
-//YAY! The magic thing that makes rendering work!
-***Does the GL ES branch need this too?
-In OGL_FBO.cpp in deactive():
-		//DCW binding to framebuffer 0 doesn't switch to the on-screen buffer on mobile.
-		//Instead, call this convneience function to do something more likely to work.
+***If games are only rendering a black screen by now, fix issue with default framebuffer. Maybe the main GLES branch should do this, too?
+
+In OGL_FBO.cpp->FBO::deactivate(), change the final glBindFramebuffer to:
+		//Binding to framebuffer 0 doesn't switch to the on-screen buffer on iOS.
+		//Instead of 0, default to 1.
 		if ( prev_fbo == 0 ) {
 			glBindFramebuffer(GL_FRAMEBUFFER, 1);
 			glBindRenderbuffer(GL_RENDERBUFFER, 1);
@@ -133,25 +232,37 @@ In OGL_FBO.cpp in deactive():
 			glBindFramebuffer(_fboTarget, prev_fbo);
 		}
 
-In mouse_sdl.cpp, #import "AlephOneHelper.h". Also add this to enter_mouse:
-//DCW clear mouse deltas to avoid a large initial jump.
+
+
+~~~~~ At this point, you should be able to start a game and see stuff rendered on the screen. ~~~~~
+~~~~~ Let's do some more gameplay and preference hooks! ~~~~~
+
+
+***Enable mouselook input from touches
+
+In mouse_sdl.cpp-> enter_mouse(), add the Helper header and add this right after "MainScreenCenterMouse();":
+		//Clear mouse deltas to avoid a large initial jump on iOS.
 		float dx, dy;
 		slurpMouseDelta(&dx, &dy);
 
-And add this to mouse_idle:    
-    slurpMouseDelta(&dx, &dy);
-    if(dx>0 || dy>0)
-    {
-      snapshot_delta_x = 0;
-      snapshot_delta_y = 0;
-    }
 
-In vbl.cpp, add #include "AlephOneHelper.h" and also add to the Parse Keymap section.
-if (key_map[code] || fake_key_map[code]) //iOS virtual input uses fake_key_map
+And add this to mouse_idle() right after "snapshot_delta_y = 0;":    
+		//iOS touch input bypass
+		slurpMouseDelta(&dx, &dy);
+		if(dx>0 || dy>0)
+		{
+			snapshot_delta_x = 0;
+			snapshot_delta_y = 0;
+		}
 
-In vbl.cpp, change to:
+
+***Enable virtual keymap overlay
+
+In vbl.cpp->parse_keymap(), add the Helper header and replace the innermost condition I "// Parse the keymap" with:
+				if (key_map[code] || fake_key_map[code]) //iOS virtual input uses fake_key_map
+
+Also, right after "if (player_in_terminal_mode(local_player_index))", change the flag assignment to:
 flags = build_terminal_action_flags((char *)/*key_map*/fake_key_map); //iOS changed to fake_key_map
-
 
 
 In preprocess_map_sdl.cpp, att the #include "AlephOneHelper.h" header and override save_game with:
@@ -162,7 +273,9 @@ bool save_game(void)
 	return true;
 
 
-In interface.cpp, override handle_load_game with:
+***Enable custom load and restore functionality
+
+In interface, add the Helper header and then override handle_load_game with:
 void handle_load_game(
 	void)
 {
@@ -170,14 +283,17 @@ void handle_load_game(
   helperHandleLoadGame();
   return;
 
-In Interface.cpp, override dialog in should_restore_game_networked (before d.run) with:
+In should_restore_network_game_networked() right before "if(d.run() == 0)" near the end of the function, return early with:
 	//iOS TODO: Test enable multiplayer restore. Currently, the dialog may not be shown.
 	if(dynamic_world->player_count != 0) {
 		switchToSDLMenu();
 	}
 	return theRestoreAsNetgameToggle->get_selection(); //iOS restore override
 
-In Console.cpp, add in the "AlephOneHelper.h" header and override the keyboard input in Console::activate_input (before SDL_StartTextInput()) like this:
+
+***Enable user-friendly keyboard input
+
+In Console.cpp, add the Helper header and override the keyboard input in Console::activate_input (before SDL_StartTextInput()) like this:
 	//Alternate iOS Keyboard input.
 	if(game_is_networked)
 		getSomeTextFromIOS("Chat", "");
@@ -185,7 +301,7 @@ In Console.cpp, add in the "AlephOneHelper.h" header and override the keyboard i
 		getSomeTextFromIOS("Console", "");
 	return;
 
-Do the same in sdl_widgits.cpp first thing in w_text_entry::click():
+Do the same in sdl_widgets.cpp->w_text_entry::click() add this right away:
 	//This might be a good place to handle text input differently on iOS.
 	char *label = this->associated_label->text;
 	const char *currentText = this->get_text();
@@ -203,11 +319,13 @@ For the above to work, modify "class w_static_text : public widget" in sdl_widgi
 protected:
 	//char *text; // Make not protected for iOS
 
-Also in sdl_widgets.cpp, in w_text_entry::set_active(bool new_active), disable the SDL keyboard:
+Also in sdl_widgets.cpp->void w_text_entry::set_active(bool new_active), disable the SDL keyboard by commenting out "SDL_StartTextInput()":
 		//SDL_StartTextInput(); //When using the iOS keyboard input helper, we only want to listen for input here and not display the keyboard (which SDL_StartTextInput does).
 
 
-In networkdialogs.cpp, in both JoinDialog::JoinNetworkGameByRunning () and SetupNetgameDialog::SetupNetworkGameByRunning (right after CStringPref namePref (player_preferences->name, MAX_NET_PLAYER_NAME_LENGTH);)...  Add #include "AlephOneHelper.h" to the top and then add this to avoid a generic "mobile' name by adding these lines:
+***Avoid using a generic player name in net games
+
+In networkdialogs.cpp add the Helper header, then in both JoinDialog::JoinNetworkGameByRunning () and SetupNetgameDialog::SetupNetworkGameByRunning (right after CStringPref namePref (player_preferences->name, MAX_NET_PLAYER_NAME_LENGTH);)...  Add these lines:
 
 	//On iOS if we get a generic mobile name from the system, replace it with something random.
 	if(strcmp(player_preferences->name, "mobile") == 0){
@@ -215,8 +333,10 @@ In networkdialogs.cpp, in both JoinDialog::JoinNetworkGameByRunning () and Setup
 	}
 
 
-In Plugins.cpp add "AlephOneHelper.h", and then also add the iOS plugin filters to Plugin::valid():
-//Plugin filters for iOS
+***Override plugins to control texture sets
+
+In Plugins.cpp->Plugin::valid() add the Helper header, and then add the iOS plugin filters to Plugin::valid() (right after the !enabled check):
+	//Plugin filters for iOS
 	if(useClassicVisuals()) {
 		if(
 				//M1
@@ -248,20 +368,25 @@ In Plugins.cpp add "AlephOneHelper.h", and then also add the iOS plugin filters 
 	}
 
 
-In screen.cpp, map_is_translucent(void), add the "AlephOneHelper.h" header and change to:
-return ( (screen_mode.translucent_map || !useClassicVisuals()) && NetAllowOverlayMap()); //iOS automatically enabled translucent map for HD visuals.
+***Allow the visual style to override map appearance
 
-In preferences.cpp, add the "AlephOneHelper.h" header. Edit graphics_preferences_tree() so that before any tex.put_attr stuff, we then run:
-	//Apply iOS texture filtering
-			if(useClassicVisuals()){
-				Config.FarFilter=2;
-				Config.NearFilter=2;
-			} else {
-				Config.FarFilter=1;
-				Config.NearFilter=1;
-			}
+In screen.cpp->map_is_translucent(void), add the Helper header and change the function to:
+	return ( (screen_mode.translucent_map || !useClassicVisuals()) && NetAllowOverlayMap()); //iOS automatically enabled translucent map for HD visuals.
 
 
+***Override preferences with custom options
+
+In preferences.cpp->graphics_preferences_tree(), add the Helper header. Right before "InfoTree tex;" add these:
+
+		//Apply iOS texture filtering
+		if(useClassicVisuals()){
+			Config.FarFilter=2;
+			Config.NearFilter=2;
+		} else {
+			Config.FarFilter=1;
+			Config.NearFilter=1;
+		}
+		
 		//For iOS, use 3D perspective
 		graphics_preferences->OGL_Configure.Flags &= ~OGL_Flag_MimicSW;
 		
@@ -284,29 +409,35 @@ In preferences.cpp, add the "AlephOneHelper.h" header. Edit graphics_preferences
 		displaying_fps = showiOSFPS();
 
 
-In RenderRasterize_shader -> render_tree(), change this line to:
-if (useShaderPostProcessing() && current_player->infravision_duration == 0 &&
+***Override bloom blur pass
+
+In RenderRasterize_shader -> render_tree(), add the Helper header and then change the blur conditional to:
+	//On iOS, we also consider useShaderPostProcessing() as an override
+	if (useShaderPostProcessing() && current_player->infravision_duration == 0 &&
 		TEST_FLAG(Get_OGL_ConfigureData().Flags, OGL_Flag_Blur) &&
 		blur.get())
 
 
-In screen_shared_h -> update_fps_display(), add the "AlephOneHelper.h" header and then add eight spaces in front of the fps string so that it isn't cut off by rounded corners:
-			sprintf(fps, "        %0.f fps %s (%d)", fps_counter.get(), ms, CAFrameRate());
+***Change format of FPS display
+
+In screen_shared_h -> update_fps_display(), add the Helper header and then add eight spaces in front of the fps string so that it isn't cut off by rounded corner displays:
+			sprintf(fps, "        %0.f/%0.f fps %s", fps_counter.get(), CAFrameRate(), ms); //On iOS, shift right to avoid rounded corners and also add CA refresh.
 
 To avoid crashes, also increase the size of the string used by adding a bunch of spaces to it:
-     char fps[sizeof("1000 fps (10000 ms)                        ")];
+		char fps[sizeof("1000 fps (10000 ms)                        ")]; //For the iOS version, pad with an extra 24 spaces or so
 
 
-Enable smart triggerUsing these steps:
+
+***Enable smart trigger
 
 In scottish_textures.h, add this near the end (just before constructor) for rectangle_definition:
 bool isLivingMonster; //iOS smart trigger hint
 
-In RenderPlaceObjs.cpp , add this to the top:
+In RenderPlaceObjs.cpp , add this near the top:
 #include "monsters.h" //Needed for iOS smart trigger
 
-Then also add this in build_render_object(), right before render_object->rectangle.flags= 0;:
-//Set iOS smart trigger hint
+Then also add this in build_render_object(), right after "render_object= &RenderObjects[Length];":
+				//Set iOS smart trigger hint
 				render_object->rectangle.isLivingMonster= 0;
 				if (GET_OBJECT_OWNER(object) == _object_is_monster)
 				{
@@ -316,8 +447,9 @@ Then also add this in build_render_object(), right before render_object->rectang
 					}
 				}
 
-In RenderRasterizeShader add the "AlephOneHelper.h" header, and then in _render_node_object_helper(), add this before the first DC()->addTriangleFan call:
-//iOS Smart trigger.
+
+In RenderRasterizeShader->_render_node_object_helper() add the Helper header, and then add this before the FIRST "DC()->addTriangleFan(4, vertex_array, texcoord_array, NULL);" call:
+	//iOS Smart trigger.
 	GLfloat spriteOnScreen[12] = {vertex_array[0], vertex_array[1], vertex_array[2],
 																vertex_array[3], vertex_array[4], vertex_array[5],
 																vertex_array[6], vertex_array[7], vertex_array[8],
@@ -337,16 +469,26 @@ In RenderRasterizeShader add the "AlephOneHelper.h" header, and then in _render_
 		}
 	}
 
-Finally, in screen.cpp -> render_screen(), right before // Render world view, call this:
+Finally, in screen.cpp -> render_screen(), right before "// Render world view", call this:
 clearSmartTrigger(); //Reset iOS smart trigger
 
+
+***Make net game stats work
 
 In interface.cpp, Replace both instances of "display_net_game_stats()" with:
 			display_net_game_stats_helper(); //iOS needs to handle hiding the HUD before showing netstats.
 
+
+***Add Local IP address to the gather dialog
+
 In network_dialogs.cpp, in SdlGatherDialog(), replace the line "autogather_placer->dual_add(autogather_w->label("Auto-Gather"), m_dialog);" with:
 
-In network_udp.cpp...
+		autogather_placer->dual_add(autogather_w->label(LANIP("Local IP: ", "           Auto-Gather:")), m_dialog); //On iOS, inject the local IP also.
+
+
+***Set recommended QoS settings
+
+In network_udp.cpp
 
 Add the include:
 #include <sys/socket.h> //Needed for setting QOS on iOS
@@ -357,12 +499,14 @@ pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0); //Set interactive Q
 
 In NetDDPOpenSocket(), right before "// Set up socket set" add this:
 
-				//Set an appropriate network socket service type vfor iOS. First connection listening when hosting.
+				//Set an appropriate network socket service type for iOS. First connection listening when hosting.
 				int	theSocketFD = ((int*)sSocket)[1];
 				int st = NET_SERVICE_TYPE_VO;
 				setsockopt(theSocketFD, SOL_SOCKET, SO_NET_SERVICE_TYPE, (void *)&st, sizeof(st));
 
 
+
+~~~~~ All Done! Good luck and have fun! ~~~~~
 
 
 *****TODOs!*****

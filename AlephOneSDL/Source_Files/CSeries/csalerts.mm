@@ -19,22 +19,12 @@
 
 */
 
-#ifdef __APPLE__
-		#include "TargetConditionals.h"
-		#ifdef TARGET_OS_IOS
-			#import <UIKit/UIKit.h>
-		#else
-			#import <Cocoa/Cocoa.h>
-		#endif
-#endif
+#import <Cocoa/Cocoa.h>
 #include "cstypes.h"
 #include "csalerts.h"
 
 void system_alert_user(const char* message, short severity)
 {
-#ifdef TARGET_OS_IOS
-	//NOT IMPLEMENTED!
-#else
 	NSAlert *alert = [NSAlert new];
 	if (severity == infoError) 
 	{
@@ -49,15 +39,10 @@ void system_alert_user(const char* message, short severity)
 	[alert setInformativeText: [NSString stringWithUTF8String: message]];
 	[alert runModal];
 	[alert release];
-#endif
 }
 
 bool system_alert_choose_scenario(char *chosen_dir)
 {
-#ifdef TARGET_OS_IOS
-	//NOT IMPLEMENTED!
-	return 0;
-#else
 	NSOpenPanel *panel = [NSOpenPanel openPanel];
 	[panel setCanChooseFiles:NO];
 	[panel setCanChooseDirectories:YES];
@@ -73,15 +58,10 @@ bool system_alert_choose_scenario(char *chosen_dir)
 		return false;
 	
 	return [[[panel URL] path] getCString:chosen_dir maxLength:256 encoding:NSUTF8StringEncoding];
-#endif
 }
 
 void system_launch_url_in_browser(const char *url)
 {
-#ifdef TARGET_OS_IOS
-	//NOT IMPLEMENTED!
-#else
 	NSURL *urlref = [NSURL URLWithString:[NSString stringWithUTF8String:url]];
 	[[NSWorkspace sharedWorkspace] openURL:urlref];
-#endif
 }

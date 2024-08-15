@@ -34,7 +34,7 @@
 #include "XML_ParseTreeRoot.h"
 #include "Scenario.h"
 
-#include "AlephOneHelper.h"
+#include "AlephOneHelper.h" //Needed for iOS port
 
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -107,6 +107,7 @@ bool Plugin::valid() const {
 			return false;
 		}
 	}
+
 	
 	if (!environment_preferences->use_solo_lua &&
 		Plugins::instance()->mode() == Plugins::kMode_Solo)

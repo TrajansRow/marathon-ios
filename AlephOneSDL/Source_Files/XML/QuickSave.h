@@ -72,5 +72,4 @@ size_t saved_game_was_networked(FileSpecifier& saved_game);
 std::string build_save_metadata(QuickSave& save);
 bool build_map_preview(std::ostringstream& ostream);
 
-
 #endif

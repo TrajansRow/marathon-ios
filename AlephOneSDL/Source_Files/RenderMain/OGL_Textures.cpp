@@ -108,17 +108,7 @@ using std::max;
 
 OGL_TexturesStats gGLTxStats = {0,0,0,500000,0,0, 0};
 
-// Texture mapping
-struct TxtrTypeInfoData
-{
-	GLenum NearFilter;			// OpenGL parameter for near filter (GL_NEAREST, etc.)
-	GLenum FarFilter;			// OpenGL parameter for far filter (GL_NEAREST, etc.)
-	int Resolution;				// 0 is full-sized, 1 is half-sized, 2 is fourth-sized
-	GLenum ColorFormat;			// OpenGL parameter for stored color format (RGBA8, etc.)
-};
-
-
-static TxtrTypeInfoData TxtrTypeInfoList[OGL_NUMBER_OF_TEXTURE_TYPES];
+TxtrTypeInfoData TxtrTypeInfoList[OGL_NUMBER_OF_TEXTURE_TYPES];
 static TxtrTypeInfoData ModelSkinInfo;
 
 // Infravision: use algorithm (red + green + blue)/3 to compose intensity,
@@ -240,6 +230,7 @@ void TextureState::FrameTick() {
 				if (unusedFrames > 450) Reset(); // release unused sprites in 15 seconds
 				break;
 		case OGL_Txtr_WeaponsInHand:
+		case OGL_Txtr_HUD:
 				if (unusedFrames > 600) Reset(); // release weapons in hand in 20 seconds
 				break;
 		}
@@ -708,6 +699,7 @@ bool TextureManager::LoadSubstituteTexture()
 		
 	case OGL_Txtr_Inhabitant:
 	case OGL_Txtr_WeaponsInHand:
+	case OGL_Txtr_HUD:
 		// Much of the code here has been copied from elsewhere.
 		// Set these for convenience; sprites are transposed, as walls are.
 		TxtrHeight = Height;
@@ -836,19 +828,18 @@ bool TextureManager::SetupTextureGeometry()
 		
 	case OGL_Txtr_Inhabitant:
 	case OGL_Txtr_WeaponsInHand:
+	case OGL_Txtr_HUD:
 		{
-			if (npotTextures) 
-			{
-				TxtrWidth = BaseTxtrWidth;
-				TxtrHeight = BaseTxtrHeight;
-			} 
-			else 
-			{
-				// The 2 here is so that there will be an empty border around a sprite,
-				// so that the texture can be conveniently mipmapped.
-				TxtrWidth = NextPowerOfTwo(BaseTxtrWidth+2);
-				TxtrHeight = NextPowerOfTwo(BaseTxtrHeight+2);
+			// The 2 here is so that there will be an empty border around a sprite,
+			// so that the texture can be conveniently mipmapped.
+			TxtrWidth = BaseTxtrWidth+2;
+			TxtrHeight = BaseTxtrHeight+2;
 			
+			if (!npotTextures)
+			{
+				TxtrWidth = NextPowerOfTwo(TxtrWidth);
+				TxtrHeight = NextPowerOfTwo(TxtrHeight);
+				
 				// This kludge no longer necessary
 				// Restored due to some people still having AppleGL 1.1.2
 				if (WhetherTextureFix())
@@ -856,19 +847,19 @@ bool TextureManager::SetupTextureGeometry()
 					TxtrWidth = MAX(TxtrWidth,128);
 					TxtrHeight = MAX(TxtrHeight,128);
 				}
-						
-				// Offsets
-				WidthOffset = (TxtrWidth - BaseTxtrWidth) >> 1;
-				HeightOffset = (TxtrHeight - BaseTxtrHeight) >> 1;
-			
-				// We can calculate the scales and offsets here
-				double TWidRecip = 1/double(TxtrWidth);
-				double THtRecip = 1/double(TxtrHeight);
-				U_Scale = TWidRecip*double(BaseTxtrWidth);
-				U_Offset = TWidRecip*WidthOffset;
-				V_Scale = THtRecip*double(BaseTxtrHeight);
-				V_Offset = THtRecip*HeightOffset;
 			}
+			
+			// Offsets
+			WidthOffset = (TxtrWidth - BaseTxtrWidth) >> 1;
+			HeightOffset = (TxtrHeight - BaseTxtrHeight) >> 1;
+			
+			// We can calculate the scales and offsets here
+			double TWidRecip = 1/double(TxtrWidth);
+			double THtRecip = 1/double(TxtrHeight);
+			U_Scale = TWidRecip*double(BaseTxtrWidth);
+			U_Offset = TWidRecip*WidthOffset;
+			V_Scale = THtRecip*double(BaseTxtrHeight);
+			V_Offset = THtRecip*HeightOffset;
 		}
 		break;
 	}
@@ -1310,10 +1301,6 @@ void TextureManager::PlaceTexture(const ImageDescriptor *Image, bool normal_map)
 		else if (Image->GetFormat() == ImageDescriptor::DXTC5)
 		  internalFormat = (load_as_sRGB) ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT : GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
 		
-#ifdef TARGET_OS_IOS
-				bool useSGISMipmaps=0;
-#endif
-		
 		switch(TxtrTypeInfo.FarFilter)
 		{
 		case GL_NEAREST:
@@ -1325,8 +1312,10 @@ void TextureManager::PlaceTexture(const ImageDescriptor *Image, bool normal_map)
 		case GL_NEAREST_MIPMAP_LINEAR:
 		case GL_LINEAR_MIPMAP_LINEAR:
 			if (Image->GetMipMapCount() > 1) {
-				
 #ifdef GL_SGIS_generate_mipmap
+#ifdef TARGET_OS_IOS
+				bool useSGISMipmaps=0;
+#endif
 				if (useSGISMipmaps) {
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_FALSE);
 				}
@@ -1338,6 +1327,9 @@ void TextureManager::PlaceTexture(const ImageDescriptor *Image, bool normal_map)
 				mipmapsLoaded = true;
 			} else {
 #if defined GL_SGIS_generate_mipmap
+#ifdef TARGET_OS_IOS
+				bool useSGISMipmaps=0;
+#endif
 				if (useSGISMipmaps) {
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_TRUE);
 					mipmapsLoaded = true;
@@ -1401,6 +1393,7 @@ void TextureManager::PlaceTexture(const ImageDescriptor *Image, bool normal_map)
 		
 	case OGL_Txtr_Inhabitant:
 	case OGL_Txtr_WeaponsInHand:
+	case OGL_Txtr_HUD:
 		// Sprites have both horizontal and vertical limits
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -1479,6 +1472,7 @@ void TextureManager::SetupTextureMatrix()
 	{
 	case OGL_Txtr_Wall:
 	case OGL_Txtr_WeaponsInHand:
+	case OGL_Txtr_HUD:
 	case OGL_Txtr_Inhabitant:
 		MSI()->matrixMode(MS_TEXTURE);
 		MSI()->loadIdentity();
@@ -1520,6 +1514,7 @@ void TextureManager::RestoreTextureMatrix()
 	{
 	case OGL_Txtr_Wall:
 	case OGL_Txtr_WeaponsInHand:
+	case OGL_Txtr_HUD:
 	case OGL_Txtr_Inhabitant:
 	case OGL_Txtr_Landscape:
 		MSI()->matrixMode(MS_TEXTURE);
@@ -1635,10 +1630,6 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 
 	bool mipmapsLoaded = false;
 
-#ifdef TARGET_OS_IOS
-				bool useSGISMipmaps=0;
-#endif
-	
 	// Load the texture
 	GLenum internalFormat = TxtrTypeInfo.ColorFormat;
 	if (Image.get()->GetFormat() == ImageDescriptor::RGBA8)
@@ -1657,6 +1648,9 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 			if (Image.get()->GetMipMapCount() > 1) 
 			{
 #ifdef GL_SGIS_generate_mipmap
+#ifdef TARGET_OS_IOS
+				bool useSGISMipmaps=0;
+#endif
 				if (useSGISMipmaps) {
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_FALSE);
 				}
@@ -1671,6 +1665,9 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 			else
 			{
 #ifdef GL_SGIS_generate_mipmap
+#ifdef TARGET_OS_IOS
+				bool useSGISMipmaps=0;
+#endif
 				if (useSGISMipmaps)
 				{
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_TRUE);
@@ -1727,6 +1724,9 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 			if (Image.get()->GetMipMapCount() > 1)
 			{
 #ifdef GL_SGIS_generate_mipmap
+#ifdef TARGET_OS_IOS
+				bool useSGISMipmaps=0;
+#endif
 				if (useSGISMipmaps)
 				{
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_FALSE);
@@ -1742,7 +1742,10 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 			else
 			{
 #ifdef GL_SGIS_generate_mipmap
-				if (useSGISMipmaps) 
+#ifdef TARGET_OS_IOS
+				bool useSGISMipmaps=0;
+#endif
+				if (useSGISMipmaps)
 				{
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_TRUE);
 					mipmapsLoaded = true;

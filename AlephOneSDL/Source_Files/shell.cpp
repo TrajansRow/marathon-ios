@@ -23,6 +23,7 @@
  *  shell.cpp - Main game loop and input handling
  */
 
+#include "alephversion.h"
 #include "cseries.h"
 
 #include "map.h"
@@ -61,8 +62,6 @@
 
 #include "mytm.h"	// mytm_initialize(), for platform-specific shell_*.h
 
-#include "AlephOneHelper.h" //Needed for iOS port"
-
 #include <stdlib.h>
 #include <ctype.h>
 #include <vector>
@@ -82,6 +81,8 @@
 #include <exception>
 #include <algorithm>
 #include <vector>
+
+#include "AlephOneHelper.h" //Needed for iOS port
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -344,7 +345,7 @@ void initialize_application(void)
 #if TARGET_OS_IPHONE
 	default_data_dir = getDataDir();
 	local_data_dir = getLocalDataDir();
-	//log_dir = getLocalTmpDir(); //DCW ok, this is not great because the log file grows forever. Commenting out.
+	//Don't set log_dir = getLocalTmpDir(); because the log file might just grow too much.
 #endif
 	
 	const string data_env = a1_getenv("ALEPHONE_DATA");

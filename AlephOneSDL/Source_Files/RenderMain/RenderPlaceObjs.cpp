@@ -71,7 +71,6 @@ May 3, 2003 (Br'fin (Jeremy Parsons))
 
 #include "monsters.h" //Needed for iOS smart trigger
 
-
 // LP: "recommended" sizes of stuff in growable lists
 #define MAXIMUM_RENDER_OBJECTS 72
 

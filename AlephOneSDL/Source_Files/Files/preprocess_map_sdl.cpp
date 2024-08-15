@@ -38,8 +38,6 @@
 #include "game_errors.h"
 #include "QuickSave.h"
 
-#include "AlephOneHelper.h"
-
 // From shell_sdl.cpp
 extern vector<DirectorySpecifier> data_search_path;
 
@@ -132,10 +130,6 @@ bool choose_saved_game_to_load(FileSpecifier &saved_game)
 
 bool save_game(void)
 {
-	//On iOS, just save with current saved game by calling the helper
-	helperSaveGame();
-	return true;
-	
     bool success = create_quick_save();
     if (success)
         screen_printf("Game saved");

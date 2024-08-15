@@ -40,13 +40,13 @@
 
 #include "SDL2/SDL_opengl.h"
 
-	//DCW
+	//OpenGL ES headers needed on iOS
 #include <OpenGLES/ES1/gl.h>
 #include <OpenGLES/ES2/gl.h>
 #include <OpenGLES/ES3/gl.h>
-typedef double GLdouble; //DCW Not defined in GLES
-typedef double GLclampd;  //DCW Not defined in GLES
-#include "SDL2/SDL_opengl_glext.h" //DCW
+typedef double GLdouble; //Added for iOS by SDL_opengl_glext.h
+typedef double GLclampd; //Added for iOS by SDL_opengl_glext.h
+#include "SDL2/SDL_opengl_glext.h" //Added for iOS
 #include "SDL2/SDL_opengles.h"
 #endif
 

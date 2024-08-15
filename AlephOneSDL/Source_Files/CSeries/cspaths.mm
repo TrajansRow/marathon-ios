@@ -18,6 +18,7 @@
 	http://www.gnu.org/licenses/gpl.html
  
  */
+
 #ifdef __APPLE__
 		#include "TargetConditionals.h"
 		#ifdef TARGET_OS_IOS
@@ -26,9 +27,9 @@
 			#import <Cocoa/Cocoa.h>
 		#endif
 #endif
+
 #include "cstypes.h"
 #include "cspaths.h"
-
 #include "alephversion.h"
 
 static std::string _add_app_name(std::string parent)

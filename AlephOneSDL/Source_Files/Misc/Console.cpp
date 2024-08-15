@@ -41,7 +41,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-#include "AlephOneHelper.h"
+#include "AlephOneHelper.h" //Needed for iOS port
 
 using namespace std;
 
@@ -307,7 +307,7 @@ void Console::activate_input(std::function<void (const std::string&)> callback,
 	else
 		getSomeTextFromIOS("Console", "");
 	return;
-	
+
 	SDL_StartTextInput();
 	SDL_FlushEvent(SDL_TEXTINPUT);
 }

@@ -187,7 +187,7 @@ public:
 	bool is_selectable(void) const {return false;}
 
         ~w_static_text();
-	
+
 	char *text; // Make not protected for iOS
 protected:
 	//char *text; // Make not protected for iOS

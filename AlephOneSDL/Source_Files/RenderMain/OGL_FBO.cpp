@@ -69,7 +69,7 @@ void FBO::setup(GLuint w, GLuint h, bool srgb) {
     while ((err = glGetError())) { printf("FBO glGenFramebuffers: OpenGL Error %d\n",err);}
   glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
     while ((err = glGetError())) { printf("FBO glBindFramebuffer: OpenGL Error %d\n",err);}
-	
+    
   //Create texture and attach it to framebuffer's color attachment point
   glGenTextures(1, &texID);
     while ((err = glGetError())) { printf("FBO glGenTextures: OpenGL Error %d\n",err);}
@@ -83,7 +83,8 @@ void FBO::setup(GLuint w, GLuint h, bool srgb) {
     while ((err = glGetError())) { printf("FBO glTexParameteri: OpenGL Error %d\n",err);}
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texID, 0);
     while ((err = glGetError())) { printf("FBO glFramebufferTexture2D: OpenGL Error %d\n",err);}
-	
+
+  
   //Generate depth buffer
   glGenRenderbuffers(1, &_depthBuffer);
     while ((err = glGetError())) { printf("FBO glGenRenderbuffers: OpenGL Error %d\n",err);}
@@ -98,7 +99,7 @@ void FBO::setup(GLuint w, GLuint h, bool srgb) {
     
   glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
   glBindRenderbuffer(GL_RENDERBUFFER, _fbo);
-
+  
   //glPopGroupMarkerEXT();
 }
 
@@ -135,15 +136,15 @@ void FBO::deactivate() {
 			prev_srgb = active_chain.back()->_srgb;
 		}
 		
-		//DCW binding to framebuffer 0 doesn't switch to the on-screen buffer on iOS.
-		//Instead of 0, switch to 1.
+		//Binding to framebuffer 0 doesn't switch to the on-screen buffer on iOS.
+		//Instead of 0, default to 1.
 		if ( prev_fbo == 0 ) {
 			glBindFramebuffer(GL_FRAMEBUFFER, 1);
 			glBindRenderbuffer(GL_RENDERBUFFER, 1);
 		} else {
 			glBindFramebuffer(_fboTarget, prev_fbo);
 		}
-
+        
         if (prev_srgb) {}
 			//////glEnable(GL_FRAMEBUFFER_SRGB);
         else {

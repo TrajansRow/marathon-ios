@@ -101,7 +101,7 @@ Feb 20, 2002 (Woody Zenfell):
 #include "Movie.h"
 #include "InfoTree.h"
 
-#include "AlephOneHelper.h"
+#include "AlephOneHelper.h" //Needed for iOS port
 
 /* ---------- constants */
 

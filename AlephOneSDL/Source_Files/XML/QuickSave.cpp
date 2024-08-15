@@ -499,7 +499,6 @@ bool load_quick_save_dialog(FileSpecifier& saved_game)
 extern SDL_Surface *draw_surface;
 extern bool OGL_MapActive;
 
-//Needed non-static for iOS port
 bool build_map_preview(std::ostringstream& ostream)
 {
     SDL_Rect r = {0, 0, RENDER_WIDTH, RENDER_HEIGHT};

@@ -69,8 +69,8 @@ static volatile bool		sKeepListening		= false;
 // packet handler when it gets something.
 static int
 receive_thread_function(void*) {
-	
-		pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0); //Set interactive QoS for iOS
+
+	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0); //Set interactive QoS for iOS
 	
     while(true) {
         // We listen with a timeout so we can shut ourselves down when needed.
@@ -79,25 +79,20 @@ receive_thread_function(void*) {
         if(!sKeepListening)
             break;
         
-        if(theResult > 0) {
-            theResult = SDLNet_UDP_Recv(sSocket, sUDPPacketBuffer);
-            if(theResult > 0) {
-                if(take_mytm_mutex()) {
-                    ddpPacketBuffer.protocolType	= kPROTOCOL_TYPE;
-                    ddpPacketBuffer.sourceAddress	= sUDPPacketBuffer->address;
-                    ddpPacketBuffer.datagramSize	= sUDPPacketBuffer->len;
+        if(theResult > 0 && take_mytm_mutex()) {
+                theResult = SDLNet_UDP_Recv(sSocket, sUDPPacketBuffer);
+                if(theResult > 0) {
+                        ddpPacketBuffer.protocolType	= kPROTOCOL_TYPE;
+                        ddpPacketBuffer.sourceAddress	= sUDPPacketBuffer->address;
+                        ddpPacketBuffer.datagramSize	= sUDPPacketBuffer->len;
                     
-                    // Hope the other guy is done using whatever's in there!
-                    // (As I recall, all uses happen in sPacketHandler and its progeny, so we should be fine.)
-                    memcpy(ddpPacketBuffer.datagramData, sUDPPacketBuffer->data, sUDPPacketBuffer->len);
+                        // Hope the other guy is done using whatever's in there!
+                        // (As I recall, all uses happen in sPacketHandler and its progeny, so we should be fine.)
+                        memcpy(ddpPacketBuffer.datagramData, sUDPPacketBuffer->data, sUDPPacketBuffer->len);
                     
-                    sPacketHandler(&ddpPacketBuffer);
-                    
-                    release_mytm_mutex();
-                }
-                else
-                    fdprintf("could not take mytm mutex - incoming packet dropped");
-            }
+                        sPacketHandler(&ddpPacketBuffer);
+                    }
+           release_mytm_mutex();
         }
     }
     
@@ -151,10 +146,11 @@ OSErr NetDDPOpenSocket(short *ioPortNumber, PacketHandlerProcPtr packetHandler)
 		return -1;
 	}
 
-				//Set an appropriate network socket service type vfor iOS. First connection listening when hosting.
-				int	theSocketFD = ((int*)sSocket)[1];
-				int st = NET_SERVICE_TYPE_VO;
-				setsockopt(theSocketFD, SOL_SOCKET, SO_NET_SERVICE_TYPE, (void *)&st, sizeof(st));
+	//Set an appropriate network socket service type for iOS. First connection listening when hosting.
+	int	theSocketFD = ((int*)sSocket)[1];
+	int st = NET_SERVICE_TYPE_VO;
+	setsockopt(theSocketFD, SOL_SOCKET, SO_NET_SERVICE_TYPE, (void *)&st, sizeof(st));
+
 	
         // Set up socket set
         sSocketSet = SDLNet_AllocSocketSet(1);
@@ -241,7 +237,7 @@ void NetDDPDisposeFrame(DDPFramePtr frame)
  *  Send frame to remote machine
  */
 
-OSErr NetDDPSendFrame(DDPFramePtr frame, NetAddrBlock *address, short protocolType, short port)
+OSErr NetDDPSendFrame(DDPFramePtr frame, const NetAddrBlock *address, short protocolType, short port)
 {
 //fdprintf("NetDDPSendFrame\n");
 	assert(frame->data_size <= ddpMaxData);
