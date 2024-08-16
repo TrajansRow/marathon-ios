@@ -172,7 +172,7 @@ void AlephOneMainLoop()
 			{
 				process_event(event);
 			} This SDL_WaitEventTimeout() is causing slow framerates on Release builds on iOS. Not sure why yet. */
-			//TODO: Figure this out
+			//TODO: Figure this out!
 		}
 
 		while (SDL_PollEvent(&event))
