@@ -28,6 +28,7 @@ extern char *getDataDir();
 extern char* getLocalDataDir();
 extern char* getLocalPrefsDir(); //DCW
 extern char* getLocalTmpDir(); //DCW
+extern char* getPhysicsFilePath();
 extern char* LANIP( char *prefix, char *suffix);
 extern void  overrideSomeA1Prefs();//DCW 
 extern void helperBringUpHUD();

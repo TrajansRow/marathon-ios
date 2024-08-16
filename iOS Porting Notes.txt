@@ -408,6 +408,11 @@ In preferences.cpp->graphics_preferences_tree(), add the Helper header. Right be
 		extern bool displaying_fps;
 		displaying_fps = showiOSFPS();
 
+		//Temporary workaround for Remote Hub to work on iOS. Future engine versions will probably not need this
+		FileSpecifier physFile = getPhysicsFilePath();
+		set_physics_file(physFile);
+
+
 
 ***Override bloom blur pass
 

@@ -3633,6 +3633,10 @@ InfoTree graphics_preferences_tree()
 		extern bool displaying_fps;
 		displaying_fps = showiOSFPS();
 		
+		//Temporary workaround for Remote Hub to work on iOS. Future engine versions will probably not need this
+		FileSpecifier physFile = getPhysicsFilePath();
+		set_physics_file(physFile);
+			
 		InfoTree tex;
 		tex.put_attr("index", i);
 		tex.put_attr("near_filter", Config.NearFilter);

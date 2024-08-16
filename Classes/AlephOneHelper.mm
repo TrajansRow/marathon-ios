@@ -150,7 +150,6 @@ char* getDataDir() {
   dataDir = [NSString stringWithFormat:@"%@/%@/", dataDir, [AlephOneAppDelegate sharedAppDelegate].scenario.path];
   MLog ( @"DataDir: %@", dataDir );
   return (char*)[dataDir UTF8String];
-  
 }
 
 char* getLocalDataDir() {
@@ -166,6 +165,12 @@ char* getLocalPrefsDir() {
 char* getLocalTmpDir() {
   NSString *tmpDir = NSTemporaryDirectory();
   return (char*)[tmpDir UTF8String];
+}
+
+char* getPhysicsFilePath() {
+	NSString *physFile = [NSString stringWithFormat:@"%@/%@/Physics Models/Standard.phyA", [[AlephOneAppDelegate sharedAppDelegate] getDataDirectory], [AlephOneAppDelegate sharedAppDelegate].scenario.path];
+	MLog ( @"Physics File: %@", physFile );
+	return (char*)[physFile UTF8String];
 }
 
 char* LANIP( char *prefix, char *suffix) {
