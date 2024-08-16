@@ -512,6 +512,9 @@ In NetDDPOpenSocket(), right before "// Set up socket set" add this:
 *****TODOs!*****
 
 
+***Figure out why SDL_WaitEventTimeout() in AlephONeShell.cpp->AlephOneMainLoop() causes slow frame rates in Release builds. Is temporarily commented out.
+
+
 ***Add check for allow local network connections permission in the app, because denying this can cause a silent failure to find net games. '"Infinity" would like to find and connect to devices on your local network.'
 
 Fix weapons reticle refresh check

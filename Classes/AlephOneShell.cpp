@@ -168,10 +168,11 @@ void AlephOneMainLoop()
 		{
 			// The game is not in a "hot" state, yield time to other
 			// processes but only try for a maximum of 30ms
-			if (SDL_WaitEventTimeout(&event, 30))
+	/*		if (SDL_WaitEventTimeout(&event, 30))
 			{
 				process_event(event);
-			}
+			} This SDL_WaitEventTimeout() is causing slow framerates on Release builds on iOS. Not sure why yet. */
+			//TODO: Figure this out
 		}
 
 		while (SDL_PollEvent(&event))
