@@ -1291,15 +1291,23 @@ void TextureManager::PlaceTexture(const ImageDescriptor *Image, bool normal_map)
 		}
 	} else if (Image->GetFormat() == ImageDescriptor::DXTC1 ||
 		   Image->GetFormat() == ImageDescriptor::DXTC3 ||
-		   Image->GetFormat() == ImageDescriptor::DXTC5)
+		   Image->GetFormat() == ImageDescriptor::DXTC5 ||
+		   Image->GetFormat() == ImageDescriptor::PVRTC2 ||
+		   Image->GetFormat() == ImageDescriptor::PVRTC4)
 	{
-#if defined(GL_ARB_texture_compression) && defined(GL_COMPRESSED_RGB_S3TC_DXT1_EXT)
+#if ( defined(GL_ARB_texture_compression) && defined(GL_COMPRESSED_RGB_S3TC_DXT1_EXT) ) || ( defined(GL_ANGLE_texture_compression_dxt3) && defined(GL_ANGLE_texture_compression_dxt5)) || defined(GL_IMG_texture_compression_pvrtc)
 		if (Image->GetFormat() == ImageDescriptor::DXTC1)
 		  internalFormat = (load_as_sRGB) ? GL_COMPRESSED_SRGB_S3TC_DXT1_EXT : GL_COMPRESSED_RGB_S3TC_DXT1_EXT;
 		else if (Image->GetFormat() == ImageDescriptor::DXTC3)
 		  internalFormat = (load_as_sRGB) ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT : GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
 		else if (Image->GetFormat() == ImageDescriptor::DXTC5)
 		  internalFormat = (load_as_sRGB) ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT : GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+#if defined GL_IMG_texture_compression_pvrtc
+		else if (Image->GetFormat() == ImageDescriptor::PVRTC2)
+		  internalFormat = (load_as_sRGB) ? 0 : GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG; //sRGB not supported in glext.h
+		else if (Image->GetFormat() == ImageDescriptor::PVRTC4)
+		  internalFormat = (load_as_sRGB) ? 0 : GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG; //sRGB not supported in glext.h
+#endif
 		
 		switch(TxtrTypeInfo.FarFilter)
 		{
@@ -1312,10 +1320,10 @@ void TextureManager::PlaceTexture(const ImageDescriptor *Image, bool normal_map)
 		case GL_NEAREST_MIPMAP_LINEAR:
 		case GL_LINEAR_MIPMAP_LINEAR:
 			if (Image->GetMipMapCount() > 1) {
-#ifdef GL_SGIS_generate_mipmap
 #ifdef TARGET_OS_IOS
 				bool useSGISMipmaps=0;
 #endif
+#ifdef GL_SGIS_generate_mipmap
 				if (useSGISMipmaps) {
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_FALSE);
 				}
@@ -1326,10 +1334,10 @@ void TextureManager::PlaceTexture(const ImageDescriptor *Image, bool normal_map)
 				}
 				mipmapsLoaded = true;
 			} else {
-#if defined GL_SGIS_generate_mipmap
 #ifdef TARGET_OS_IOS
 				bool useSGISMipmaps=0;
 #endif
+#if defined GL_SGIS_generate_mipmap
 				if (useSGISMipmaps) {
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_TRUE);
 					mipmapsLoaded = true;
@@ -1647,10 +1655,10 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 		case GL_LINEAR_MIPMAP_LINEAR:
 			if (Image.get()->GetMipMapCount() > 1) 
 			{
-#ifdef GL_SGIS_generate_mipmap
 #ifdef TARGET_OS_IOS
 				bool useSGISMipmaps=0;
 #endif
+#ifdef GL_SGIS_generate_mipmap
 				if (useSGISMipmaps) {
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_FALSE);
 				}
@@ -1664,10 +1672,10 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 			}
 			else
 			{
-#ifdef GL_SGIS_generate_mipmap
 #ifdef TARGET_OS_IOS
 				bool useSGISMipmaps=0;
 #endif
+#ifdef GL_SGIS_generate_mipmap
 				if (useSGISMipmaps)
 				{
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_TRUE);
@@ -1701,15 +1709,23 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 	}
 	else if (Image.get()->GetFormat() == ImageDescriptor::DXTC1 ||
 		 Image.get()->GetFormat() == ImageDescriptor::DXTC3 ||
-		 Image.get()->GetFormat() == ImageDescriptor::DXTC5)
+		 Image.get()->GetFormat() == ImageDescriptor::DXTC5||
+		 Image.get()->GetFormat() == ImageDescriptor::PVRTC2 ||
+		 Image.get()->GetFormat() == ImageDescriptor::PVRTC4)
 	{
-#if defined (GL_ARB_texture_compression) && defined(GL_COMPRESSED_RGB_S3TC_DXT1_EXT)
+#if ( defined(GL_ARB_texture_compression) && defined(GL_COMPRESSED_RGB_S3TC_DXT1_EXT) ) || ( defined(GL_ANGLE_texture_compression_dxt3) && defined(GL_ANGLE_texture_compression_dxt5)) || defined(GL_IMG_texture_compression_pvrtc)
 		if (Image.get()->GetFormat() == ImageDescriptor::DXTC1)
 			internalFormat = GL_COMPRESSED_RGB_S3TC_DXT1_EXT;
 		else if (Image.get()->GetFormat() == ImageDescriptor::DXTC3)
 			internalFormat = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
 		else if (Image.get()->GetFormat() == ImageDescriptor::DXTC5)
 			internalFormat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+#if defined GL_IMG_texture_compression_pvrtc
+		else if (Image.get()->GetFormat() == ImageDescriptor::PVRTC2)
+		  internalFormat = GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG;
+		else if (Image.get()->GetFormat() == ImageDescriptor::PVRTC4)
+		  internalFormat = GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
+#endif
 
 		switch (TxtrTypeInfo.FarFilter)
 		{
@@ -1723,10 +1739,10 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 		case GL_LINEAR_MIPMAP_LINEAR:
 			if (Image.get()->GetMipMapCount() > 1)
 			{
-#ifdef GL_SGIS_generate_mipmap
 #ifdef TARGET_OS_IOS
 				bool useSGISMipmaps=0;
 #endif
+#ifdef GL_SGIS_generate_mipmap
 				if (useSGISMipmaps)
 				{
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_FALSE);
@@ -1741,11 +1757,11 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 			}
 			else
 			{
-#ifdef GL_SGIS_generate_mipmap
 #ifdef TARGET_OS_IOS
 				bool useSGISMipmaps=0;
 #endif
-				if (useSGISMipmaps)
+#ifdef GL_SGIS_generate_mipmap
+				if (useSGISMipmaps) 
 				{
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_TRUE);
 					mipmapsLoaded = true;
@@ -1868,7 +1884,11 @@ void FindSilhouetteVersion(ImageDescriptorManager &imageManager)
 	else if (imageManager.get()->GetFormat() == ImageDescriptor::DXTC3 || imageManager.get()->GetFormat() == ImageDescriptor::DXTC5) 
 	{
 		FindSilhouetteVersionDXTC35(imageManager.edit()->GetBufferSize(), (unsigned char *) imageManager.edit()->GetBuffer());
+	} else if (imageManager.get()->GetFormat() == ImageDescriptor::PVRTC2 || imageManager.get()->GetFormat() == ImageDescriptor::PVRTC2)
+	{
+		fprintf(stderr, "FindSilhouetteVersion not implemented for PVRTC of size %d\n", imageManager.edit()->GetBufferSize());
 	}
+	
 	imageManager.edit()->PremultipliedAlpha = false;
 }
 

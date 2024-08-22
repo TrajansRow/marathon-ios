@@ -96,13 +96,11 @@ bool Plugin::valid() const {
 				//Any CFP
 				strncmp(name.c_str(), "CFP", 3) == 0 ||
 			 
-				//M3
-				strcmp(name.c_str(), "Gorans Highres Landscapes") == 0 ||
-				strcmp(name.c_str(), "Gorans Jjarro Set DDS") == 0 ||
-				strcmp(name.c_str(), "Gorans Lava Set 2.0") == 0 ||
-				strcmp(name.c_str(), "Gorans Pfhor Set DDS") == 0 ||
-				strcmp(name.c_str(), "Gorans Sewage Set DDS") == 0 ||
-				strcmp(name.c_str(), "Gorans Pfhor Set DDS") == 0
+				//Any 4096
+				strncmp(name.c_str(), "4096", 4) == 0 ||
+			 
+				//Any Gorans
+				strncmp(name.c_str(), "Gorans", 6) == 0 
 				) {
 			return false;
 		}
