@@ -355,13 +355,11 @@ In Plugins.cpp->Plugin::valid() add the Helper header, and then add the iOS plug
 				//Any CFP
 				strncmp(name.c_str(), "CFP", 3) == 0 ||
 			 
-				//M3
-				strcmp(name.c_str(), "Gorans Highres Landscapes") == 0 ||
-				strcmp(name.c_str(), "Gorans Jjarro Set DDS") == 0 ||
-				strcmp(name.c_str(), "Gorans Lava Set 2.0") == 0 ||
-				strcmp(name.c_str(), "Gorans Pfhor Set DDS") == 0 ||
-				strcmp(name.c_str(), "Gorans Sewage Set DDS") == 0 ||
-				strcmp(name.c_str(), "Gorans Pfhor Set DDS") == 0
+				//Any 4096
+				strncmp(name.c_str(), "4096", 4) == 0 ||
+			 
+				//Any Gorans
+				strncmp(name.c_str(), "Gorans", 6) == 0 
 				) {
 			return false;
 		}
@@ -509,6 +507,9 @@ In NetDDPOpenSocket(), right before "// Set up socket set" add this:
 				int st = NET_SERVICE_TYPE_VO;
 				setsockopt(theSocketFD, SOL_SOCKET, SO_NET_SERVICE_TYPE, (void *)&st, sizeof(st));
 
+
+In ViewControl.cpp->View_AdjustFOV(), add the Helper header then this line at the top:
+	FOV_Target += extraFieldOfView();
 
 
 ~~~~~ All Done! Good luck and have fun! ~~~~~
