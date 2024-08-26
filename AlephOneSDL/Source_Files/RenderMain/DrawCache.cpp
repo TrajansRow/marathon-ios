@@ -648,11 +648,11 @@ void DrawCache::drawAll() {
 			geometry[g].shader->setFloat(Shader::U_BloomScale, geometry[g].bloomScale);
 			geometry[g].shader->setFloat(Shader::U_BloomShift, geometry[g].bloomShift);
 			geometry[g].shader->setFloat(Shader::U_Flare, geometry[g].flare);
-			geometry[g].shader->setFloat(Shader::U_SelfLuminosity, selfLuminosity);
+			geometry[g].shader->setFloat(Shader::U_SelfLuminosity, geometry[g].selfLuminosity);
 			geometry[g].shader->setFloat(Shader::U_Pulsate, geometry[g].pulsate);
 			geometry[g].shader->setFloat(Shader::U_Wobble, geometry[g].wobble);
 			geometry[g].shader->setFloat(Shader::U_Depth, geometry[g].depth);
-			geometry[g].shader->setFloat(Shader::U_Glow, glow);
+			geometry[g].shader->setFloat(Shader::U_Glow, geometry[g].glow);
 			geometry[g].shader->setFloat(Shader::U_StrictDepthMode, strictDepthMode);
 			
 			//U_TransferFadeOut //TODO: needs to be captured.
