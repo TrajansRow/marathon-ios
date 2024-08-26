@@ -753,6 +753,12 @@ void stopProgress() {
 
 short helperGetEntryLevelNumber() {
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+	
+		//If vidmaster disabled, always start at level 0
+	if( [defaults boolForKey:kUseVidmasterMode] == FALSE) {
+		return 0;
+	}
+	
   return [defaults integerForKey:kEntryLevelNumber];
 }
 
