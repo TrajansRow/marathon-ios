@@ -7274,7 +7274,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -7328,13 +7328,8 @@
 					"-Wl,-undefined,error",
 					"-lSDL2_image",
 					"-lSDL2_net",
-					"-lavcodec",
 					"-lSDL2_ttf",
 					"-lfreetype",
-					"-lavdevice",
-					"-lavutil",
-					"-lavformat",
-					"-lavfilter",
 					"-lboost_filesystem",
 					"-lbz2",
 					"-lbrotlicommon",
@@ -7343,7 +7338,6 @@
 					"-framework",
 					VideoToolbox,
 					"-lzzip",
-					"-lvpx",
 					"-lvorbis",
 					"-lFLAC",
 					"-lopus",
@@ -7351,8 +7345,6 @@
 					"-lz",
 					"-logg",
 					"-lvorbisenc",
-					"-lswresample",
-					"-lswscale",
 					"-lnfd",
 					"-lsndfile",
 					"-lopenal",
@@ -7380,7 +7372,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -7425,13 +7417,8 @@
 					"-Wl,-undefined,error",
 					"-lSDL2_image",
 					"-lSDL2_net",
-					"-lavcodec",
 					"-lSDL2_ttf",
 					"-lfreetype",
-					"-lavdevice",
-					"-lavutil",
-					"-lavformat",
-					"-lavfilter",
 					"-lboost_filesystem",
 					"-lbz2",
 					"-lbrotlicommon",
@@ -7440,7 +7427,6 @@
 					"-framework",
 					VideoToolbox,
 					"-lzzip",
-					"-lvpx",
 					"-lvorbis",
 					"-lFLAC",
 					"-lopus",
@@ -7448,8 +7434,6 @@
 					"-lz",
 					"-logg",
 					"-lvorbisenc",
-					"-lswresample",
-					"-lswscale",
 					"-lnfd",
 					"-lsndfile",
 					"-lopenal",
@@ -7477,7 +7461,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -7523,13 +7507,8 @@
 					"-Wl,-undefined,error",
 					"-lSDL2_image",
 					"-lSDL2_net",
-					"-lavcodec",
 					"-lSDL2_ttf",
 					"-lfreetype",
-					"-lavdevice",
-					"-lavutil",
-					"-lavformat",
-					"-lavfilter",
 					"-lboost_filesystem",
 					"-lbz2",
 					"-lbrotlicommon",
@@ -7538,7 +7517,6 @@
 					"-framework",
 					VideoToolbox,
 					"-lzzip",
-					"-lvpx",
 					"-lvorbis",
 					"-lFLAC",
 					"-lopus",
@@ -7546,8 +7524,6 @@
 					"-lz",
 					"-logg",
 					"-lvorbisenc",
-					"-lswresample",
-					"-lswscale",
 					"-lnfd",
 					"-lsndfile",
 					"-lopenal",
@@ -7878,7 +7854,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -7924,13 +7900,8 @@
 					"-Wl,-undefined,error",
 					"-lSDL2_image",
 					"-lSDL2_net",
-					"-lavcodec",
 					"-lSDL2_ttf",
 					"-lfreetype",
-					"-lavdevice",
-					"-lavutil",
-					"-lavformat",
-					"-lavfilter",
 					"-lboost_filesystem",
 					"-lbz2",
 					"-lbrotlicommon",
@@ -7939,7 +7910,6 @@
 					"-framework",
 					VideoToolbox,
 					"-lzzip",
-					"-lvpx",
 					"-lvorbis",
 					"-lFLAC",
 					"-lopus",
@@ -7947,8 +7917,6 @@
 					"-lz",
 					"-logg",
 					"-lvorbisenc",
-					"-lswresample",
-					"-lswscale",
 					"-lnfd",
 					"-lsndfile",
 					"-lopenal",

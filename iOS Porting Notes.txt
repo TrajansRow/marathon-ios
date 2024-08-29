@@ -411,6 +411,12 @@ In preferences.cpp->graphics_preferences_tree(), add the Helper header. Right be
 		set_physics_file(physFile);
 
 
+Also in sound_preferences_tree(), add this to the end:
+
+		//On iOS, always enable 3D audio and HRTF
+	sound_preferences->flags |= _3d_sounds_flag;
+	sound_preferences->flags |= _hrtf_flag;
+
 
 ***Override bloom blur pass
 
@@ -512,6 +518,18 @@ In ViewControl.cpp->View_AdjustFOV(), add the Helper header then this line at th
 	FOV_Target += extraFieldOfView();
 
 
+***Disable miniupnpc
+
+In config.h, undefine these (actually, maybe not needed...):
+
+/* ${desc_miniupnpc} enabled */
+#define HAVE_MINIUPNPC 0
+
+/* Define to 1 if you have the <miniupnpc/miniupnpc.h> header file. */
+#define HAVE_MINIUPNPC_MINIUPNPC_H 0
+
+
+
 ~~~~~ All Done! Good luck and have fun! ~~~~~
 
 
@@ -546,3 +564,5 @@ Verify the SDL mouse event works in - (void)handleTapFrom:(UITapGestureRecognize
 Do we need esutils files?
 
 Done?: Check out and see if we need #include "game_window.h"for this line: //Still needed for iOS 6-19-24? mark_shield_display_as_dirty();
+
+Do we need -lavcodec or -lavdevice -lavutil -lavformat -lavfilter or -lvpx or -lswresample -lswscale?
