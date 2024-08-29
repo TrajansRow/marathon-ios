@@ -118,7 +118,8 @@ static uint32 lastTimeThroughLoop = 0;
 
 // Unlike the original, we just want to run one pass through.  Leave the scheduling to
 // CADisplayLink
-const uint32 TICKS_BETWEEN_EVENT_POLL = 167; // 6 Hz
+//const uint32 TICKS_BETWEEN_EVENT_POLL = 167; // 6 Hz
+const uint32 TICKS_BETWEEN_EVENT_POLL = 16; // 60 Hz
 void AlephOneMainLoop()
 {
   uint32 last_event_poll = 0;
@@ -159,7 +160,8 @@ void AlephOneMainLoop()
 			yield_time = poll_event = true;
 			break;
 	}
-
+	
+	global_idle_proc(); //Needed to refresh 3D sounds on iOS, since a false poll_event prevents idle refresh.
 	if (poll_event) {
 		global_idle_proc();
 

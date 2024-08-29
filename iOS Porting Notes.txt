@@ -43,6 +43,10 @@ From the new source tree, sort all of the subfolders by name. Then Remove Refere
 
 We need a copy of the main event loop to run without the enclosing infinite while loop. Look in shell.cpp->void main_event_loop(void), and grab the inner contents of the "while ((game_state = get_game_state()) != _quit_game)" loop, and paste it into the void AlephOneMainLoop() function in AlephOneShell.cpp
 
+Also, add this in there somewhere:
+	global_idle_proc(); //Needed to refresh 3D sounds on iOS, since a false poll_event prevents idle refresh.
+
+
 ***Update OpenGL Headers for ES
 
 If not using ANGLE, swap in the needed OpenGL and GLES headers in OGL_Headers.h for "__APPLE__". Should look something like this:
@@ -535,6 +539,8 @@ In config.h, undefine these (actually, maybe not needed...):
 
 *****TODOs!*****
 
+
+***Prevent last_event_poll = 0; from getting reset on each frame!
 
 ***Figure out why SDL_WaitEventTimeout() in AlephONeShell.cpp->AlephOneMainLoop() causes slow frame rates in Release builds. Is temporarily commented out.
 
