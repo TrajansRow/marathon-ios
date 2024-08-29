@@ -3946,6 +3946,11 @@ InfoTree sound_preferences_tree()
 	root.put_attr("video_export_volume_db", sound_preferences->video_export_volume_db);
 	root.put_attr("channel", static_cast<int>(sound_preferences->channel_type));
 
+		//On iOS, always enable 3D audio and HRTF
+	sound_preferences->flags |= _3d_sounds_flag;
+	sound_preferences->flags |= _hrtf_flag;
+	sound_preferences->flags |= _dynamic_tracking_flag;
+	
 	return root;
 }
 
