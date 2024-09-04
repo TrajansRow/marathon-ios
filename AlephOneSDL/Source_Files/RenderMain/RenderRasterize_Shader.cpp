@@ -1267,10 +1267,13 @@ bool RenderModel(rectangle_definition& RenderRectangle, short Collection, short 
 		//glAlphaFunc(GL_GREATER, 0.001); //NOT SUPPORTED ANGLE FUNCTION
 
 		s->enable();
-		s->setFloat(Shader::U_Glow, SkinPtr->MinGlowIntensity);
+		//s->setFloat(Shader::U_Glow, SkinPtr->MinGlowIntensity);
+		DC()->cacheGlow(SkinPtr->MinGlowIntensity);
 		if (renderStep == kGlow) {
-			s->setFloat(Shader::U_BloomScale, SkinPtr->GlowBloomScale);
-			s->setFloat(Shader::U_BloomShift, SkinPtr->GlowBloomShift);
+			//s->setFloat(Shader::U_BloomScale, SkinPtr->GlowBloomScale);
+			//s->setFloat(Shader::U_BloomShift, SkinPtr->GlowBloomShift);
+			DC()->cacheBloomScale(SkinPtr->GlowBloomScale);
+			DC()->cacheBloomShift(SkinPtr->GlowBloomShift);
 		}
 
 		if(ModelPtr->Use(CLUT,OGL_SkinManager::Glowing)) {

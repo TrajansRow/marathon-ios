@@ -273,6 +273,15 @@
 		51B684FE1EB3E39E00CB1628 /* A1_fade_in.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 51B684FD1EB3E39E00CB1628 /* A1_fade_in.mp4 */; };
 		51B684FF1EB3E39E00CB1628 /* A1_fade_in.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 51B684FD1EB3E39E00CB1628 /* A1_fade_in.mp4 */; };
 		51B685001EB3E39E00CB1628 /* A1_fade_in.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 51B684FD1EB3E39E00CB1628 /* A1_fade_in.mp4 */; };
+		51C220EB2C88BB5C00A00545 /* ScenarioChooser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51C220EA2C88BB5C00A00545 /* ScenarioChooser.cpp */; };
+		51C220EC2C88BB5C00A00545 /* ScenarioChooser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51C220EA2C88BB5C00A00545 /* ScenarioChooser.cpp */; };
+		51C220ED2C88BB5C00A00545 /* ScenarioChooser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51C220EA2C88BB5C00A00545 /* ScenarioChooser.cpp */; };
+		51C220EF2C88BBC000A00545 /* inf_achievements.lua in Resources */ = {isa = PBXBuildFile; fileRef = 51C220EE2C88BBC000A00545 /* inf_achievements.lua */; };
+		51C220F02C88BBC000A00545 /* inf_achievements.lua in Resources */ = {isa = PBXBuildFile; fileRef = 51C220EE2C88BBC000A00545 /* inf_achievements.lua */; };
+		51C220F12C88BBC000A00545 /* inf_achievements.lua in Resources */ = {isa = PBXBuildFile; fileRef = 51C220EE2C88BBC000A00545 /* inf_achievements.lua */; };
+		51C220F32C88C46700A00545 /* steamshim_child.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51C220F22C88C46700A00545 /* steamshim_child.cpp */; };
+		51C220F42C88C46700A00545 /* steamshim_child.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51C220F22C88C46700A00545 /* steamshim_child.cpp */; };
+		51C220F52C88C46700A00545 /* steamshim_child.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51C220F22C88C46700A00545 /* steamshim_child.cpp */; };
 		51C730441E59027900558D7D /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 51C730431E59027900558D7D /* CoreAudio.framework */; };
 		51C730451E59027900558D7D /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 51C730431E59027900558D7D /* CoreAudio.framework */; };
 		51C730461E59027900558D7D /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 51C730431E59027900558D7D /* CoreAudio.framework */; };
@@ -321,9 +330,6 @@
 		51CFBA9B2C6E480500D82B8B /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB8652C6E480500D82B8B /* Console.cpp */; };
 		51CFBA9C2C6E480500D82B8B /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB8652C6E480500D82B8B /* Console.cpp */; };
 		51CFBA9D2C6E480500D82B8B /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB8652C6E480500D82B8B /* Console.cpp */; };
-		51CFBA9E2C6E480500D82B8B /* steamshim_child.c in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB8662C6E480500D82B8B /* steamshim_child.c */; };
-		51CFBA9F2C6E480500D82B8B /* steamshim_child.c in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB8662C6E480500D82B8B /* steamshim_child.c */; };
-		51CFBAA02C6E480500D82B8B /* steamshim_child.c in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB8662C6E480500D82B8B /* steamshim_child.c */; };
 		51CFBAA42C6E480500D82B8B /* Statistics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB86A2C6E480500D82B8B /* Statistics.cpp */; };
 		51CFBAA52C6E480500D82B8B /* Statistics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB86A2C6E480500D82B8B /* Statistics.cpp */; };
 		51CFBAA62C6E480500D82B8B /* Statistics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB86A2C6E480500D82B8B /* Statistics.cpp */; };
@@ -495,9 +501,6 @@
 		51CFBBB22C6E480500D82B8B /* SDL_netx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB91C2C6E480500D82B8B /* SDL_netx.cpp */; };
 		51CFBBB32C6E480500D82B8B /* SDL_netx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB91C2C6E480500D82B8B /* SDL_netx.cpp */; };
 		51CFBBB42C6E480500D82B8B /* SDL_netx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB91C2C6E480500D82B8B /* SDL_netx.cpp */; };
-		51CFBBB52C6E480500D82B8B /* RingGameProtocol.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB91D2C6E480500D82B8B /* RingGameProtocol.cpp */; };
-		51CFBBB62C6E480500D82B8B /* RingGameProtocol.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB91D2C6E480500D82B8B /* RingGameProtocol.cpp */; };
-		51CFBBB72C6E480500D82B8B /* RingGameProtocol.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB91D2C6E480500D82B8B /* RingGameProtocol.cpp */; };
 		51CFBBB82C6E480500D82B8B /* PortForward.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB9212C6E480500D82B8B /* PortForward.cpp */; };
 		51CFBBB92C6E480500D82B8B /* PortForward.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB9212C6E480500D82B8B /* PortForward.cpp */; };
 		51CFBBBA2C6E480500D82B8B /* PortForward.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CFB9212C6E480500D82B8B /* PortForward.cpp */; };
@@ -2009,6 +2012,10 @@
 		51A6CB9121A209C400D2C4ED /* AcceptButtonHighlighted.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AcceptButtonHighlighted.png; sourceTree = "<group>"; };
 		51A6CB9221A209C500D2C4ED /* AcceptButton.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AcceptButton.png; sourceTree = "<group>"; };
 		51B684FD1EB3E39E00CB1628 /* A1_fade_in.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; name = A1_fade_in.mp4; path = Resources/A1_fade_in.mp4; sourceTree = "<group>"; };
+		51C220E92C88BB5C00A00545 /* ScenarioChooser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ScenarioChooser.h; sourceTree = "<group>"; };
+		51C220EA2C88BB5C00A00545 /* ScenarioChooser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ScenarioChooser.cpp; sourceTree = "<group>"; };
+		51C220EE2C88BBC000A00545 /* inf_achievements.lua */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = inf_achievements.lua; sourceTree = "<group>"; };
+		51C220F22C88C46700A00545 /* steamshim_child.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = steamshim_child.cpp; sourceTree = "<group>"; };
 		51C730431E59027900558D7D /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/CoreAudio.framework; sourceTree = DEVELOPER_DIR; };
 		51CE513221FD514800E1132C /* web2a */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = web2a; sourceTree = "<group>"; };
 		51CFB84B2C6E480500D82B8B /* shell_options.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = shell_options.cpp; sourceTree = "<group>"; };
@@ -2037,7 +2044,6 @@
 		51CFB8632C6E480500D82B8B /* preferences.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = preferences.cpp; sourceTree = "<group>"; };
 		51CFB8642C6E480500D82B8B /* CircularByteBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CircularByteBuffer.h; sourceTree = "<group>"; };
 		51CFB8652C6E480500D82B8B /* Console.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Console.cpp; sourceTree = "<group>"; };
-		51CFB8662C6E480500D82B8B /* steamshim_child.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = steamshim_child.c; sourceTree = "<group>"; };
 		51CFB8672C6E480500D82B8B /* DefaultStringSets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DefaultStringSets.h; sourceTree = "<group>"; };
 		51CFB8692C6E480500D82B8B /* vbl_definitions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = vbl_definitions.h; sourceTree = "<group>"; };
 		51CFB86A2C6E480500D82B8B /* Statistics.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Statistics.cpp; sourceTree = "<group>"; };
@@ -2177,9 +2183,7 @@
 		51CFB9152C6E480500D82B8B /* network.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = network.h; sourceTree = "<group>"; };
 		51CFB9162C6E480500D82B8B /* network_dialog_widgets_sdl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = network_dialog_widgets_sdl.h; sourceTree = "<group>"; };
 		51CFB91C2C6E480500D82B8B /* SDL_netx.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SDL_netx.cpp; sourceTree = "<group>"; };
-		51CFB91D2C6E480500D82B8B /* RingGameProtocol.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RingGameProtocol.cpp; sourceTree = "<group>"; };
 		51CFB91E2C6E480500D82B8B /* network_star.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = network_star.h; sourceTree = "<group>"; };
-		51CFB91F2C6E480500D82B8B /* RingGameProtocol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RingGameProtocol.h; sourceTree = "<group>"; };
 		51CFB9202C6E480500D82B8B /* PortForward.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PortForward.h; sourceTree = "<group>"; };
 		51CFB9212C6E480500D82B8B /* PortForward.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PortForward.cpp; sourceTree = "<group>"; };
 		51CFB9222C6E480500D82B8B /* HTTP.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = HTTP.cpp; sourceTree = "<group>"; };
@@ -3450,6 +3454,7 @@
 				51CFB86E2C6E480500D82B8B /* Logging.h */,
 				51CFB8892C6E480500D82B8B /* m1_achievements.lua */,
 				51CFB8552C6E480500D82B8B /* m2_achievements.lua */,
+				51C220EE2C88BBC000A00545 /* inf_achievements.lua */,
 				51CFB8532C6E480500D82B8B /* PlayerImage_sdl.cpp */,
 				51CFB8612C6E480500D82B8B /* PlayerImage_sdl.h */,
 				51CFB85C2C6E480500D82B8B /* PlayerName.cpp */,
@@ -3476,8 +3481,10 @@
 				51CFB8712C6E480500D82B8B /* shared_widgets.h */,
 				51CFB86A2C6E480500D82B8B /* Statistics.cpp */,
 				51CFB87E2C6E480500D82B8B /* Statistics.h */,
-				51CFB8662C6E480500D82B8B /* steamshim_child.c */,
+				51C220EA2C88BB5C00A00545 /* ScenarioChooser.cpp */,
+				51C220E92C88BB5C00A00545 /* ScenarioChooser.h */,
 				51CFB88A2C6E480500D82B8B /* steamshim_child.h */,
+				51C220F22C88C46700A00545 /* steamshim_child.cpp */,
 				51CFB8722C6E480500D82B8B /* thread_priority_sdl_macosx.cpp */,
 				51CFB8852C6E480500D82B8B /* thread_priority_sdl.h */,
 				51CFB8692C6E480500D82B8B /* vbl_definitions.h */,
@@ -3613,8 +3620,6 @@
 				51CFB8FC2C6E480500D82B8B /* Pinger.h */,
 				51CFB9212C6E480500D82B8B /* PortForward.cpp */,
 				51CFB9202C6E480500D82B8B /* PortForward.h */,
-				51CFB91D2C6E480500D82B8B /* RingGameProtocol.cpp */,
-				51CFB91F2C6E480500D82B8B /* RingGameProtocol.h */,
 				51CFB91C2C6E480500D82B8B /* SDL_netx.cpp */,
 				51CFB9122C6E480500D82B8B /* SDL_netx.h */,
 				51CFB90C2C6E480500D82B8B /* SSLP_API.h */,
@@ -5225,6 +5230,7 @@
 				A8DEE8D9145C4FA900D8608F /* BasicHUDViewController~iphone.xib in Resources */,
 				A8DEE8E5145CDEA100D8608F /* SliderTab@2x~iphone.png in Resources */,
 				5152754E21A1F52C004D1E07 /* MenuHighlighted.png in Resources */,
+				51C220EF2C88BBC000A00545 /* inf_achievements.lua in Resources */,
 				A8DEE8E8145CDEA100D8608F /* SliderRedTrack~iphone.png in Resources */,
 				A8DEE8EB145CDEA100D8608F /* SliderBlackTrack~iphone.png in Resources */,
 				5152753F21A1F52C004D1E07 /* JoinNetworkGameHighlighted.png in Resources */,
@@ -5542,6 +5548,7 @@
 				A8421EFF14565584008BBF22 /* ThrowSwitch.png in Resources */,
 				515275A021A1F534004D1E07 /* RestoreButton.png in Resources */,
 				5152759421A1F534004D1E07 /* Difficulty-Easy.png in Resources */,
+				51C220F02C88BBC000A00545 /* inf_achievements.lua in Resources */,
 				515275A121A1F534004D1E07 /* ResumeHighlighted.png in Resources */,
 				A8421F0814565584008BBF22 /* UseComputer.png in Resources */,
 				A8DEE8DA145C4FA900D8608F /* BasicHUDViewController~iphone.xib in Resources */,
@@ -5833,6 +5840,7 @@
 				A83FBBE3144C95DF00B27426 /* SwitchOn.png in Resources */,
 				A83FBBE6144C95DF00B27426 /* SwitchOn@2x~iphone.png in Resources */,
 				A83FBBE9144C95DF00B27426 /* SwitchOn~iphone.png in Resources */,
+				51C220F12C88BBC000A00545 /* inf_achievements.lua in Resources */,
 				A8421ED914565584008BBF22 /* MenuButton.png in Resources */,
 				A8421EDC14565584008BBF22 /* MenuButton@2x~iphone.png in Resources */,
 				515275F721A1F53B004D1E07 /* RestoreButton.png in Resources */,
@@ -6049,6 +6057,7 @@
 				51CFBCB42C6E480600D82B8B /* HUDRenderer_Lua.cpp in Sources */,
 				51CFBAC22C6E480500D82B8B /* achievements.cpp in Sources */,
 				51CFBC122C6E480600D82B8B /* lzio.c in Sources */,
+				51C220EB2C88BB5C00A00545 /* ScenarioChooser.cpp in Sources */,
 				51CFBB822C6E480500D82B8B /* network_lookup_sdl.cpp in Sources */,
 				51CFBC062C6E480600D82B8B /* ldump.c in Sources */,
 				51CFBBE52C6E480600D82B8B /* lua_player.cpp in Sources */,
@@ -6060,6 +6069,7 @@
 				51CFBBB82C6E480500D82B8B /* PortForward.cpp in Sources */,
 				51CFBB012C6E480500D82B8B /* OGL_Setup.cpp in Sources */,
 				51CFBD562C6E480600D82B8B /* placement.cpp in Sources */,
+				51C220F32C88C46700A00545 /* steamshim_child.cpp in Sources */,
 				51CFBBC72C6E480500D82B8B /* network_star_hub.cpp in Sources */,
 				51CFBD442C6E480600D82B8B /* map_constructors.cpp in Sources */,
 				A8A06C80125819C800BE6EF5 /* PDColoredProgressView.m in Sources */,
@@ -6109,7 +6119,6 @@
 				51CFBBC12C6E480500D82B8B /* ConnectPool.cpp in Sources */,
 				51CFBD1D2C6E480600D82B8B /* resource_manager.cpp in Sources */,
 				51CFBBBB2C6E480500D82B8B /* HTTP.cpp in Sources */,
-				51CFBBB52C6E480500D82B8B /* RingGameProtocol.cpp in Sources */,
 				51CFBDAA2C6E480600D82B8B /* shell.cpp in Sources */,
 				51CFBC152C6E480600D82B8B /* ldblib.c in Sources */,
 				51CFBC902C6E480600D82B8B /* screen.cpp in Sources */,
@@ -6132,7 +6141,6 @@
 				51CFBAB62C6E480500D82B8B /* vbl.cpp in Sources */,
 				51CFBD6B2C6E480600D82B8B /* physics.cpp in Sources */,
 				51CFBC9C2C6E480600D82B8B /* HUDRenderer_SW.cpp in Sources */,
-				51CFBA9E2C6E480500D82B8B /* steamshim_child.c in Sources */,
 				51CFBC362C6E480600D82B8B /* lapi.c in Sources */,
 				51CFBD3B2C6E480600D82B8B /* CommunicationsChannel.cpp in Sources */,
 				51CFBD082C6E480600D82B8B /* Packing.cpp in Sources */,
@@ -6314,6 +6322,7 @@
 				51CFBCB52C6E480600D82B8B /* HUDRenderer_Lua.cpp in Sources */,
 				51CFBAC32C6E480500D82B8B /* achievements.cpp in Sources */,
 				51CFBC132C6E480600D82B8B /* lzio.c in Sources */,
+				51C220EC2C88BB5C00A00545 /* ScenarioChooser.cpp in Sources */,
 				51CFBB832C6E480500D82B8B /* network_lookup_sdl.cpp in Sources */,
 				51CFBC072C6E480600D82B8B /* ldump.c in Sources */,
 				51CFBBE62C6E480600D82B8B /* lua_player.cpp in Sources */,
@@ -6325,6 +6334,7 @@
 				51CFBBB92C6E480500D82B8B /* PortForward.cpp in Sources */,
 				51CFBB022C6E480500D82B8B /* OGL_Setup.cpp in Sources */,
 				51CFBD572C6E480600D82B8B /* placement.cpp in Sources */,
+				51C220F42C88C46700A00545 /* steamshim_child.cpp in Sources */,
 				51CFBBC82C6E480500D82B8B /* network_star_hub.cpp in Sources */,
 				51CFBD452C6E480600D82B8B /* map_constructors.cpp in Sources */,
 				A881216912C7816300A1A08E /* AlephOneShell.cpp in Sources */,
@@ -6374,7 +6384,6 @@
 				51CFBBC22C6E480500D82B8B /* ConnectPool.cpp in Sources */,
 				51CFBD1E2C6E480600D82B8B /* resource_manager.cpp in Sources */,
 				51CFBBBC2C6E480500D82B8B /* HTTP.cpp in Sources */,
-				51CFBBB62C6E480500D82B8B /* RingGameProtocol.cpp in Sources */,
 				51CFBDAB2C6E480600D82B8B /* shell.cpp in Sources */,
 				51CFBC162C6E480600D82B8B /* ldblib.c in Sources */,
 				51CFBC912C6E480600D82B8B /* screen.cpp in Sources */,
@@ -6397,7 +6406,6 @@
 				51CFBAB72C6E480500D82B8B /* vbl.cpp in Sources */,
 				51CFBD6C2C6E480600D82B8B /* physics.cpp in Sources */,
 				51CFBC9D2C6E480600D82B8B /* HUDRenderer_SW.cpp in Sources */,
-				51CFBA9F2C6E480500D82B8B /* steamshim_child.c in Sources */,
 				51CFBC372C6E480600D82B8B /* lapi.c in Sources */,
 				51CFBD3C2C6E480600D82B8B /* CommunicationsChannel.cpp in Sources */,
 				51CFBD092C6E480600D82B8B /* Packing.cpp in Sources */,
@@ -6579,6 +6587,7 @@
 				51CFBCB62C6E480600D82B8B /* HUDRenderer_Lua.cpp in Sources */,
 				51CFBAC42C6E480500D82B8B /* achievements.cpp in Sources */,
 				51CFBC142C6E480600D82B8B /* lzio.c in Sources */,
+				51C220ED2C88BB5C00A00545 /* ScenarioChooser.cpp in Sources */,
 				51CFBB842C6E480500D82B8B /* network_lookup_sdl.cpp in Sources */,
 				51CFBC082C6E480600D82B8B /* ldump.c in Sources */,
 				51CFBBE72C6E480600D82B8B /* lua_player.cpp in Sources */,
@@ -6590,6 +6599,7 @@
 				51CFBBBA2C6E480500D82B8B /* PortForward.cpp in Sources */,
 				51CFBB032C6E480500D82B8B /* OGL_Setup.cpp in Sources */,
 				51CFBD582C6E480600D82B8B /* placement.cpp in Sources */,
+				51C220F52C88C46700A00545 /* steamshim_child.cpp in Sources */,
 				51CFBBC92C6E480500D82B8B /* network_star_hub.cpp in Sources */,
 				51CFBD462C6E480600D82B8B /* map_constructors.cpp in Sources */,
 				A881237112C7826300A1A08E /* PDColoredProgressView.m in Sources */,
@@ -6639,7 +6649,6 @@
 				51CFBBC32C6E480500D82B8B /* ConnectPool.cpp in Sources */,
 				51CFBD1F2C6E480600D82B8B /* resource_manager.cpp in Sources */,
 				51CFBBBD2C6E480500D82B8B /* HTTP.cpp in Sources */,
-				51CFBBB72C6E480500D82B8B /* RingGameProtocol.cpp in Sources */,
 				51CFBDAC2C6E480600D82B8B /* shell.cpp in Sources */,
 				51CFBC172C6E480600D82B8B /* ldblib.c in Sources */,
 				51CFBC922C6E480600D82B8B /* screen.cpp in Sources */,
@@ -6662,7 +6671,6 @@
 				51CFBAB82C6E480500D82B8B /* vbl.cpp in Sources */,
 				51CFBD6D2C6E480600D82B8B /* physics.cpp in Sources */,
 				51CFBC9E2C6E480600D82B8B /* HUDRenderer_SW.cpp in Sources */,
-				51CFBAA02C6E480500D82B8B /* steamshim_child.c in Sources */,
 				51CFBC382C6E480600D82B8B /* lapi.c in Sources */,
 				51CFBD3D2C6E480600D82B8B /* CommunicationsChannel.cpp in Sources */,
 				51CFBD0A2C6E480600D82B8B /* Packing.cpp in Sources */,
@@ -7274,7 +7282,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -7372,7 +7380,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -7461,7 +7469,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -7854,7 +7862,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";

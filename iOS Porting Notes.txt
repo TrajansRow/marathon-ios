@@ -161,11 +161,11 @@ Many of the following changes need the AlephOneHelper.h header for various hooks
 
 In shell.cpp, add the Helper header and then right before "const string data_env = a1_getenv("ALEPHONE_DATA");", change default_data_dir using (also include the healer header file): 
 #if TARGET_OS_IPHONE
-  default_data_dir = getDataDir();
-  local_data_dir = getLocalDataDir();
-  //log_dir = getLocalTmpDir(); //DCW ok, this is not great because the log file grows forever. Commenting out.
+	//iOS directory override
+	default_data_dir = getDataDir();
+	local_data_dir = getLocalDataDir();
+	//log_dir = getLocalTmpDir(); //This is not great because the log file grows forever. Commenting out.
 #endif
-
 
 ***Force OpenGL ES 3.0
 
@@ -542,7 +542,7 @@ In config.h, undefine these (actually, maybe not needed...):
 
 ***Prevent last_event_poll = 0; from getting reset on each frame!
 
-***Figure out why SDL_WaitEventTimeout() in AlephONeShell.cpp->AlephOneMainLoop() causes slow frame rates in Release builds. Is temporarily commented out.
+***Figure out why SDL_WaitEventTimeout() in AlephOneShell.cpp->AlephOneMainLoop() causes slow frame rates in Release builds. Is temporarily commented out.
 
 
 ***Add check for allow local network connections permission in the app, because denying this can cause a silent failure to find net games. '"Infinity" would like to find and connect to devices on your local network.'
