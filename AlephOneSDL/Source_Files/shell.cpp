@@ -1061,7 +1061,7 @@ static void handle_game_key(const SDL_Event &event)
 			extern bool displaying_fps;
 			displaying_fps = !displaying_fps;
 		}
-		else if (input_preferences->shell_key_bindings[_key_activate_console].count(sc))
+		else if (input_preferences->shell_key_bindings[_key_activate_console].count(sc) || key == SDLK_BACKSLASH ) //iOS needs check for || key == SDLK_BACKSLASH
 		{
 			if (game_is_networked) {
 #if !defined(DISABLE_NETWORKING)
@@ -1079,7 +1079,7 @@ static void handle_game_key(const SDL_Event &event)
 				PlayInterfaceButtonSound(Sound_ButtonFailure());
 			}
 		} 
-		else if (input_preferences->shell_key_bindings[_key_show_scores].count(sc))
+		else if (input_preferences->shell_key_bindings[_key_show_scores].count(sc) || key == SDLK_1) //iOS needs check for || key == SDLK_1
 		{
 			PlayInterfaceButtonSound(Sound_ButtonSuccess());
 			{

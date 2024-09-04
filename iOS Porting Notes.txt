@@ -43,8 +43,26 @@ From the new source tree, sort all of the subfolders by name. Then Remove Refere
 
 We need a copy of the main event loop to run without the enclosing infinite while loop. Look in shell.cpp->void main_event_loop(void), and grab the inner contents of the "while ((game_state = get_game_state()) != _quit_game)" loop, and paste it into the void AlephOneMainLoop() function in AlephOneShell.cpp
 
-Also, add this in there somewhere:
-	global_idle_proc(); //Needed to refresh 3D sounds on iOS, since a false poll_event prevents idle refresh.
+Remove these lines, and make sure they are OUTSIDE of the AlephOneMainLoop() definition:
+	uint32 last_event_poll = 0;
+	short game_state;
+
+It should look something like this:
+
+...
+//last_event_poll and game_state need to be outside this scope, otherwise 3D sounds and console keys won't work.
+uint32 last_event_poll = 0;
+short game_state = 0;
+void AlephOneMainLoop()
+{
+...
+
+If you don't do the above, stereo sounds will not update panning and the console and stats keys won't work!
+
+
+
+***See notes on commenting out SDL_WaitEventTimeout below!!!
+
 
 
 ***Update OpenGL Headers for ES
@@ -166,6 +184,18 @@ In shell.cpp, add the Helper header and then right before "const string data_env
 	local_data_dir = getLocalDataDir();
 	//log_dir = getLocalTmpDir(); //This is not great because the log file grows forever. Commenting out.
 #endif
+
+***Enable console and stats keys
+
+In shell.cpp-> handle game key, change:
+
+		else if (input_preferences->shell_key_bindings[_key_show_scores].count(sc) || key == SDLK_1) //iOS needs check for || key == SDLK_1
+
+
+And:
+		else if (input_preferences->shell_key_bindings[_key_activate_console].count(sc) || key == SDLK_BACKSLASH ) //iOS needs check for || key == SDLK_BACKSLASH
+
+
 
 ***Force OpenGL ES 3.0
 

@@ -120,11 +120,12 @@ static uint32 lastTimeThroughLoop = 0;
 // CADisplayLink
 //const uint32 TICKS_BETWEEN_EVENT_POLL = 167; // 6 Hz
 const uint32 TICKS_BETWEEN_EVENT_POLL = 16; // 60 Hz
+
+//last_event_poll and game_state need to be outside this scope, otherwise 3D sounds and console keys won't work.
+uint32 last_event_poll = 0;
+short game_state = 0;
 void AlephOneMainLoop()
 {
-  uint32 last_event_poll = 0;
-  short game_state;
-  
 	uint32 cur_time = machine_tick_count();
 	bool yield_time = false;
 	bool poll_event = false;
@@ -161,7 +162,6 @@ void AlephOneMainLoop()
 			break;
 	}
 	
-	global_idle_proc(); //Needed to refresh 3D sounds on iOS, since a false poll_event prevents idle refresh.
 	if (poll_event) {
 		global_idle_proc();
 
