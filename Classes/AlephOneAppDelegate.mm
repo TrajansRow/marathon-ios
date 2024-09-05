@@ -139,6 +139,9 @@ SDL_IdleTimerDisabledChanged(void *userdata, const char *name, const char *oldVa
   for(int i=0; i<SDL_NUM_SCANCODES; ++i)
     fake_key_map[i]=0;
   
+	//Any iPhone 11 (iPhone12,*) or older gets 30 fps as the default, otherwise default to 60.
+	int defaultFPSTarget = (isiPhone() && majorDeviceVersion() <= 12) ? 30 : 60;
+	
   // Default preferences
   // Set the application defaults  
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
@@ -180,7 +183,7 @@ SDL_IdleTimerDisabledChanged(void *userdata, const char *name, const char *oldVa
                                @"YES", kUseTransparentLiquids,
                                @"NO", kUseBloom,
                                @"NO", kUseExtraFOV,
-															 [NSNumber numberWithInt:60], kFPSTarget,
+															 [NSNumber numberWithInt:defaultFPSTarget], kFPSTarget,
 															 @"YES", kUseBumpMapping,
 															 @"NO", kShowFPS,
                                nil];

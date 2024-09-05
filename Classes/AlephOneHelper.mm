@@ -19,6 +19,8 @@
 #include "computer_interface.h" //Used for player in terminal check
 #include "SDL2/SDL_syswm.h"
 
+#include <sys/sysctl.h>
+
 #include "player.h"
 #include "preferences.h"
 #include "key_definitions.h"
@@ -71,6 +73,34 @@ int screenShortDimension;
 float screenScale;
 
 NSString *dataDir;
+
+
+extern bool isiPhone() 
+{
+	bool isiPhone = [[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone;
+	return isiPhone;
+}
+extern int majorDeviceVersion()
+{
+	size_t size;
+	sysctlbyname("hw.machine", NULL, &size, NULL, 0);
+	char *machine = (char *)malloc(size);
+	sysctlbyname("hw.machine", machine, &size, NULL, 0);
+	NSString *platform = [NSString stringWithCString:machine encoding:NSUTF8StringEncoding];
+	free(machine);
+	
+	// Extract the major version
+	int deviceMajor = 0;
+	NSArray *components = [platform componentsSeparatedByString:@","];
+	if (components.count > 0) {
+					NSString *majorVersionString = components[0];
+					NSCharacterSet *nonDigitCharacterSet = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+					NSString *digitsOnly = [[majorVersionString componentsSeparatedByCharactersInSet:nonDigitCharacterSet] componentsJoinedByString:@""];
+					deviceMajor = [digitsOnly intValue];
+	}
+	
+	return deviceMajor;
+}
 
 void printGLError( const char* message ) {
   switch ( glGetError() ) {

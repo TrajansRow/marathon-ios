@@ -4148,18 +4148,6 @@
 		A83983DC11F2AB92002E7CF2 /* Classes */ = {
 			isa = PBXGroup;
 			children = (
-				A80498DE13DDC97900F807FB /* HUD */,
-				513436E32266C9B400435C9D /* AOMGameController.h */,
-				513436E42266C9B400435C9D /* AOMGameController.mm */,
-				A8193C2F140EB09C00FFD05A /* RootViewController.h */,
-				A8193C30140EB09C00FFD05A /* RootViewController.mm */,
-				A84CA788130E1F9800A3A4F4 /* Secrets.h */,
-				A8EB682512DC1413001D43EA /* Appirater.h */,
-				A8EB682612DC1413001D43EA /* Appirater.m */,
-				A88124A012C79E0100A1A08E /* FilmCell.h */,
-				A88124A112C79E0100A1A08E /* FilmCell.m */,
-				A88124A212C79E0100A1A08E /* FilmViewController.h */,
-				A88124A312C79E0100A1A08E /* FilmViewController.mm */,
 				32CA4F630368D1EE00C91783 /* AlephOne_Prefix.pch */,
 				A8AD432312220F9500A09383 /* AlephOneAppDelegate.h */,
 				A8AD432212220F9500A09383 /* AlephOneAppDelegate.mm */,
@@ -4167,14 +4155,29 @@
 				A84254AB11B4A9DA00F4D68F /* AlephOneHelper.mm */,
 				A82B5BD9122ECAAF00B0316C /* AlephOneShell.cpp */,
 				A82B5BD8122ECAAF00B0316C /* AlephOneShell.h */,
+				A817BDFE12CCC84300C31134 /* AlertPrompt.h */,
+				A817BDFF12CCC84300C31134 /* AlertPrompt.m */,
+				A80498DF13DDC9D500F807FB /* AlertView.h */,
+				A80498E013DDC9D500F807FB /* AlertView.m */,
+				513436E32266C9B400435C9D /* AOMGameController.h */,
+				513436E42266C9B400435C9D /* AOMGameController.mm */,
+				A8EB682512DC1413001D43EA /* Appirater.h */,
+				A8EB682612DC1413001D43EA /* Appirater.m */,
 				A88E2DF812BC72C200ABFAAA /* Constants.h */,
 				A8A06C7F125819C800BE6EF5 /* drawing.m */,
 				A88E2EB312BDB43000ABFAAA /* Effects.h */,
 				A88E2EB412BDB43000ABFAAA /* Effects.m */,
+				A88124A012C79E0100A1A08E /* FilmCell.h */,
+				A88124A112C79E0100A1A08E /* FilmCell.m */,
+				A88124A212C79E0100A1A08E /* FilmViewController.h */,
+				A88124A312C79E0100A1A08E /* FilmViewController.mm */,
 				A8562A7811DACF1B0071DFEF /* GameViewController.h */,
 				A8562A7911DACF1B0071DFEF /* GameViewController.mm */,
 				A8C3922B129789A100E09E32 /* HelpViewController.h */,
 				A8C3922C129789A100E09E32 /* HelpViewController.mm */,
+				A80498DE13DDC97900F807FB /* HUD */,
+				519FCACB1EA06A450066EE69 /* KeychainItemWrapper.h */,
+				519FCACC1EA06A450066EE69 /* KeychainItemWrapper.m */,
 				A8AD432412220F9500A09383 /* main.m */,
 				A8C29BA41224B69600E79491 /* ManagedObjects.h */,
 				A8C29BA51224B69600E79491 /* ManagedObjects.m */,
@@ -4186,29 +4189,26 @@
 				A8A06C7D125819C800BE6EF5 /* PDColoredProgressView.m */,
 				A8EB77F21266A1130043F0D4 /* PreferencesViewController.h */,
 				A8EB77F31266A1130043F0D4 /* PreferencesViewController.mm */,
+				A8A4D31112A4B2C100AEE140 /* Prefs.h */,
+				A8D5AA7E126545AE002211FB /* ProgressViewController.h */,
+				A8D5AA7F126545AE002211FB /* ProgressViewController.mm */,
 				514F145121195A0C00685003 /* Purchases.h */,
 				514F145221195A0C00685003 /* Purchases.mm */,
 				514F144F21195A0B00685003 /* PurchaseViewController.h */,
 				514F145021195A0B00685003 /* PurchaseViewController.mm */,
-				519FCACB1EA06A450066EE69 /* KeychainItemWrapper.h */,
-				519FCACC1EA06A450066EE69 /* KeychainItemWrapper.m */,
-				A8A4D31112A4B2C100AEE140 /* Prefs.h */,
-				A8D5AA7E126545AE002211FB /* ProgressViewController.h */,
-				A8D5AA7F126545AE002211FB /* ProgressViewController.mm */,
+				A8193C2F140EB09C00FFD05A /* RootViewController.h */,
+				A8193C30140EB09C00FFD05A /* RootViewController.mm */,
+				A817C0121323318E00964061 /* RoundedView.h */,
+				A817C0131323318E00964061 /* RoundedView.m */,
 				A8B4138F1235DE10000D59A4 /* SavedGameCell.h */,
 				A8B413901235DE10000D59A4 /* SavedGameCell.m */,
 				A8DC98E51238799C00317186 /* SaveGame.xcdatamodeld */,
 				A8AE47C51229152F0093110D /* SaveGameViewController.h */,
 				A8AE47C61229152F0093110D /* SaveGameViewController.mm */,
 				A8D0D6941248544E0098D2AB /* SaveState.h */,
-				A817BDFE12CCC84300C31134 /* AlertPrompt.h */,
-				A817BDFF12CCC84300C31134 /* AlertPrompt.m */,
-				A817C0121323318E00964061 /* RoundedView.h */,
-				A817C0131323318E00964061 /* RoundedView.m */,
+				A84CA788130E1F9800A3A4F4 /* Secrets.h */,
 				A8528B6B1353EBC500EFB947 /* Statistics.h */,
 				A8528B6C1353EBC500EFB947 /* Statistics.m */,
-				A80498DF13DDC9D500F807FB /* AlertView.h */,
-				A80498E013DDC9D500F807FB /* AlertView.m */,
 			);
 			name = Classes;
 			sourceTree = "<group>";
@@ -7282,7 +7282,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -7380,7 +7380,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -7469,7 +7469,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -7862,7 +7862,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";

@@ -20,6 +20,8 @@
 // #define USE_SDL_EVENT_LOOP 1
 #define USE_CADisplayLoop 1
 
+extern bool isiPhone();
+extern int majorDeviceVersion();
 extern void* getLayerFromSDLWindow(SDL_Window *main_screen);
 extern void cleanRenderer(SDL_Renderer *renderer);
 extern void setDefaultA1View();
