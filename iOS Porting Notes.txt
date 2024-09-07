@@ -563,6 +563,13 @@ In config.h, undefine these (actually, maybe not needed...):
 #define HAVE_MINIUPNPC_MINIUPNPC_H 0
 
 
+***Enable hiding of HUD and controls for cinematic recording
+In screen.cpp->render_screen(), in the OpenGL version of DrawHUD, add a conditional of:
+#ifdef HAVE_OPENGL
+		if (Screen::instance()->hud() && !shouldHideHud()) {
+
+
+
 
 ~~~~~ All Done! Good luck and have fun! ~~~~~
 
