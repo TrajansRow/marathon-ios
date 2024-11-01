@@ -1833,7 +1833,7 @@ short items[]=
     if ([currSysVer compare:reqSysVer options:NSNumericSearch] != NSOrderedAscending) {
       displayLinkSupported = TRUE;
     }
-
+		
     NSInteger animationFrameInterval = 2;
     if (displayLinkSupported) {
       // CADisplayLink is API new to iPhone SDK 3.1. Compiling against earlier versions will result in a warning, but can be dismissed
@@ -1844,7 +1844,7 @@ short items[]=
 				[self setFPSFromPrefs];
         [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
     } else {
-      animationTimer = [NSTimer scheduledTimerWithTimeInterval:(NSTimeInterval)((1.0 / 60.0) * animationFrameInterval) target:self selector:@selector(runMainLoopOnce:) userInfo:nil repeats:TRUE];
+			animationTimer = [NSTimer scheduledTimerWithTimeInterval:(NSTimeInterval)((1.0 / 60.0) * animationFrameInterval) target:self selector:@selector(runMainLoopOnce:) userInfo:nil repeats:TRUE];
     }
     inMainLoop = NO;
     animating = YES;
@@ -1872,7 +1872,6 @@ short items[]=
 
 - (void)setFPSFromPrefs {
 	//As long as the game engine runs at unlimited fps, displayLink fps can be set to anything.
-	
 	int preferredFPS = [[NSUserDefaults standardUserDefaults] integerForKey:kFPSTarget];
 	if( preferredFPS < 30 ) { preferredFPS = 60; }
 	[displayLink setPreferredFrameRateRange:CAFrameRateRangeMake(30, 120, preferredFPS)]; //Min. Max, Preferred
@@ -1909,7 +1908,7 @@ short items[]=
     }
     // Causing a bug, always dim
     // [self.HUDViewController dimActionKey:0];
-    if ( mode == GameMode ) {
+    if ( mode == GameMode && current_player_index >= 0) {
         short target_type, object_index;
         object_index = localFindActionTarget(current_player_index, MAXIMUM_ACTIVATION_RANGE, &target_type);
         if ( NONE == object_index ) {

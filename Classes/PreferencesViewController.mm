@@ -29,7 +29,6 @@
 @synthesize musicVolume;
 @synthesize hSensitivity;
 @synthesize vSensitivity;
-@synthesize musicLabel;
 @synthesize crosshairs;
 @synthesize onScreenTrigger;
 @synthesize hiLowTapsAltFire;
@@ -51,6 +50,8 @@
 @synthesize preferredFPS, fpsNote;
 @synthesize showFPS;
 @synthesize bumpMapping;
+@synthesize musicLabel;
+@synthesize music;
 
 - (IBAction)closePreferences:(id)sender {
   // Save the back to defaults
@@ -133,6 +134,8 @@
 	
 	[defaults setBool:[self.showFPS isSelected] forKey:kShowFPS];
 	[defaults setBool:[self.bumpMapping isSelected] forKey:kUseBumpMapping];
+	
+	[defaults setBool:[self.music isSelected] forKey:kUseMusic];
 	
   [defaults synchronize];
   [PreferencesViewController setAlephOnePreferences:YES checkPurchases:inMainMenu];
@@ -248,6 +251,14 @@
 
 	[self.bumpMapping setSelected:[defaults boolForKey:kUseBumpMapping]];
 	
+	[self.musicLabel setText:@"Fan Music by Talashar:"];
+	#if SCENARIO == 1
+	[self.musicLabel setText:@"Original Music:"];
+	#endif
+	
+	[self.music setSelected:[defaults boolForKey:kUseMusic]];
+
+	
   [self.dPadAction setSelected:[defaults boolForKey:kDPadAction]];
   [self.threeDTouchFires setSelected:[defaults boolForKey:kThreeDTouchFires]];
   if ( self.traitCollection.forceTouchCapability == UIForceTouchCapabilityAvailable ) {
@@ -266,10 +277,10 @@
   self.hSensitivity.value = [defaults floatForKey:kHSensitivity];
   self.vSensitivity.value = [defaults floatForKey:kVSensitivity];
   self.brightness.value = [defaults floatForKey:kGamma];
-#if SCENARIO == 1
+//#if SCENARIO == 1
   self.musicLabel.hidden = NO;
   self.musicVolume.hidden = NO;
-#endif
+//#endif
   self.hiresTexturesLabel.hidden = YES;
   self.hiresTextures.hidden = YES;
   [self.hiresTextures setSelected:[defaults boolForKey:kUseTTEP]];

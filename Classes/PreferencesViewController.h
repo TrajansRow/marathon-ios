@@ -32,7 +32,6 @@
   UIButton *hiresTextures;
   UILabel *vidmasterModeLabel;
   UIButton *vidmasterMode;
-  UILabel *musicLabel;
   UILabel *filmsDisabled;
   UIView *screenView;
   UIButton *bloom;
@@ -43,6 +42,8 @@
 	UILabel *fpsNote;
 	UIButton *showFPS;
 	UIButton *bumpMapping;
+	UILabel *musicLabel;
+	UIButton *music;
 }
 
 @property (nonatomic, retain) IBOutlet UIScrollView *prefsScrollView;
@@ -65,7 +66,6 @@
 @property (nonatomic, retain) IBOutlet UIButton *dPadAction;
 @property (nonatomic, retain) IBOutlet UISlider *sfxVolume;
 @property (nonatomic, retain) IBOutlet UISlider *musicVolume;
-@property (nonatomic, retain) IBOutlet UILabel *musicLabel;
 @property (nonatomic, retain) IBOutlet UILabel *filmsDisabled;
 @property (nonatomic, retain) IBOutlet UISlider *hSensitivity;
 @property (nonatomic, retain) IBOutlet UISlider *vSensitivity;
@@ -78,7 +78,8 @@
 @property (nonatomic, retain) IBOutlet UILabel *fpsNote;
 @property (nonatomic, retain) IBOutlet UIButton *showFPS;
 @property (nonatomic, retain) IBOutlet UIButton *bumpMapping;
-
+@property (nonatomic, retain) IBOutlet UILabel *musicLabel;
+@property (nonatomic, retain) IBOutlet UIButton *music;
 
 
 @property (nonatomic, retain) IBOutlet UIButton *hiresTextures;

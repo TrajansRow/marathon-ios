@@ -124,8 +124,23 @@ const uint32 TICKS_BETWEEN_EVENT_POLL = 16; // 60 Hz
 //last_event_poll and game_state need to be outside this scope, otherwise 3D sounds and console keys won't work.
 uint32 last_event_poll = 0;
 short game_state = 0;
+
+time_t start_time = time(NULL);
+time_t current_time;
+float frames = 0;
+
 void AlephOneMainLoop()
 {
+	game_state = get_game_state();
+	frames++;
+	current_time = time(NULL);
+	if (difftime(current_time, start_time) >= 1.0) {
+		//printf("AlephOneMainLoop per second: %f GameState: %d\n", frames, game_state);
+		start_time = current_time; // Reset the start time
+		frames = 0;
+
+	}
+	
 	uint32 cur_time = machine_tick_count();
 	bool yield_time = false;
 	bool poll_event = false;
@@ -161,7 +176,8 @@ void AlephOneMainLoop()
 			yield_time = poll_event = true;
 			break;
 	}
-	
+
+
 	if (poll_event) {
 		global_idle_proc();
 
@@ -227,6 +243,5 @@ void AlephOneMainLoop()
 			last_redraw = machine_tick_count();
 		}
 	}
-
 }
 

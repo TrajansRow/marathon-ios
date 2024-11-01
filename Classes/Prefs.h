@@ -10,6 +10,7 @@
 
 #define kSfxVolume @"sfxVolume"
 #define kMusicVolume @"musicVolume"
+#define kUseMusic @"useMusic"
 #define kHSensitivity @"horizontalSensitivity"
 #define kVSensitivity @"verticalSensitivity"
 #define kTapShoots @"tapShoots"

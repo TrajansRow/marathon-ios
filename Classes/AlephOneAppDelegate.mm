@@ -186,6 +186,11 @@ SDL_IdleTimerDisabledChanged(void *userdata, const char *name, const char *oldVa
 															 [NSNumber numberWithInt:defaultFPSTarget], kFPSTarget,
 															 @"YES", kUseBumpMapping,
 															 @"NO", kShowFPS,
+															#if SCENARIO == 1
+															 @"YES", kUseMusic,
+															#else
+															 @"NO", kUseMusic,
+															#endif
                                nil];
   [defaults registerDefaults:appDefaults];
   [defaults synchronize];  

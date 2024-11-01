@@ -59,6 +59,7 @@ extern int iOSFPSTarget();
 extern float CAFrameRate();
 extern bool showiOSFPS();
 extern bool useBumpMapping();
+extern void setVolumeAndRefreshSound();
 extern void AddItemsToPlayer(short ItemType, short MaxNumber);
 extern void AddOneItemToPlayer(short ItemType, short MaxNumber);
 extern bool headBelowMedia ();

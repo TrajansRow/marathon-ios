@@ -573,6 +573,7 @@ extern GLfloat helperPauseAlpha() {
 
 void helperSetPreferences( int notify) {
   [PreferencesViewController setAlephOnePreferences:notify checkPurchases:YES];
+	setVolumeAndRefreshSound(); //Refresh sound preferences to apply any volume changes.
 }
 
 bool getLocalPlayer () {
@@ -597,6 +598,23 @@ bool showiOSFPS() {
 
 bool useBumpMapping() {
 	return [[NSUserDefaults standardUserDefaults] boolForKey:kUseBumpMapping];
+}
+
+void setVolumeAndRefreshSound() {
+	
+	float previous_music_db = sound_preferences->music_db;
+	
+	bool useMusic = [[NSUserDefaults standardUserDefaults] boolForKey:kUseMusic] || [GameViewController sharedInstance].mode != GameMode;
+
+	//On iOS, volume -6db and music at -18db sounds good. If sound is off, use -20.
+	sound_preferences->volume_db = -6;
+	sound_preferences->music_db = useMusic ? -18 : -20;
+	
+	//Only reload sound manager if there is a change to music volume, otherwise, the volume will change everytime you close preferences.
+	if(previous_music_db != sound_preferences->music_db) {
+		SoundManager::instance()->SetParameters(*sound_preferences);
+	}
+	
 }
 
 //These functions were cribbed from an older version of Aleph One, and have since been removed from newer versions. Replicated here for cheat capability.
