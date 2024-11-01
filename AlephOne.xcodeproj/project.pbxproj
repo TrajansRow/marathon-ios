@@ -6771,6 +6771,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
@@ -6810,54 +6811,56 @@
 				);
 				GCC_THUMB_SUPPORT = NO;
 				"GCC_THUMB_SUPPORT[arch=armv7]" = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(SRCROOT)/submodules/Libraries/freetype_2.4.4/include/**",
-					"${SOURCE_ROOT}/submodules//Libraries/libvorbis-1.2.0/include",
-					"${SOURCE_ROOT}/submodules/Libraries/libogg-1.1.3/include",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_ttf-2.0.14",
-					"${SOURCE_ROOT}/submodules//Libraries/boost_1_63_0",
-					"$(SRCROOT)/submodules/Libraries/FFmpeg-iOS/include",
-					"$(SRCROOT)/AlephOneSDL/Source_Files",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2-2.0.10/src/events",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2-2.0.10/include",
-					"${SOURCE_ROOT}/Libraries/SDL2_net-2.0.1",
-					"$(SRCROOT)/AlephOneSDL/Source_Files/CSeries",
-					"$(SRCROOT)/submodules/Libraries/glm",
-					"${SRCROOT}/submodules/Libraries/bgfx/bgfx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bimg/include",
-					"${SRCROOT}/shaders/shader_h",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_image-2.0.1",
-				);
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
+				"HEADER_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
+				"HEADER_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/include";
 				INFOPLIST_FILE = Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/submodules/Libraries/SDL\"",
-					"$(PROJECT_DIR)/submodules/Libraries/TestFlight",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL",
-					"$(PROJECT_DIR)/submodules/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/Classes/TapittyTapTap",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.5",
-					"$(PROJECT_DIR)/submodules/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_ttf-2.0.14",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_net-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_image-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10/build-scripts/lib",
-					"$(PROJECT_DIR)/Classes",
-					"$(PROJECT_DIR)/submodules/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx/fat_libs",
-				);
-				MARKETING_VERSION = 6.0;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
+				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/lib";
+				MARKETING_VERSION = 6.1;
 				OTHER_CFLAGS = "";
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",
 				);
-				OTHER_LDFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-lSDL2",
+					"-liconv",
+					"-lm",
+					"-Wl,-weak_framework,CoreHaptics",
+					"-Wl,-weak_framework,QuartzCore",
+					"-Wl,-weak_framework,Metal",
+					"-Wl,-weak_framework,GameController",
+					"-Wl,-current_version,15.0.0",
+					"-Wl,-compatibility_version,1.0.0",
+					"-Wl,-undefined,error",
+					"-lSDL2_image",
+					"-lSDL2_net",
+					"-lSDL2_ttf",
+					"-lfreetype",
+					"-lboost_filesystem",
+					"-lbz2",
+					"-lbrotlicommon",
+					"-lbrotlienc",
+					"-lbrotlidec",
+					"-framework",
+					VideoToolbox,
+					"-lzzip",
+					"-lvorbis",
+					"-lFLAC",
+					"-lopus",
+					"-lpng",
+					"-lz",
+					"-logg",
+					"-lvorbisenc",
+					"-lnfd",
+					"-lsndfile",
+					"-lopenal",
+					"-ljpeg",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.swirlingvortex.m1;
 				PRODUCT_NAME = Marathon;
 				PROVISIONING_PROFILE = "";
@@ -6874,6 +6877,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -6911,54 +6915,51 @@
 				);
 				GCC_THUMB_SUPPORT = NO;
 				"GCC_THUMB_SUPPORT[arch=armv7]" = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(SRCROOT)/submodules/Libraries/freetype_2.4.4/include/**",
-					"${SOURCE_ROOT}/submodules//Libraries/libvorbis-1.2.0/include",
-					"${SOURCE_ROOT}/submodules/Libraries/libogg-1.1.3/include",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_ttf-2.0.14",
-					"${SOURCE_ROOT}/submodules//Libraries/boost_1_63_0",
-					"$(SRCROOT)/submodules/Libraries/FFmpeg-iOS/include",
-					"$(SRCROOT)/AlephOneSDL/Source_Files",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2-2.0.10/src/events",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2-2.0.10/include",
-					"${SOURCE_ROOT}/Libraries/SDL2_net-2.0.1",
-					"$(SRCROOT)/AlephOneSDL/Source_Files/CSeries",
-					"$(SRCROOT)/submodules/Libraries/glm",
-					"${SRCROOT}/submodules/Libraries/bgfx/bgfx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bimg/include",
-					"${SRCROOT}/shaders/shader_h",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_image-2.0.1",
-				);
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
 				INFOPLIST_FILE = Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/submodules/Libraries/freetype-2.4.4\"",
-					"\"$(SRCROOT)/submodules/Libraries/SDL\"",
-					"$(PROJECT_DIR)/submodules/Libraries/TestFlight",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL",
-					"$(PROJECT_DIR)/submodules/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/Classes/TapittyTapTap",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.5",
-					"$(PROJECT_DIR)/submodules/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_ttf-2.0.14",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_net-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_image-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10/build-scripts/lib",
-					"$(PROJECT_DIR)/Classes",
-					"$(PROJECT_DIR)/submodules/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx/fat_libs",
-				);
-				MARKETING_VERSION = 6.0;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
+				MARKETING_VERSION = 6.1;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",
 				);
-				OTHER_LDFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-lSDL2",
+					"-liconv",
+					"-lm",
+					"-Wl,-weak_framework,CoreHaptics",
+					"-Wl,-weak_framework,QuartzCore",
+					"-Wl,-weak_framework,Metal",
+					"-Wl,-weak_framework,GameController",
+					"-Wl,-current_version,15.0.0",
+					"-Wl,-compatibility_version,1.0.0",
+					"-Wl,-undefined,error",
+					"-lSDL2_image",
+					"-lSDL2_net",
+					"-lSDL2_ttf",
+					"-lfreetype",
+					"-lboost_filesystem",
+					"-lbz2",
+					"-lbrotlicommon",
+					"-lbrotlienc",
+					"-lbrotlidec",
+					"-framework",
+					VideoToolbox,
+					"-lzzip",
+					"-lvorbis",
+					"-lFLAC",
+					"-lopus",
+					"-lpng",
+					"-lz",
+					"-logg",
+					"-lvorbisenc",
+					"-lnfd",
+					"-lsndfile",
+					"-lopenal",
+					"-ljpeg",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.alephonesdg.m1;
 				PRODUCT_NAME = Marathon;
 				PROVISIONING_PROFILE = "";
@@ -6976,6 +6977,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-2";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
@@ -7016,53 +7018,52 @@
 				GCC_THUMB_SUPPORT = NO;
 				"GCC_THUMB_SUPPORT[arch=armv7]" = YES;
 				GCC_VERSION = "";
-				HEADER_SEARCH_PATHS = (
-					"\"$(SRCROOT)/submodules/Libraries/freetype_2.4.4/include\"/**",
-					"${SDL}/Xcode-iPhoneOS/SDL/build/${BUILD_STYLE}-${PLATFORM_NAME}/usr/local/include",
-					"${SOURCE_ROOT}/submodules//Libraries/libvorbis-1.2.0/include",
-					"${SOURCE_ROOT}/submodules//Libraries/libogg-1.1.3/include",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_ttf-2.0.14",
-					"\"$(SRCROOT)/submodules//Libraries/TestFlight\"",
-					"${SOURCE_ROOT}/submodules//Libraries/boost_1_63_0",
-					"${SOURCE_ROOT}/submodules//Libraries/SDL2-2.0.5/src/events",
-					"\"$(SRCROOT)/submodules//Libraries/FFmpeg-iOS/include\"",
-					"\"$(SRCROOT)/AlephOneSDL/Source_Files\"",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2-2.0.10/include",
-					"${SOURCE_ROOT}/Libraries/SDL2_net-2.0.1",
-					"$(SRCROOT)/AlephOneSDL/Source_Files/CSeries",
-					"$(SRCROOT)/submodules/Libraries/glm",
-					"${SRCROOT}/submodules/Libraries/bgfx/bgfx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bimg/include",
-					"${SRCROOT}/shaders/shader_h",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_image-2.0.1",
-				);
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
+				"HEADER_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
+				"HEADER_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/include";
 				INFOPLIST_FILE = Info2.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/Libraries/SDL\"",
-					"$(PROJECT_DIR)/Libraries/TestFlight",
-					"$(PROJECT_DIR)/Libraries/SDL",
-					"$(PROJECT_DIR)/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/Classes/TapittyTapTap",
-					"$(PROJECT_DIR)/Libraries/SDL2-2.0.10/build-scripts/lib",
-					"$(PROJECT_DIR)/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/Libraries/SDL2_ttf-2.0.14",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_net-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_image-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10/build-scripts/lib",
-					"$(PROJECT_DIR)/Classes",
-					"$(PROJECT_DIR)/submodules/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx/fat_libs",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_ttf-2.0.14",
-				);
-				MARKETING_VERSION = 6.0;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
+				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/lib";
+				MARKETING_VERSION = 6.1;
 				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-lSDL2",
+					"-liconv",
+					"-lm",
+					"-Wl,-weak_framework,CoreHaptics",
+					"-Wl,-weak_framework,QuartzCore",
+					"-Wl,-weak_framework,Metal",
+					"-Wl,-weak_framework,GameController",
+					"-Wl,-current_version,15.0.0",
+					"-Wl,-compatibility_version,1.0.0",
+					"-Wl,-undefined,error",
+					"-lSDL2_image",
+					"-lSDL2_net",
+					"-lSDL2_ttf",
+					"-lfreetype",
+					"-lboost_filesystem",
+					"-lbz2",
+					"-lbrotlicommon",
+					"-lbrotlienc",
+					"-lbrotlidec",
+					"-framework",
+					VideoToolbox,
+					"-lzzip",
+					"-lvorbis",
+					"-lFLAC",
+					"-lopus",
+					"-lpng",
+					"-lz",
+					"-logg",
+					"-lvorbisenc",
+					"-lnfd",
+					"-lsndfile",
+					"-lopenal",
+					"-ljpeg",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.alephonesdg.m2;
 				PRODUCT_NAME = Durandal;
 				PROVISIONING_PROFILE = "";
@@ -7078,6 +7079,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-2";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -7117,52 +7119,47 @@
 				GCC_THUMB_SUPPORT = NO;
 				"GCC_THUMB_SUPPORT[arch=armv7]" = YES;
 				GCC_VERSION = "";
-				HEADER_SEARCH_PATHS = (
-					"\"$(SRCROOT)/submodules/Libraries/freetype_2.4.4/include\"/**",
-					"${SDL}/Xcode-iPhoneOS/SDL/build/${BUILD_STYLE}-${PLATFORM_NAME}/usr/local/include",
-					"${SOURCE_ROOT}/submodules//Libraries/libvorbis-1.2.0/include",
-					"${SOURCE_ROOT}/submodules//Libraries/libogg-1.1.3/include",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_ttf-2.0.14",
-					"\"$(SRCROOT)/submodules//Libraries/TestFlight\"",
-					"${SOURCE_ROOT}/submodules//Libraries/boost_1_63_0",
-					"${SOURCE_ROOT}/submodules//Libraries/SDL2-2.0.5/src/events",
-					"\"$(SRCROOT)/submodules//Libraries/FFmpeg-iOS/include\"",
-					"\"$(SRCROOT)/AlephOneSDL/Source_Files\"",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2-2.0.10/include",
-					"${SOURCE_ROOT}/Libraries/SDL2_net-2.0.1",
-					"$(SRCROOT)/AlephOneSDL/Source_Files/CSeries",
-					"$(SRCROOT)/submodules/Libraries/glm",
-					"${SRCROOT}/submodules/Libraries/bgfx/bgfx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bimg/include",
-					"${SRCROOT}/shaders/shader_h",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_image-2.0.1",
-				);
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
 				INFOPLIST_FILE = Info2.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/Libraries/SDL\"",
-					"$(PROJECT_DIR)/Libraries/TestFlight",
-					"$(PROJECT_DIR)/Libraries/SDL",
-					"$(PROJECT_DIR)/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/Classes/TapittyTapTap",
-					"$(PROJECT_DIR)/Libraries/SDL2-2.0.10/build-scripts/lib",
-					"$(PROJECT_DIR)/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/Libraries/SDL2_ttf-2.0.14",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_net-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_image-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10/build-scripts/lib",
-					"$(PROJECT_DIR)/Classes",
-					"$(PROJECT_DIR)/submodules/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx/fat_libs",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_ttf-2.0.14",
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
+				MARKETING_VERSION = 6.1;
+				OTHER_LDFLAGS = (
+					"-lSDL2",
+					"-liconv",
+					"-lm",
+					"-Wl,-weak_framework,CoreHaptics",
+					"-Wl,-weak_framework,QuartzCore",
+					"-Wl,-weak_framework,Metal",
+					"-Wl,-weak_framework,GameController",
+					"-Wl,-current_version,15.0.0",
+					"-Wl,-compatibility_version,1.0.0",
+					"-Wl,-undefined,error",
+					"-lSDL2_image",
+					"-lSDL2_net",
+					"-lSDL2_ttf",
+					"-lfreetype",
+					"-lboost_filesystem",
+					"-lbz2",
+					"-lbrotlicommon",
+					"-lbrotlienc",
+					"-lbrotlidec",
+					"-framework",
+					VideoToolbox,
+					"-lzzip",
+					"-lvorbis",
+					"-lFLAC",
+					"-lopus",
+					"-lpng",
+					"-lz",
+					"-logg",
+					"-lvorbisenc",
+					"-lnfd",
+					"-lsndfile",
+					"-lopenal",
+					"-ljpeg",
 				);
-				MARKETING_VERSION = 6.0;
-				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.alephonesdg.m2;
 				PRODUCT_NAME = Durandal;
 				PROVISIONING_PROFILE = "";
@@ -7178,6 +7175,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-2";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_ENTITLEMENTS = Resources/Entitlements.plist;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -7217,50 +7215,47 @@
 				GCC_THUMB_SUPPORT = NO;
 				"GCC_THUMB_SUPPORT[arch=armv7]" = YES;
 				GCC_VERSION = "";
-				HEADER_SEARCH_PATHS = (
-					"\"$(SRCROOT)/submodules/Libraries/freetype_2.4.4/include\"/**",
-					"${SDL}/Xcode-iPhoneOS/SDL/build/${BUILD_STYLE}-${PLATFORM_NAME}/usr/local/include",
-					"${SOURCE_ROOT}/submodules//Libraries/libvorbis-1.2.0/include",
-					"${SOURCE_ROOT}/submodules//Libraries/libogg-1.1.3/include",
-					"${SOURCE_ROOT/submodules/}/Libraries/SDL_ttf-2.0.10",
-					"\"$(SRCROOT)/submodules//Libraries/TestFlight\"",
-					"${SOURCE_ROOT}/submodules//Libraries/boost_1_63_0",
-					"${SOURCE_ROOT}/submodules//Libraries/SDL2-2.0.10/src/events",
-					"\"$(SRCROOT)/submodules//Libraries/FFmpeg-iOS/include\"",
-					"\"$(SRCROOT)/AlephOneSDL/Source_Files\"",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2-2.0.10/include",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_net-2.0.1",
-					"$(SRCROOT)/AlephOneSDL/Source_Files/CSeries",
-					"$(SRCROOT)/submodules/Libraries/glm",
-					"${SRCROOT}/submodules/Libraries/bgfx/bgfx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bimg/include",
-				);
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
 				INFOPLIST_FILE = Info2.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/Libraries/SDL\"",
-					"$(PROJECT_DIR)/Libraries/TestFlight",
-					"$(PROJECT_DIR)/Libraries/SDL",
-					"$(PROJECT_DIR)/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/Classes/TapittyTapTap",
-					"$(PROJECT_DIR)/Libraries/SDL2-2.0.10/build-scripts/lib",
-					"$(PROJECT_DIR)/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/Libraries/SDL2_ttf-2.0.14",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_net-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_image-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10/build-scripts/lib",
-					"$(PROJECT_DIR)/Classes",
-					"$(PROJECT_DIR)/submodules/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx/fat_libs",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_ttf-2.0.14",
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
+				MARKETING_VERSION = 6.1;
+				OTHER_LDFLAGS = (
+					"-lSDL2",
+					"-liconv",
+					"-lm",
+					"-Wl,-weak_framework,CoreHaptics",
+					"-Wl,-weak_framework,QuartzCore",
+					"-Wl,-weak_framework,Metal",
+					"-Wl,-weak_framework,GameController",
+					"-Wl,-current_version,15.0.0",
+					"-Wl,-compatibility_version,1.0.0",
+					"-Wl,-undefined,error",
+					"-lSDL2_image",
+					"-lSDL2_net",
+					"-lSDL2_ttf",
+					"-lfreetype",
+					"-lboost_filesystem",
+					"-lbz2",
+					"-lbrotlicommon",
+					"-lbrotlienc",
+					"-lbrotlidec",
+					"-framework",
+					VideoToolbox,
+					"-lzzip",
+					"-lvorbis",
+					"-lFLAC",
+					"-lopus",
+					"-lpng",
+					"-lz",
+					"-logg",
+					"-lvorbisenc",
+					"-lnfd",
+					"-lsndfile",
+					"-lopenal",
+					"-ljpeg",
 				);
-				MARKETING_VERSION = 6.0;
-				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.alephonesdg.m2;
 				PRODUCT_NAME = Durandal;
 				PROVISIONING_PROFILE = "";
@@ -7281,7 +7276,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				GCC_DYNAMIC_NO_PIC = NO;
@@ -7314,11 +7309,12 @@
 				"HEADER_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
 				"HEADER_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/include";
 				INFOPLIST_FILE = Info3.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/lib";
-				MARKETING_VERSION = 6.0;
+				MARKETING_VERSION = 6.1;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CFLAGS = "";
 				OTHER_LDFLAGS = (
@@ -7375,11 +7371,9 @@
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 10;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"SCENARIO=3",
@@ -7406,9 +7400,10 @@
 				"GCC_THUMB_SUPPORT[arch=armv7]" = YES;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
 				INFOPLIST_FILE = Info3.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.0;
+				MARKETING_VERSION = 6.1;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7449,7 +7444,6 @@
 				PROVISIONING_PROFILE = "";
 				"PROVISIONING_PROFILE[sdk=iphoneos*]" = "";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Dustin iPhone 15 Pro";
 				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = YES;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -7466,7 +7460,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -7496,9 +7490,10 @@
 				"GCC_THUMB_SUPPORT[arch=armv7]" = YES;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
 				INFOPLIST_FILE = Info3.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.0;
+				MARKETING_VERSION = 6.1;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7650,6 +7645,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_ENTITLEMENTS = Resources/Entitlements.plist;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -7688,54 +7684,51 @@
 				);
 				GCC_THUMB_SUPPORT = NO;
 				"GCC_THUMB_SUPPORT[arch=armv7]" = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(SRCROOT)/submodules/Libraries/freetype_2.4.4/include/**",
-					"${SOURCE_ROOT}/submodules//Libraries/libvorbis-1.2.0/include",
-					"${SOURCE_ROOT}/submodules/Libraries/libogg-1.1.3/include",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_ttf-2.0.14",
-					"${SOURCE_ROOT}/submodules//Libraries/boost_1_63_0",
-					"$(SRCROOT)/submodules/Libraries/FFmpeg-iOS/include",
-					"$(SRCROOT)/AlephOneSDL/Source_Files",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2-2.0.10/src/events",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2-2.0.10/include",
-					"${SOURCE_ROOT}/Libraries/SDL2_net-2.0.1",
-					"$(SRCROOT)/AlephOneSDL/Source_Files/CSeries",
-					"$(SRCROOT)/submodules/Libraries/glm",
-					"${SRCROOT}/submodules/Libraries/bgfx/bgfx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bimg/include",
-					"${SRCROOT}/shaders/shader_h",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_image-2.0.1",
-				);
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
 				INFOPLIST_FILE = Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/submodules/Libraries/freetype-2.4.4\"",
-					"\"$(SRCROOT)/submodules/Libraries/SDL\"",
-					"$(PROJECT_DIR)/submodules/Libraries/TestFlight",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL",
-					"$(PROJECT_DIR)/submodules/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/Classes/TapittyTapTap",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.5",
-					"$(PROJECT_DIR)/submodules/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_ttf-2.0.14",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_net-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_image-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10/build-scripts/lib",
-					"$(PROJECT_DIR)/Classes",
-					"$(PROJECT_DIR)/submodules/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx/fat_libs",
-				);
-				MARKETING_VERSION = 6.0;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
+				MARKETING_VERSION = 6.1;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",
 				);
-				OTHER_LDFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-lSDL2",
+					"-liconv",
+					"-lm",
+					"-Wl,-weak_framework,CoreHaptics",
+					"-Wl,-weak_framework,QuartzCore",
+					"-Wl,-weak_framework,Metal",
+					"-Wl,-weak_framework,GameController",
+					"-Wl,-current_version,15.0.0",
+					"-Wl,-compatibility_version,1.0.0",
+					"-Wl,-undefined,error",
+					"-lSDL2_image",
+					"-lSDL2_net",
+					"-lSDL2_ttf",
+					"-lfreetype",
+					"-lboost_filesystem",
+					"-lbz2",
+					"-lbrotlicommon",
+					"-lbrotlienc",
+					"-lbrotlidec",
+					"-framework",
+					VideoToolbox,
+					"-lzzip",
+					"-lvorbis",
+					"-lFLAC",
+					"-lopus",
+					"-lpng",
+					"-lz",
+					"-logg",
+					"-lvorbisenc",
+					"-lnfd",
+					"-lsndfile",
+					"-lopenal",
+					"-ljpeg",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.alephonesdg.m1;
 				PRODUCT_NAME = Marathon;
 				PROVISIONING_PROFILE = "";
@@ -7753,6 +7746,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-2";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_ENTITLEMENTS = Resources/Entitlements.plist;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -7792,52 +7786,47 @@
 				GCC_THUMB_SUPPORT = NO;
 				"GCC_THUMB_SUPPORT[arch=armv7]" = YES;
 				GCC_VERSION = "";
-				HEADER_SEARCH_PATHS = (
-					"\"$(SRCROOT)/submodules/Libraries/freetype_2.4.4/include\"/**",
-					"${SDL}/Xcode-iPhoneOS/SDL/build/${BUILD_STYLE}-${PLATFORM_NAME}/usr/local/include",
-					"${SOURCE_ROOT}/submodules//Libraries/libvorbis-1.2.0/include",
-					"${SOURCE_ROOT}/submodules//Libraries/libogg-1.1.3/include",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_ttf-2.0.14",
-					"\"$(SRCROOT)/submodules//Libraries/TestFlight\"",
-					"${SOURCE_ROOT}/submodules//Libraries/boost_1_63_0",
-					"${SOURCE_ROOT}/submodules//Libraries/SDL2-2.0.5/src/events",
-					"\"$(SRCROOT)/submodules//Libraries/FFmpeg-iOS/include\"",
-					"\"$(SRCROOT)/AlephOneSDL/Source_Files\"",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2-2.0.10/include",
-					"${SOURCE_ROOT}/Libraries/SDL2_net-2.0.1",
-					"$(SRCROOT)/AlephOneSDL/Source_Files/CSeries",
-					"$(SRCROOT)/submodules/Libraries/glm",
-					"${SRCROOT}/submodules/Libraries/bgfx/bgfx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bimg/include",
-					"${SRCROOT}/shaders/shader_h",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_image-2.0.1",
-				);
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
 				INFOPLIST_FILE = Info2.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/Libraries/SDL\"",
-					"$(PROJECT_DIR)/Libraries/TestFlight",
-					"$(PROJECT_DIR)/Libraries/SDL",
-					"$(PROJECT_DIR)/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/Classes/TapittyTapTap",
-					"$(PROJECT_DIR)/Libraries/SDL2-2.0.10/build-scripts/lib",
-					"$(PROJECT_DIR)/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/Libraries/SDL2_ttf-2.0.14",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_net-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_image-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10/build-scripts/lib",
-					"$(PROJECT_DIR)/Classes",
-					"$(PROJECT_DIR)/submodules/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx/fat_libs",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_ttf-2.0.14",
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
+				MARKETING_VERSION = 6.1;
+				OTHER_LDFLAGS = (
+					"-lSDL2",
+					"-liconv",
+					"-lm",
+					"-Wl,-weak_framework,CoreHaptics",
+					"-Wl,-weak_framework,QuartzCore",
+					"-Wl,-weak_framework,Metal",
+					"-Wl,-weak_framework,GameController",
+					"-Wl,-current_version,15.0.0",
+					"-Wl,-compatibility_version,1.0.0",
+					"-Wl,-undefined,error",
+					"-lSDL2_image",
+					"-lSDL2_net",
+					"-lSDL2_ttf",
+					"-lfreetype",
+					"-lboost_filesystem",
+					"-lbz2",
+					"-lbrotlicommon",
+					"-lbrotlienc",
+					"-lbrotlidec",
+					"-framework",
+					VideoToolbox,
+					"-lzzip",
+					"-lvorbis",
+					"-lFLAC",
+					"-lopus",
+					"-lpng",
+					"-lz",
+					"-logg",
+					"-lvorbisenc",
+					"-lnfd",
+					"-lsndfile",
+					"-lopenal",
+					"-ljpeg",
 				);
-				MARKETING_VERSION = 6.0;
-				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.alephonesdg.m2;
 				PRODUCT_NAME = Durandal;
 				PROVISIONING_PROFILE = "";
@@ -7859,7 +7848,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -7889,9 +7878,10 @@
 				"GCC_THUMB_SUPPORT[arch=armv7]" = YES;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
 				INFOPLIST_FILE = Info3.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.0;
+				MARKETING_VERSION = 6.1;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -8043,6 +8033,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_ENTITLEMENTS = Resources/Entitlements.plist;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -8081,53 +8072,51 @@
 				);
 				GCC_THUMB_SUPPORT = NO;
 				"GCC_THUMB_SUPPORT[arch=armv7]" = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(SRCROOT)/submodules/Libraries/freetype_2.4.4/include/**",
-					"${SOURCE_ROOT}/submodules//Libraries/libvorbis-1.2.0/include",
-					"${SOURCE_ROOT}/submodules/Libraries/libogg-1.1.3/include",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_ttf-2.0.14",
-					"${SOURCE_ROOT}/submodules//Libraries/boost_1_63_0",
-					"$(SRCROOT)/submodules/Libraries/FFmpeg-iOS/include",
-					"$(SRCROOT)/AlephOneSDL/Source_Files",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2-2.0.10/src/events",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2-2.0.10/include",
-					"${SOURCE_ROOT}/Libraries/SDL2_net-2.0.1",
-					"$(SRCROOT)/AlephOneSDL/Source_Files/CSeries",
-					"$(SRCROOT)/submodules/Libraries/glm",
-					"${SRCROOT}/submodules/Libraries/bgfx/bgfx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bx/include",
-					"${SRCROOT}/submodules/Libraries/bgfx/bimg/include",
-					"${SRCROOT}/shaders/shader_h",
-					"${SOURCE_ROOT}/submodules/Libraries/SDL2_image-2.0.1",
-				);
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/include";
 				INFOPLIST_FILE = Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/submodules/Libraries/SDL\"",
-					"$(PROJECT_DIR)/submodules/Libraries/TestFlight",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL",
-					"$(PROJECT_DIR)/Classes/TapittyTapTap",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.5",
-					"$(PROJECT_DIR)/submodules/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_ttf-2.0.14",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_net-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2_image-2.0.1",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.5",
-					"$(PROJECT_DIR)/Classes",
-					"$(PROJECT_DIR)/submodules/Libraries/FFmpeg-iOS/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/freetype_2.4.4",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10/build-scripts/lib",
-					"$(PROJECT_DIR)/submodules/Libraries/SDL2-2.0.10",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx",
-					"$(PROJECT_DIR)/submodules/Libraries/bgfx/fat_libs",
-				);
-				MARKETING_VERSION = 6.0;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
+				MARKETING_VERSION = 6.1;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",
 				);
-				OTHER_LDFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-lSDL2",
+					"-liconv",
+					"-lm",
+					"-Wl,-weak_framework,CoreHaptics",
+					"-Wl,-weak_framework,QuartzCore",
+					"-Wl,-weak_framework,Metal",
+					"-Wl,-weak_framework,GameController",
+					"-Wl,-current_version,15.0.0",
+					"-Wl,-compatibility_version,1.0.0",
+					"-Wl,-undefined,error",
+					"-lSDL2_image",
+					"-lSDL2_net",
+					"-lSDL2_ttf",
+					"-lfreetype",
+					"-lboost_filesystem",
+					"-lbz2",
+					"-lbrotlicommon",
+					"-lbrotlienc",
+					"-lbrotlidec",
+					"-framework",
+					VideoToolbox,
+					"-lzzip",
+					"-lvorbis",
+					"-lFLAC",
+					"-lopus",
+					"-lpng",
+					"-lz",
+					"-logg",
+					"-lvorbisenc",
+					"-lnfd",
+					"-lsndfile",
+					"-lopenal",
+					"-ljpeg",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.alephonesdg.m1;
 				PRODUCT_NAME = Marathon;
 				PROVISIONING_PROFILE = "";
