@@ -403,8 +403,7 @@ In Plugins.cpp->Plugin::valid() add the Helper header, and then add the iOS plug
 ***Allow the visual style to override map appearance
 
 In screen.cpp->map_is_translucent(void), add the Helper header and change the function to:
-	return ( (screen_mode.translucent_map || !useClassicVisuals()) && NetAllowOverlayMap()); //iOS automatically enabled translucent map for HD visuals.
-
+	return ( (screen_mode.translucent_map || true) && NetAllowOverlayMap()); //iOS should always use translucent map, bnecause the opaque version sometimes is very slow to refresh for some reason.
 
 ***Override preferences with custom options
 
@@ -450,6 +449,8 @@ Also in sound_preferences_tree(), add this to the end:
 		//On iOS, always enable 3D audio and HRTF
 	sound_preferences->flags |= _3d_sounds_flag;
 	sound_preferences->flags |= _hrtf_flag;
+	setVolumeAndRefreshSound();
+
 
 
 ***Override bloom blur pass

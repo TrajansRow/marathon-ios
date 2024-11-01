@@ -3629,7 +3629,7 @@ InfoTree graphics_preferences_tree()
 		
 		//for iOS, set FPS target higher
 		graphics_preferences->fps_target = iOSFPSTarget();
-		graphics_preferences->OGL_Configure.WaitForVSync = 1;
+		graphics_preferences->OGL_Configure.WaitForVSync = 0;
 		
 		//Show iOS FPS if desired.
 		extern bool displaying_fps;
@@ -3952,6 +3952,7 @@ InfoTree sound_preferences_tree()
 	sound_preferences->flags |= _3d_sounds_flag;
 	sound_preferences->flags |= _hrtf_flag;
 	sound_preferences->flags |= _dynamic_tracking_flag;
+	setVolumeAndRefreshSound();
 	
 	return root;
 }
@@ -4387,7 +4388,7 @@ static bool validate_player_preferences(player_preferences_data *preferences)
 {
 	// Fix bool options
 	preferences->background_music_on = !!preferences->background_music_on;
-
+	
 	return false;
 }
 
