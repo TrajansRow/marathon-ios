@@ -299,6 +299,7 @@ void Screen::Initialize(screen_mode_data* mode)
 	screen_initialized = true;
 	
 	SDL_GL_SetSwapInterval(0); //Set default to no vsync like legacy OpenGL, unless player requests it (they really should).
+	//SDL_RenderSetVSync(main_render, 0); //ios test
 }
 
 int Screen::height()
@@ -664,7 +665,7 @@ void ReloadViewContext(void)
 
 bool map_is_translucent(void)
 {
-	return ( (screen_mode.translucent_map || !useClassicVisuals()) && NetAllowOverlayMap()); //iOS automatically enabled translucent map for HD visuals.
+	return ( (screen_mode.translucent_map || true) && NetAllowOverlayMap()); //iOS should always use translucent map, because the opaque version sometimes is very slow to refresh for some reason.
 }
 
 /*
@@ -900,13 +901,16 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 		
 		setenv("ANGLE_DEFAULT_PLATFORM", "metal", 0); //If we don't specify this, ANGLE will probably try to use the OpenGL backend (which is super slow)
 		
-        SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
+        
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_EGL, 1);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 		
 				// For iOS, force OpenGL ES 3.x. The default would otherwise be ES 2.
 				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+				SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
+				SDL_SetWindowFullscreen(main_screen, SDL_WINDOW_FULLSCREEN);
+
 		
         // Explicitly set channel depths, otherwise we might get some < 8
         SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
@@ -1540,7 +1544,7 @@ void render_screen(short ticks_elapsed)
     if (screen_mode.acceleration == _no_acceleration &&
 		(MapIsTranslucent || Screen::instance()->lua_hud()))
         clear_screen_margin();
-    
+	
 	if (game_is_networked && is_network_pregame)
 	{
 		clear_screen(false);
@@ -1678,7 +1682,7 @@ void render_screen(short ticks_elapsed)
 			darken_world_window();
 		}
 
-		OGL_SwapBuffers();
+		OGL_SwapBuffers(); //return; //ios break test
 	}
 #endif
 	
