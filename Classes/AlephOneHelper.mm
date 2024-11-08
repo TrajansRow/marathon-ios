@@ -606,9 +606,9 @@ void setVolumeAndRefreshSound() {
 	
 	bool useMusic = [[NSUserDefaults standardUserDefaults] boolForKey:kUseMusic] || [GameViewController sharedInstance].mode != GameMode;
 
-	//On iOS, volume -6db and music at -18db sounds good. If sound is off, use -20.
+	//On iOS, volume -6db and music at -10db sounds good. If sound is off, use -20.
 	sound_preferences->volume_db = -6;
-	sound_preferences->music_db = useMusic ? -18 : -20;
+	sound_preferences->music_db = useMusic ? -10 : -20;
 	
 	//Only reload sound manager if there is a change to music volume, otherwise, the volume will change everytime you close preferences.
 	if(previous_music_db != sound_preferences->music_db) {
