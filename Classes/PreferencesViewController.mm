@@ -56,7 +56,7 @@
 - (IBAction)closePreferences:(id)sender {
   // Save the back to defaults
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-
+	
   KeychainItemWrapper *keychain = [[[KeychainItemWrapper alloc] initWithIdentifier:@"metaserver" accessGroup:nil] autorelease];
   [keychain setObject:[login text] forKey:(id)kSecAttrAccount];
   [keychain setObject:[password text] forKey:(id)kSecValueData];
@@ -146,7 +146,7 @@
   cacheRendererPreferences();
   
   [[AlephOneAppDelegate sharedAppDelegate].game closePreferences:sender];
-  
+	
   // Crosshairs are set in the UI layer, not by the engine
   //Crosshairs_SetActive(NO);
   //DCW changed this; now uses engine reticle.

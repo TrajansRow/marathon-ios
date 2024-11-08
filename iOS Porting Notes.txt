@@ -440,8 +440,11 @@ In preferences.cpp->graphics_preferences_tree(), add the Helper header. Right be
 		displaying_fps = showiOSFPS();
 
 		//Temporary workaround for Remote Hub to work on iOS. Future engine versions will probably not need this
+		//Badly breaks M1 game state, so we don't use it for that (nor does it seem needed)
+		#if SCENARIO != 1
 		FileSpecifier physFile = getPhysicsFilePath();
 		set_physics_file(physFile);
+		#endif
 
 
 Also in sound_preferences_tree(), add this to the end:

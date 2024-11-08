@@ -3636,9 +3636,12 @@ InfoTree graphics_preferences_tree()
 		displaying_fps = showiOSFPS();
 		
 		//Temporary workaround for Remote Hub to work on iOS. Future engine versions will probably not need this
+		//Badly breaks M1 game state, so we don't use it for that (nor does it seem needed)
+		#if SCENARIO != 1
 		FileSpecifier physFile = getPhysicsFilePath();
 		set_physics_file(physFile);
-			
+		#endif
+
 		InfoTree tex;
 		tex.put_attr("index", i);
 		tex.put_attr("near_filter", Config.NearFilter);
