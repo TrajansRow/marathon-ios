@@ -446,6 +446,11 @@ In preferences.cpp->graphics_preferences_tree(), add the Helper header. Right be
 		set_physics_file(physFile);
 		#endif
 
+Also in parse_input_preferences, add this right after "root.read_attr("controller_deadzone", input_preferences->controller_deadzone);"
+
+	//On iOS, always use extra mouse precision
+	input_preferences->extra_mouse_precision = true;
+
 
 Also in sound_preferences_tree(), add this to the end:
 

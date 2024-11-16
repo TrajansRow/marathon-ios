@@ -4835,6 +4835,9 @@ void parse_input_preferences(InfoTree root, std::string version)
 	root.read_attr("controller_sensitivity", input_preferences->controller_sensitivity);
 	root.read_attr("controller_deadzone", input_preferences->controller_deadzone);
 
+	//On iOS, always use extra mouse precision
+	input_preferences->extra_mouse_precision = true;
+	
 	// remove default key bindings the first time we see one from these prefs
 	std::set<std::pair<BindingType, int>> seen_key;
 	
