@@ -3614,6 +3614,14 @@ InfoTree graphics_preferences_tree()
 			Config.NearFilter=1;
 		}
 		
+#if SCENARIO == 1
+			//Inhabitant textures are always GL_NEAREST_MIPMAP_NEAREST because we currently don't have HD textures for M1, and blurry sprites look bad.
+		if (i == OGL_Txtr_Inhabitant) {
+			Config.FarFilter=2;
+			Config.NearFilter=2;
+		}
+#endif
+		
 		//For iOS, use 3D perspective
 		graphics_preferences->OGL_Configure.Flags &= ~OGL_Flag_MimicSW;
 		
