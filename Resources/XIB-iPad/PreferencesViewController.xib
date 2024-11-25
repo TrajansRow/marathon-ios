@@ -16,7 +16,7 @@
             <connections>
                 <outlet property="alwaysRun" destination="FR6-XL-vdr" id="fhk-LP-j46"/>
                 <outlet property="bloom" destination="LTJ-Hj-mGY" id="amm-PR-W7q"/>
-                <outlet property="brightness" destination="38" id="39"/>
+                <outlet property="brightness" destination="rhG-4H-8ki" id="5G4-td-Dh1"/>
                 <outlet property="bumpMapping" destination="wE6-Ee-c0o" id="kcv-DN-yYG"/>
                 <outlet property="crosshairs" destination="77" id="79"/>
                 <outlet property="dPadAction" destination="yOy-kl-nbb" id="6cg-St-SIR"/>
@@ -160,33 +160,33 @@
                     </connections>
                 </button>
                 <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Mm1-kD-CWj" userLabel="Frame">
-                    <rect key="frame" x="110" y="157" width="804" height="455"/>
+                    <rect key="frame" x="110" y="126" width="804" height="501"/>
                     <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                     <subviews>
                         <slider opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" value="0.5" minValue="0.0" maxValue="1" translatesAutoresizingMaskIntoConstraints="NO" id="22" userLabel="Horizontal Sensitivity">
-                            <rect key="frame" x="203" y="113" width="207" height="29"/>
+                            <rect key="frame" x="203" y="157" width="207" height="29"/>
                             <autoresizingMask key="autoresizingMask" flexibleMinX="YES" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                         </slider>
                         <slider opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" value="0.5" minValue="0.0" maxValue="1" translatesAutoresizingMaskIntoConstraints="NO" id="41" userLabel="Vertical Sensitivity">
-                            <rect key="frame" x="203" y="149" width="204" height="29"/>
+                            <rect key="frame" x="203" y="190" width="204" height="29"/>
                             <autoresizingMask key="autoresizingMask" flexibleMinX="YES" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                         </slider>
                         <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" fixedFrame="YES" text="Horizontal Sensitivity:" textAlignment="right" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="uug-Ap-A0c" userLabel="H sensitivity">
-                            <rect key="frame" x="27" y="116" width="171" height="23"/>
+                            <rect key="frame" x="27" y="159" width="171" height="23"/>
                             <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                             <fontDescription key="fontDescription" name="BankGothicBT-Medium" family="BankGothic Md BT" pointSize="13"/>
                             <color key="textColor" red="0.0" green="1" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                             <color key="highlightedColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         </label>
                         <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" fixedFrame="YES" text="Vertical Sensitivity:" textAlignment="right" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="xbk-VK-2l4" userLabel="V Sensitivity">
-                            <rect key="frame" x="27" y="152" width="171" height="23"/>
+                            <rect key="frame" x="27" y="193" width="171" height="23"/>
                             <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                             <fontDescription key="fontDescription" name="BankGothicBT-Medium" family="BankGothic Md BT" pointSize="13"/>
                             <color key="textColor" red="0.0" green="1" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                             <color key="highlightedColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         </label>
                         <view alpha="0.69718307256698608" contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="geP-jV-9G2" userLabel="Metaserver Settings Background">
-                            <rect key="frame" x="15" y="12" width="326" height="74"/>
+                            <rect key="frame" x="15" y="14" width="326" height="74"/>
                             <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                             <subviews>
                                 <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" fixedFrame="YES" text="INTERNET MEATSERVER" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="erQ-yo-Bci" userLabel="Meatserver Label">
@@ -226,7 +226,7 @@
                             <color key="backgroundColor" red="0.0004253318202347081" green="0.1324617444989116" blue="0.31484779792746109" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         </view>
                         <view alpha="0.69718307256698608" contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="ntg-GG-0Ug" userLabel="Firing">
-                            <rect key="frame" x="553" y="13" width="232" height="163"/>
+                            <rect key="frame" x="553" y="17" width="232" height="163"/>
                             <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                             <subviews>
                                 <button opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" showsTouchWhenHighlighted="YES" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="hIT-bR-PuV" userLabel="HiLow">
@@ -323,7 +323,7 @@
                             <color key="backgroundColor" red="0.26740608809999999" green="0.11272067396235824" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         </view>
                         <view alpha="0.69718307256698608" contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="0Go-Hx-PPT" userLabel="Control">
-                            <rect key="frame" x="553" y="329" width="232" height="110"/>
+                            <rect key="frame" x="553" y="373" width="232" height="110"/>
                             <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                             <subviews>
                                 <button opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" showsTouchWhenHighlighted="YES" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="K8i-db-PC7" userLabel="Gyro">
@@ -381,7 +381,7 @@
                             <color key="backgroundColor" red="0.26740608809999999" green="0.0" blue="0.2367885472" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         </view>
                         <view alpha="0.69718307256698608" contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="BON-tl-kzI" userLabel="Enhancements">
-                            <rect key="frame" x="12" y="192" width="347" height="265"/>
+                            <rect key="frame" x="12" y="238" width="347" height="265"/>
                             <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                             <subviews>
                                 <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" fixedFrame="YES" text="ENHANCEMENTS" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="0xC-5T-VKN" userLabel="Enhancements Label">
@@ -641,14 +641,14 @@ Does Action:</string>
                             <color key="backgroundColor" red="0.1876065719913933" green="0.0" blue="0.26740608809999999" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         </view>
                         <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Renderer changes will be effective at next load. Classic Visuals are faster on older devices." textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" id="rhF-BV-fz9" userLabel="Renderer Note">
-                            <rect key="frame" x="80" y="486" width="644" height="13"/>
+                            <rect key="frame" x="80" y="532" width="644" height="13"/>
                             <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxX="YES" flexibleMinY="YES"/>
                             <fontDescription key="fontDescription" name="BankGothicBT-Medium" family="BankGothic Md BT" pointSize="12"/>
                             <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                             <nil key="highlightedColor"/>
                         </label>
                         <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" reversesTitleShadowWhenHighlighted="YES" showsTouchWhenHighlighted="YES" lineBreakMode="wordWrap" id="3FZ-jh-LkQ">
-                            <rect key="frame" x="553" y="213" width="232" height="39"/>
+                            <rect key="frame" x="553" y="259" width="232" height="39"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                             <color key="backgroundColor" red="0.93924060880000004" green="0.044808120450000002" blue="0.0" alpha="0.27935189259999998" colorSpace="custom" customColorSpace="sRGB"/>
                             <fontDescription key="fontDescription" name="BankGothicBT-Medium" family="BankGothic Md BT" pointSize="17"/>
@@ -659,6 +659,17 @@ Does Action:</string>
                                 <action selector="toggleButton:" destination="-1" eventType="touchUpInside" id="ttH-Ib-KVh"/>
                             </connections>
                         </button>
+                        <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" fixedFrame="YES" text="Screen Brightness:" textAlignment="right" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="7yr-L4-1tk" userLabel="Screen Brightness">
+                            <rect key="frame" x="27" y="115" width="171" height="24"/>
+                            <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
+                            <fontDescription key="fontDescription" name="BankGothicBT-Medium" family="BankGothic Md BT" pointSize="13"/>
+                            <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                            <color key="highlightedColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        </label>
+                        <slider opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" value="2" minValue="0.0" maxValue="7" translatesAutoresizingMaskIntoConstraints="NO" id="rhG-4H-8ki" userLabel="Brightness">
+                            <rect key="frame" x="204" y="113" width="203" height="29"/>
+                            <autoresizingMask key="autoresizingMask" flexibleMinX="YES" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
+                        </slider>
                     </subviews>
                     <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                 </view>

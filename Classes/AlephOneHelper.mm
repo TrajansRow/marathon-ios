@@ -596,6 +596,13 @@ bool showiOSFPS() {
 	return [[NSUserDefaults standardUserDefaults] boolForKey:kShowFPS];
 }
 
+int iOsGammaLevel() {
+	//Ranges between 0 and 7
+	
+	
+	
+}
+
 bool useBumpMapping() {
 	return [[NSUserDefaults standardUserDefaults] boolForKey:kUseBumpMapping];
 }

@@ -16,7 +16,7 @@
             <connections>
                 <outlet property="alwaysRun" destination="FR6-XL-vdr" id="fhk-LP-j46"/>
                 <outlet property="bloom" destination="YUd-Ea-gO8" id="3kK-E4-qdN"/>
-                <outlet property="brightness" destination="38" id="39"/>
+                <outlet property="brightness" destination="Roz-bt-x2n" id="uri-c9-UQV"/>
                 <outlet property="bumpMapping" destination="nU8-QL-ARH" id="ieU-Mt-tnC"/>
                 <outlet property="crosshairs" destination="77" id="79"/>
                 <outlet property="dPadAction" destination="yOy-kl-nbb" id="6cg-St-SIR"/>
@@ -178,7 +178,7 @@
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
                 <view alpha="0.69718307256698608" contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="BON-tl-kzI" userLabel="Enhancements">
-                    <rect key="frame" x="14" y="239" width="341" height="281"/>
+                    <rect key="frame" x="14" y="296" width="341" height="281"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                     <subviews>
                         <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" fixedFrame="YES" text="ENHANCEMENTS" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="0xC-5T-VKN" userLabel="Enhancements Label">
@@ -437,14 +437,14 @@ Does Action:</string>
                     <color key="backgroundColor" red="0.1876065719913933" green="0.0" blue="0.26740608809999999" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                 </view>
                 <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" text="Renderer changes at next load. HD Visuals may be slow on older devices" textAlignment="natural" lineBreakMode="wordWrap" numberOfLines="2" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" preferredMaxLayoutWidth="341" translatesAutoresizingMaskIntoConstraints="NO" id="zGv-c6-9t1" userLabel="Renderer Note">
-                    <rect key="frame" x="14" y="155" width="341" height="40"/>
+                    <rect key="frame" x="14" y="212" width="341" height="40"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                     <fontDescription key="fontDescription" name="BankGothicBT-Medium" family="BankGothic Md BT" pointSize="12"/>
                     <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                     <nil key="highlightedColor"/>
                 </label>
                 <button opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" reversesTitleShadowWhenHighlighted="YES" showsTouchWhenHighlighted="YES" lineBreakMode="wordWrap" translatesAutoresizingMaskIntoConstraints="NO" id="4Bc-nx-7kN">
-                    <rect key="frame" x="14" y="193" width="341" height="38"/>
+                    <rect key="frame" x="14" y="250" width="341" height="38"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                     <color key="backgroundColor" red="0.93924060880829019" green="0.044808120453820537" blue="0.0" alpha="0.27935189260563381" colorSpace="custom" customColorSpace="sRGB"/>
                     <fontDescription key="fontDescription" name="BankGothicBT-Medium" family="BankGothic Md BT" pointSize="17"/>
@@ -456,25 +456,25 @@ Does Action:</string>
                     </connections>
                 </button>
                 <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" fixedFrame="YES" text="Horizontal Sensitivity:" textAlignment="right" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="uug-Ap-A0c" userLabel="H sensitivity">
-                    <rect key="frame" x="14" y="105" width="171" height="24"/>
+                    <rect key="frame" x="14" y="162" width="171" height="24"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                     <fontDescription key="fontDescription" name="BankGothicBT-Medium" family="BankGothic Md BT" pointSize="13"/>
                     <color key="textColor" red="0.0" green="1" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                     <color key="highlightedColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                 </label>
                 <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" fixedFrame="YES" text="Vertical Sensitivity:" textAlignment="right" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="xbk-VK-2l4" userLabel="V Sensitivity">
-                    <rect key="frame" x="14" y="131" width="171" height="24"/>
+                    <rect key="frame" x="14" y="188" width="171" height="24"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                     <fontDescription key="fontDescription" name="BankGothicBT-Medium" family="BankGothic Md BT" pointSize="13"/>
                     <color key="textColor" red="0.0" green="1" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                     <color key="highlightedColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                 </label>
                 <slider opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" value="0.5" minValue="0.0" maxValue="1" translatesAutoresizingMaskIntoConstraints="NO" id="22" userLabel="Horizontal Sensitivity">
-                    <rect key="frame" x="222" y="102" width="135" height="29"/>
+                    <rect key="frame" x="222" y="159" width="135" height="29"/>
                     <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxX="YES" flexibleMaxY="YES"/>
                 </slider>
                 <slider opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" value="0.5" minValue="0.0" maxValue="1" translatesAutoresizingMaskIntoConstraints="NO" id="41" userLabel="Vertical Sensitivity">
-                    <rect key="frame" x="222" y="127" width="135" height="29"/>
+                    <rect key="frame" x="222" y="184" width="135" height="29"/>
                     <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxX="YES" flexibleMaxY="YES"/>
                 </slider>
                 <view alpha="0.69718307256698608" contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="geP-jV-9G2" userLabel="Metaserver Settings Background">
@@ -518,7 +518,7 @@ Does Action:</string>
                     <color key="backgroundColor" red="0.0004253318202347081" green="0.1324617444989116" blue="0.31484779792746109" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                 </view>
                 <view alpha="0.69718307256698608" contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="ntg-GG-0Ug" userLabel="Firing">
-                    <rect key="frame" x="14" y="528" width="209" height="143"/>
+                    <rect key="frame" x="14" y="585" width="209" height="143"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                     <subviews>
                         <button opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" showsTouchWhenHighlighted="YES" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="hIT-bR-PuV" userLabel="HiLow">
@@ -615,7 +615,7 @@ Does Action:</string>
                     <color key="backgroundColor" red="0.26740608809999999" green="0.11272067396235824" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                 </view>
                 <view alpha="0.69718307256698608" contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="0Go-Hx-PPT" userLabel="Gyroscope">
-                    <rect key="frame" x="14" y="679" width="209" height="87"/>
+                    <rect key="frame" x="14" y="736" width="209" height="87"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                     <subviews>
                         <button opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" showsTouchWhenHighlighted="YES" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="K8i-db-PC7" userLabel="Gyro">
@@ -672,6 +672,17 @@ Does Action:</string>
                     </subviews>
                     <color key="backgroundColor" red="0.26740608809999999" green="0.0" blue="0.2367885472" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                 </view>
+                <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" fixedFrame="YES" text="Screen Brightness:" textAlignment="right" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="1nH-vG-sgQ" userLabel="Screen Brightness">
+                    <rect key="frame" x="14" y="119" width="171" height="24"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <fontDescription key="fontDescription" name="BankGothicBT-Medium" family="BankGothic Md BT" pointSize="13"/>
+                    <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                    <color key="highlightedColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                </label>
+                <slider opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" value="2" minValue="0.0" maxValue="7" translatesAutoresizingMaskIntoConstraints="NO" id="Roz-bt-x2n" userLabel="Brightness">
+                    <rect key="frame" x="222" y="116" width="135" height="29"/>
+                    <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                </slider>
             </subviews>
             <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
             <point key="canvasLocation" x="603.90625" y="547.8515625"/>

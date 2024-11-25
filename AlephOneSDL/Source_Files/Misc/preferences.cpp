@@ -3622,6 +3622,9 @@ InfoTree graphics_preferences_tree()
 		}
 #endif
 		
+		//Override gamma levels for iOS
+		graphics_preferences->screen_mode.gamma_level = helperGamma();
+		
 		//For iOS, use 3D perspective
 		graphics_preferences->OGL_Configure.Flags &= ~OGL_Flag_MimicSW;
 		
