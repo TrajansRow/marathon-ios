@@ -471,6 +471,19 @@ Also in sound_preferences_tree(), add this to the end:
 	setVolumeAndRefreshSound();
 
 
+Also in parse_environment_preferences(), comment out the disable_plugin environment check in order to force-enable the Enhanced HUD for M1:
+	/*for (const InfoTree &plugin : root.children_named("disable_plugin"))
+	{
+		char tempstr[256];
+		if (plugin.read_path("path", tempstr))
+		{
+			if (!Plugins::instance()->disable(tempstr))
+			{
+				orphan_disabled_plugins.push_back(tempstr);
+			}
+		}
+	}*/
+
 
 ***Override bloom blur pass
 

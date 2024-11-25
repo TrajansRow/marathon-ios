@@ -5082,7 +5082,7 @@ void parse_environment_preferences(InfoTree root, std::string version)
 	root.read_attr("auto_play_demos", environment_preferences->auto_play_demos);
 	
 	orphan_disabled_plugins.clear();
-	for (const InfoTree &plugin : root.children_named("disable_plugin"))
+	/*for (const InfoTree &plugin : root.children_named("disable_plugin"))
 	{
 		char tempstr[256];
 		if (plugin.read_path("path", tempstr))
@@ -5092,7 +5092,7 @@ void parse_environment_preferences(InfoTree root, std::string version)
 				orphan_disabled_plugins.push_back(tempstr);
 			}
 		}
-	}
+	}*/
 
 	orphan_enabled_plugins.clear();
 	for (const InfoTree& plugin : root.children_named("enable_plugin"))

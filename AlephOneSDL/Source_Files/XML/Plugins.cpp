@@ -76,7 +76,7 @@ bool Plugin::allowed() const {
 bool Plugin::valid() const {
 	if (!enabled)
 		return false;
-	
+
 	//Plugin filters for iOS
 	if(useClassicVisuals()) {
 		if(
