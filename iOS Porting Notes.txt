@@ -418,8 +418,14 @@ In preferences.cpp->graphics_preferences_tree(), add the Helper header. Right be
 			Config.NearFilter=1;
 		}
 		
+		//Use NEAREST for WiH sasmpling on iOS to prevent the weapon mask from having a thin line above the sprite.
+		if (i == OGL_Txtr_WeaponsInHand) {
+			Config.FarFilter=2;
+			Config.NearFilter=2;
+		}
+		
 #if SCENARIO == 1
-			//Inhabitant textures are always GL_NEAREST_MIPMAP_NEAREST because we currently don't have HD textures for M1, and blurry sprites look bad.
+			//Inhabitant textures are currently GL_NEAREST_MIPMAP_NEAREST because we currently don't have HD textures for M1 on iOS, and blurry sprites look bad.
 		if (i == OGL_Txtr_Inhabitant) {
 			Config.FarFilter=2;
 			Config.NearFilter=2;
@@ -502,6 +508,11 @@ In screen_shared_h -> update_fps_display(), add the Helper header and then add e
 To avoid crashes, also increase the size of the string used by adding a bunch of spaces to it:
 		char fps[sizeof("1000 fps (10000 ms)                        ")]; //For the iOS version, pad with an extra 24 spaces or so
 
+
+***Attempt to workaround bad render/framebuffer when starting a new game too fast, resulting in a green or teal tint.
+(Hard to say if this actually does anything or not; testing will tell if it fixes the issue.)
+In class RenderRasterize_Shader : public RenderRasterizerClass, change this dummy initializer from 0,0  to:
+	FBO colorDepthSansMedia = FBO(640, 480, false);
 
 
 ***Enable smart trigger
