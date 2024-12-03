@@ -49,7 +49,7 @@ const GLfloat kViewBaseMatrixInverse[16] = {
 
 Rasterizer_Shader_Class::Rasterizer_Shader_Class() = default;
 Rasterizer_Shader_Class::~Rasterizer_Shader_Class() = default;
-
+bool ios_start_delayed = 0;
 void Rasterizer_Shader_Class::SetView(view_data& view) {
 	OGL_SetView(view);
 	
@@ -58,6 +58,7 @@ void Rasterizer_Shader_Class::SetView(view_data& view) {
 		view_height = view.screen_height;
 		swapper.reset();
 		swapper.reset(new FBOSwapper(view_width * MainScreenPixelScale(), view_height * MainScreenPixelScale(), false));
+		if(!ios_start_delayed) {sleep(1); ios_start_delayed=1;} //Attempt to mitigate green-tint issue that seems to arise when starting the first game rapidly on iOS
 	}
 	
 	float aspect = view.screen_width / float(view.screen_height);
