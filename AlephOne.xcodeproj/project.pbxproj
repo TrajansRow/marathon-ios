@@ -6777,7 +6777,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -6820,7 +6820,7 @@
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/lib";
-				MARKETING_VERSION = 6.3;
+				MARKETING_VERSION = 6.4;
 				OTHER_CFLAGS = "";
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
@@ -6882,7 +6882,7 @@
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TZ45ZW2588;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -6918,7 +6918,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.3;
+				MARKETING_VERSION = 6.4;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",
@@ -7024,7 +7024,7 @@
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/lib";
-				MARKETING_VERSION = 6.3;
+				MARKETING_VERSION = 6.4;
 				OTHER_CFLAGS = "";
 				OTHER_LDFLAGS = (
 					"-lSDL2",
@@ -7121,7 +7121,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.3;
+				MARKETING_VERSION = 6.4;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7217,7 +7217,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.3;
+				MARKETING_VERSION = 6.4;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7311,7 +7311,7 @@
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/lib";
-				MARKETING_VERSION = 6.3;
+				MARKETING_VERSION = 6.4;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CFLAGS = "";
 				OTHER_LDFLAGS = (
@@ -7400,7 +7400,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.3;
+				MARKETING_VERSION = 6.4;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7490,7 +7490,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.3;
+				MARKETING_VERSION = 6.4;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7648,7 +7648,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 82636XW3TE;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 82636XW3TE;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -7686,7 +7686,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.3;
+				MARKETING_VERSION = 6.4;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",
@@ -7788,7 +7788,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.3;
+				MARKETING_VERSION = 6.4;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7878,7 +7878,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.3;
+				MARKETING_VERSION = 6.4;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -8036,7 +8036,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 82636XW3TE;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 82636XW3TE;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -8074,7 +8074,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.3;
+				MARKETING_VERSION = 6.4;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",

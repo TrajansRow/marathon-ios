@@ -189,7 +189,7 @@ extern "C" {
     float arbitraryConstant=14; 
 
     rightXAxis = rX * arbitraryConstant;
-    rightYAxis = 0.0 - rY * arbitraryConstant * 2.0;
+    rightYAxis = 0.0 - rY * arbitraryConstant;
     
 
     //NSLog(@"Controller thing: %@", message);
