@@ -63,6 +63,8 @@ void FBO::setup(GLuint w, GLuint h, bool srgb) {
     return;
   }
   
+	glFinish(); //Attempt to resolve green tint issue.
+	
   while (glGetError()) {} //Clear earlier errors
     
   glGenFramebuffers(1, &_fbo);
@@ -97,10 +99,10 @@ void FBO::setup(GLuint w, GLuint h, bool srgb) {
   
   if( glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE ) { printf("FBO framebuffer not complete\n"); }
     
-  glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
-  //glBindRenderbuffer(GL_RENDERBUFFER, _fbo);
-	glBindRenderbuffer(GL_RENDERBUFFER, _depthBuffer);
-  
+  //glBindFramebuffer(GL_FRAMEBUFFER, _fbo); //This may not be correct; commenting out for now.
+  glBindRenderbuffer(GL_RENDERBUFFER, _fbo);
+	
+	glFinish(); //Attempt to resolve green tint issue.
   //glPopGroupMarkerEXT();
 }
 
@@ -136,16 +138,17 @@ void FBO::deactivate() {
 			prev_fbo = active_chain.back()->_fbo;
 			prev_srgb = active_chain.back()->_srgb;
 		}
-		
+		//glBindFramebuffer(_fboTarget, prev_fbo);
+      
 		//Binding to framebuffer 0 doesn't switch to the on-screen buffer on iOS.
-		//Instead of 0, default to 1.
-		if ( prev_fbo == 0 ) {
-			glBindFramebuffer(GL_FRAMEBUFFER, 1);
-			glBindRenderbuffer(GL_RENDERBUFFER, 1);
-		} else {
-			glBindFramebuffer(_fboTarget, prev_fbo);
-		}
-        
+				//Instead of 0, default to 1.
+				if ( prev_fbo == 0 ) {
+					glBindFramebuffer(GL_FRAMEBUFFER, 1);
+					glBindRenderbuffer(GL_RENDERBUFFER, 1);
+				} else {
+					glBindFramebuffer(_fboTarget, prev_fbo);
+				}
+		
         if (prev_srgb) {}
 			//////glEnable(GL_FRAMEBUFFER_SRGB);
         else {

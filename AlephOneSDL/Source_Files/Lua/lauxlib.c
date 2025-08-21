@@ -1037,12 +1037,12 @@ FILE* luai_fopen(const char* path, const char* mode) { return fopen(path, mode);
 FILE* luai_popen(const char* command, const char* mode) { return popen(command, mode); }
 int luai_system(const char* command) {
 #ifdef __APPLE__
-		#include "TargetConditionals.h"
-		#ifdef TARGET_OS_IOS
-			return 0;
-		#else
-			return system(command);
-		#endif
+#include "TargetConditionals.h"
+#ifdef TARGET_OS_IOS
+	return 0;
+#else
+	return system(command);
+#endif
 #endif
 }
 int luai_remove(const char* path) { return remove(path); }

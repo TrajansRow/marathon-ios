@@ -25,7 +25,6 @@
 #include "screen.h"
 #include "MatrixStack.hpp"
 #include "DrawCache.hpp"
-
 #include "AlephOneHelper.h" //Needed for iOS port
 
 #ifdef HAVE_OPENGL
@@ -275,11 +274,11 @@ void RenderRasterize_Shader::render_tree() {
 	
     render_viewer_sprite_layer(kDiffuse);
 	DC()->drawAll(); //Draw and flush buffers
-	
+    
 	//On iOS, we also consider useShaderPostProcessing() as an override
-	if (useShaderPostProcessing() && current_player->infravision_duration == 0 &&
-		TEST_FLAG(Get_OGL_ConfigureData().Flags, OGL_Flag_Blur) &&
-		blur.get())
+		if (useShaderPostProcessing() && current_player->infravision_duration == 0 &&
+			TEST_FLAG(Get_OGL_ConfigureData().Flags, OGL_Flag_Blur) &&
+			blur.get())
 	{
 		blur->begin();
             DC()->startGatheringLights();
@@ -1279,8 +1278,8 @@ bool RenderModel(rectangle_definition& RenderRectangle, short Collection, short 
 		if(ModelPtr->Use(CLUT,OGL_SkinManager::Glowing)) {
 			LoadModelSkin(SkinPtr->GlowImg, Collection, CLUT);
 		}
-        
-        /*Shader* lastShader = lastEnabledShader();
+
+		/*Shader* lastShader = lastEnabledShader();
         if (lastShader) {
 			GLfloat modelMatrix[16], projectionMatrix[16], modelProjection[16], modelMatrixInverse[16], textureMatrix[16];
 
@@ -1380,6 +1379,7 @@ void RenderRasterize_Shader::_render_node_object_helper(render_object_data *obje
 	double yaw = view->virtual_yaw * FixedAngleToDegrees;
 	MSI()->rotatef(yaw, 0.0, 0.0, 1.0);
 
+			
 	float offset = 0;
 	if (OGL_ForceSpriteDepth()) {
 		// look for parasitic objects based on y position,
@@ -1397,6 +1397,15 @@ void RenderRasterize_Shader::_render_node_object_helper(render_object_data *obje
 
 	auto TMgr = setupSpriteTexture(rect, OGL_Txtr_Inhabitant, offset, renderStep);
 	if (TMgr->ShapeDesc == UNONE) { MSI()->popMatrix(); return; }
+
+	if (!view->mimic_sw_perspective)
+	{
+		if (TMgr->ForceXYBillboard() ||
+			(view->billboard_xy && !TMgr->ForceYBillboard()))
+		{
+			MSI()->rotatef(view->virtual_pitch * FixedAngleToDegrees, 0.0, -1.0, 0.0);
+		}
+	}
 
 	float texCoords[2][2];
 
@@ -1496,9 +1505,7 @@ void RenderRasterize_Shader::_render_node_object_helper(render_object_data *obje
 		lastShader->setVec4(Shader::U_ClipPlane1, plane1);
 		lastShader->setVec4(Shader::U_ClipPlane5, plane5);
     }*/
-    
-	//glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-	
+    	
 	//iOS Smart trigger.
 	GLfloat spriteOnScreen[12] = {vertex_array[0], vertex_array[1], vertex_array[2],
 																vertex_array[3], vertex_array[4], vertex_array[5],
@@ -1518,7 +1525,8 @@ void RenderRasterize_Shader::_render_node_object_helper(render_object_data *obje
 				}
 		}
 	}
-	
+
+	//glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 	DC()->addTriangleFan(4, vertex_array, texcoord_array, NULL);
 	
 	if (setupGlow(view, TMgr, 0, 1, weaponFlare, selfLuminosity, offset, renderStep)) {

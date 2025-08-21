@@ -116,6 +116,11 @@ Feb 13, 2003 (Woody Zenfell):
 #include <algorithm>
 #include <sstream>
 
+#ifdef HAVE_LIBYUV
+#include <libyuv/convert.h>
+#include <libyuv/scale.h>
+#endif
+
 #ifdef PERFORMANCE
 #include <perf.h>
 
@@ -135,15 +140,12 @@ extern TP2PerfGlobals perf_globals;
 #include "Music.h"
 #include "images.h"
 #include "screen.h"
-#include "network.h"
 #include "vbl.h"
-#include "shell.h"
 #include "preferences.h"
 #include "FileHandler.h"
 #include "lua_script.h" // PostIdle
 #include "interface_menus.h"
 #include "XML_LevelScript.h"
-#include "Music.h"
 #include "Movie.h"
 #include "QuickSave.h"
 #include "Plugins.h"
@@ -151,15 +153,14 @@ extern TP2PerfGlobals perf_globals;
 #include "shell_options.h"
 #include "OpenALManager.h"
 
-#include "AlephOneHelper.h" //Needed for iOS port
-
-#ifdef HAVE_FFMPEG
-#include "SDL_ffmpeg.h"
-#endif
+#define PL_MPEG_IMPLEMENTATION
+#include "pl_mpeg.h"
 
 #include "sdl_dialogs.h"
 #include "sdl_widgets.h"
 #include "network_dialog_widgets_sdl.h"
+
+#include "AlephOneHelper.h" //Needed for iOS port
 
 /* Change this when marathon changes & replays are no longer valid */
 enum recording_version {
@@ -175,10 +176,11 @@ enum recording_version {
 	RECORDING_VERSION_ALEPH_ONE_1_2 = 9,
 	RECORDING_VERSION_ALEPH_ONE_1_3 = 10,
 	RECORDING_VERSION_ALEPH_ONE_1_4 = 11,
-	RECORDING_VERSION_ALEPH_ONE_1_7 = 12
+	RECORDING_VERSION_ALEPH_ONE_1_7 = 12,
+	RECORDING_VERSION_ALEPH_ONE_1_11 = 13,
 };
-const short default_recording_version = RECORDING_VERSION_ALEPH_ONE_1_7;
-const short max_handled_recording= RECORDING_VERSION_ALEPH_ONE_1_7;
+const short default_recording_version = RECORDING_VERSION_ALEPH_ONE_1_11;
+const short max_handled_recording= RECORDING_VERSION_ALEPH_ONE_1_11;
 
 #include "screen_definitions.h"
 #include "interface_menus.h"
@@ -201,7 +203,7 @@ const short max_handled_recording= RECORDING_VERSION_ALEPH_ONE_1_7;
 
 #include "lua_hud_script.h"
 
-#include "AlephOneHelper.h" //Needed for iOS port
+#include "progress.h"
 
 using alephone::Screen;
 
@@ -255,7 +257,7 @@ struct game_state {
 	short flags;
 	short user;
 	int32 phase;
-	int32 last_ticks_on_idle;
+	uint64_t last_ticks_on_idle;
 	short current_screen;
 	bool suppress_background_tasks;
 	bool current_netgame_allows_microphone;
@@ -268,6 +270,23 @@ struct screen_data {
 	short screen_count;
 	int32 duration;
 };
+
+#ifdef HAVE_STEAM
+
+#include <steamshim_child.h>
+
+struct steam_workshop_uploader_ui_data {
+	uint64_t item_id;
+	int item_type;
+	int content_type;
+	FileSpecifier directory_path;
+	FileSpecifier thumbnail_path;
+	bool is_scenarios_compatible;
+};
+
+extern steam_game_information steam_game_info;
+
+#endif
 
 /* -------------- constants */
 struct screen_data display_screens[]= {
@@ -336,7 +355,7 @@ static void display_introduction_screen_for_demo(void);
 static void display_epilogue(void);
 static void display_about_dialog();
 
-static void force_system_colors(void);
+static void force_system_colors(bool fade_music);
 static bool point_in_rectangle(short x, short y, screen_rectangle *rect);
 
 static void start_interface_fade(short type, struct color_table *original_color_table);
@@ -344,7 +363,7 @@ static void update_interface_fades(void);
 static void interface_fade_out(short pict_resource_number, bool fade_music);
 static bool can_interface_fade_out(void);
 static void transfer_to_new_level(short level_number);
-static void try_and_display_chapter_screen(short level, bool interface_table_is_valid, bool text_block, bool epilogue_screen);
+static void try_and_display_chapter_screen(short level, bool interface_table_is_valid, bool text_block);
 
 static screen_data *get_screen_data(
 	short index);
@@ -424,11 +443,6 @@ void set_game_state(
 		case _game_in_progress:
 			switch(new_state)
 			{
-				case _display_epilogue:
-					game_state.state= _begin_display_of_epilogue;
-					game_state.phase= 0;
-					break;
-					
 				case _close_game:
 					finish_game(true);
 					break;
@@ -603,6 +617,7 @@ static short find_start_for_identifier(const player_start_data* inStartArray, sh
 // cues from the "extras" that load_game_from_file() does.
 static bool make_restored_game_relevant(bool inNetgame, const player_start_data* inStartArray, short inStartCount)
 {
+        RunLuaScript();
         game_is_networked = inNetgame;
         
         // set_random_seed() needs to happen before synchronize_players_with_starts()
@@ -654,108 +669,116 @@ static bool make_restored_game_relevant(bool inNetgame, const player_start_data*
         return success;
 }
 
+bool load_saved_game_from_flat_data(byte* saved_flat_data)
+{
+	if (!saved_flat_data) return false;
+
+	wad_header theWadHeader;
+	wad_data* theWad;
+
+	theWad = inflate_flat_data(saved_flat_data, &theWadHeader);
+	if (!theWad)
+	{
+		free(saved_flat_data);
+		return false;
+	}
+
+	dynamic_data dynamic_data_wad;
+	bool result = get_dynamic_data_from_wad(theWad, &dynamic_data_wad);
+	assert(result);
+
+	Plugins::instance()->set_mode(dynamic_data_wad.player_count > 1 ? Plugins::kMode_Net : Plugins::kMode_Solo);
+
+	ResetLevelScript();
+	uint32 theParentChecksum = theWadHeader.parent_checksum;
+
+	bool found_map = use_map_file(theParentChecksum);
+	if (found_map) RunLevelScript(dynamic_data_wad.current_level_number);
+
+	bool success = process_map_wad(theWad, true /* resuming */, theWadHeader.data_version);
+	free_wad(theWad); /* Note that the flat data points into the wad. */
+	// ZZZ: maybe this is what the Bungie comment meant, but apparently
+	// free_wad() somehow (voodoo) frees theSavedGameFlatData as well.
+
+	// try to locate the Map file for the saved-game, so that (1) we have a crack
+	// at continuing the game if the original gatherer disappears, and (2) we can
+	// save the game on our own machine and continue it properly (as part of a bigger scenario) later.
+	if (found_map)
+	{
+		// LP: getting the level scripting off of the map file
+		// Being careful to carry over errors so that Pfhortran errors can be ignored
+		short SavedType, SavedError = get_game_error(&SavedType);
+		LoadAchievementsLua();
+		LoadStatsLua();
+		set_game_error(SavedType, SavedError);
+	}
+	else
+	{
+		/* Tell the user they’re screwed when they try to leave this level. */
+		// ZZZ: should really issue a different warning since the ramifications are different
+		alert_user(infoError, strERRORS, cantFindMap, 0);
+
+		// LP addition: makes the game look normal
+		hide_cursor();
+
+		/* Set to the default map. */
+		set_to_default_map();
+
+		LoadAchievementsLua();
+		LoadStatsLua();
+	}
+
+	if (!game_is_networked)
+	{
+		if (dynamic_world->player_count == 1)
+			LoadSoloLua();
+		else
+			LoadReplayNetLua();
+	}
+
+	return success;
+}
+
 // ZZZ end generalized game startup support -----
 
 #if !defined(DISABLE_NETWORKING)
 // ZZZ: this will get called (eventually) shortly after NetUpdateJoinState() returns netStartingResumeGame
 bool join_networked_resume_game()
 {
-        bool success = true;
-        
-        // Get the saved-game data
-        byte* theSavedGameFlatData = NetReceiveGameData(false /* do_physics */);
-        if(theSavedGameFlatData == NULL)
-        {
-                success = false;
-        }
-        
-        if(success)
-        {
-                // Use the saved-game data
-                wad_header theWadHeader;
-                wad_data* theWad;
-                
-                theWad = inflate_flat_data(theSavedGameFlatData, &theWadHeader);
-                if(theWad == NULL)
-                {
-                        success = false;
-                        free(theSavedGameFlatData);
-                }
-                
-				bool found_map = false;
-                if(success)
-                {
-					ResetLevelScript();
-					uint32 theParentChecksum = theWadHeader.parent_checksum;
-					found_map = use_map_file(theParentChecksum);
+    player_start_data theStarts[MAXIMUM_NUMBER_OF_PLAYERS];
+    short theStartCount;
 
-					if (found_map) {
-						dynamic_data dynamic_data_wad;
-						bool result = get_dynamic_data_from_wad(theWad, &dynamic_data_wad);
-						assert(result);
-						RunLevelScript(dynamic_data_wad.current_level_number);
-					}
+    // Get the saved-game data
+    byte* theSavedGameFlatData = NetReceiveGameData(false /* do_physics */);
+    auto saved_wad_length = theSavedGameFlatData ? get_flat_data_length(theSavedGameFlatData) : 0;
+	std::vector<byte> saved_wad_data(theSavedGameFlatData, theSavedGameFlatData + saved_wad_length);
 
-                    success = process_map_wad(theWad, true /* resuming */, theWadHeader.data_version);
-                    free_wad(theWad); /* Note that the flat data points into the wad. */
-                    // ZZZ: maybe this is what the Bungie comment meant, but apparently
-                    // free_wad() somehow (voodoo) frees theSavedGameFlatData as well.
-                }
-                
-                if(success)
-                {
-                        Plugins::instance()->set_mode(Plugins::kMode_Net);
-                        Crosshairs_SetActive(player_preferences->crosshairs_active);
-                        LoadHUDLua();
-                        RunLuaHUDScript();
+    bool success = load_saved_game_from_flat_data(theSavedGameFlatData);
+    if(success)
+    {
+        Crosshairs_SetActive(player_preferences->crosshairs_active);
+        LoadHUDLua();
+        RunLuaHUDScript();
+                        
+        // set the revert-game info to defaults (for full-auto saving on the local machine)
+        set_saved_game_name_to_default();
+                        
+        construct_multiplayer_starts(theStarts, &theStartCount);
+        success = make_restored_game_relevant(true /* multiplayer */, theStarts, theStartCount);
+    }
 
-                        // try to locate the Map file for the saved-game, so that (1) we have a crack
-                        // at continuing the game if the original gatherer disappears, and (2) we can
-                        // save the game on our own machine and continue it properly (as part of a bigger scenario) later.
-                        
-                        if(found_map)
-                        {
-                                // LP: getting the level scripting off of the map file
-                                // Being careful to carry over errors so that Pfhortran errors can be ignored
-                                short SavedType, SavedError = get_game_error(&SavedType);
-								LoadAchievementsLua();
-								LoadStatsLua();
-                                set_game_error(SavedType,SavedError);
-                        }
-                        else
-                        {
-                                /* Tell the user they’re screwed when they try to leave this level. */
-                                // ZZZ: should really issue a different warning since the ramifications are different
-                                alert_user(infoError, strERRORS, cantFindMap, 0);
-        
-                                // LP addition: makes the game look normal
-                                hide_cursor();
-                        
-                                /* Set to the default map. */
-                                set_to_default_map();
+    if(success)
+    {
+        set_recording_header_data(theStartCount, dynamic_world->current_level_number, ((game_info*)NetGetGameData())->parent_checksum,
+            default_recording_version, theStarts, &dynamic_world->game_information);
 
-								LoadAchievementsLua();
-								LoadStatsLua();
-                        }
-                        
-                        // set the revert-game info to defaults (for full-auto saving on the local machine)
-                        set_saved_game_name_to_default();
-                        
-                        player_start_data theStarts[MAXIMUM_NUMBER_OF_PLAYERS];
-                        short theStartCount;
-                        construct_multiplayer_starts(theStarts, &theStartCount);
-                        
-			RunLuaScript();
-                        success = make_restored_game_relevant(true /* multiplayer */, theStarts, theStartCount);
-                }
-        }
+        set_recording_saved_wad_data(saved_wad_data);
+        start_recording();
+
+        start_game(_network_player, false /*changing level?*/);
+    }
         
-        if(success)
-	{
-		start_game(_network_player, false /*changing level?*/);
-	}
-        
-        return success;
+    return success;
 }
 #endif // !defined(DISABLE_NETWORKING)
 
@@ -780,7 +803,7 @@ bool load_and_start_game(FileSpecifier& File)
 	if (!success)
 	{
 		/* Reset the system colors, since the screen clut is all black.. */
-		force_system_colors();
+		force_system_colors(false);
 		show_cursor(); // JTP: Was hidden by force system colors
 		display_loading_map_error();
 	}
@@ -806,18 +829,15 @@ bool load_and_start_game(FileSpecifier& File)
 	if (success)
 	{
 		game_state.user = userWantsMultiplayer ? _network_player : _single_player;
-		int theSavedGameFlatDataLength = 0;
-		auto theSavedGameFlatData = std::unique_ptr<byte, decltype(&free)>(nullptr, free);
+		auto theSavedGameFlatData = std::unique_ptr<byte, decltype(&free)>((byte*)get_flat_data(File, false /* union wad? */, 0 /* level # */), free);
+		int theSavedGameFlatDataLength = theSavedGameFlatData ? get_flat_data_length(theSavedGameFlatData.get()) : 0;
+		success = theSavedGameFlatDataLength > 0;
 
 #if !defined(DISABLE_NETWORKING)
 		if (userWantsMultiplayer)
 		{
-			theSavedGameFlatData.reset((byte*)get_flat_data(File, false /* union wad? */, 0 /* level # */));
-			success = theSavedGameFlatData != nullptr;
-
 			if (success)
 			{
-				theSavedGameFlatDataLength = get_flat_data_length(theSavedGameFlatData.get());
 				set_game_state(_displaying_network_game_dialogs);
 
 				//we don't know at this point if we are going to use a remote hub but this must be set if we do
@@ -880,10 +900,17 @@ bool load_and_start_game(FileSpecifier& File)
 
 			if (success)
 			{
-				RunLuaScript();
 				success = make_restored_game_relevant(userWantsMultiplayer, theStarts, theNumberOfStarts);
+
 				if (success)
 				{
+					set_recording_header_data(theNumberOfStarts, dynamic_world->current_level_number, userWantsMultiplayer ? ((game_info*)NetGetGameData())->parent_checksum : get_current_map_checksum(),
+						default_recording_version, theStarts, &dynamic_world->game_information);
+
+					std::vector<byte> saved_wad_data(theSavedGameFlatData.get(), theSavedGameFlatData.get() + theSavedGameFlatDataLength);
+					set_recording_saved_wad_data(saved_wad_data);
+					start_recording();
+					
 					start_game(game_state.user, false);
 				}
 			}
@@ -907,7 +934,7 @@ bool handle_open_replay(FileSpecifier& File)
 	
 	bool success;
 	
-	force_system_colors();
+	force_system_colors(true);
 	success= begin_game(_replay_from_file, false);
 	if(!success) display_main_menu();
 	return success;
@@ -917,7 +944,7 @@ bool handle_edit_map()
 {
 	bool success;
 
-	force_system_colors();
+	force_system_colors(true);
 	success = begin_game(_single_player, false);
 	if (!success) display_main_menu();
 	return success;
@@ -941,25 +968,22 @@ bool check_level_change(
 void pause_game(
 	void)
 {
-	stop_fade();
-	if (!OGL_IsActive() || !(TEST_FLAG(Get_OGL_ConfigureData().Flags,OGL_Flag_Fader)))
-		set_fade_effect(NONE);
 	set_keyboard_controller_status(false);
 	show_cursor();
+	if (!game_is_networked && OpenALManager::Get()) OpenALManager::Get()->Pause(true);
 }
 
 void resume_game(
 	void)
 {
 	hide_cursor();
-	if (!OGL_IsActive() || !(TEST_FLAG(Get_OGL_ConfigureData().Flags,OGL_Flag_Fader)))
-		SetFadeEffectDelay(TICKS_PER_SECOND/2);
 #ifdef HAVE_OPENGL
 	if (OGL_IsActive())
 		OGL_Blitter::BoundScreen(true);
 #endif
 	validate_world_window();
 	set_keyboard_controller_status(true);
+	if (OpenALManager::Get()) OpenALManager::Get()->Pause(false);
 }
 
 void draw_menu_button_for_command(
@@ -1003,9 +1027,9 @@ extern bool first_frame_rendered;
 float last_heartbeat_fraction = -1.f;
 bool is_network_pregame = false;
 
-bool idle_game_state(uint32 time)
+bool idle_game_state(uint64_t time)
 {
-	int machine_ticks_elapsed = time - game_state.last_ticks_on_idle;
+	auto machine_ticks_elapsed = time - game_state.last_ticks_on_idle;
 
 	if(machine_ticks_elapsed || game_state.phase==0)
 	{
@@ -1089,7 +1113,6 @@ bool idle_game_state(uint32 time)
 					break;
 					
 				case _begin_display_of_epilogue:
-					finish_game(false);
 					display_epilogue();
 					break;
 
@@ -1140,7 +1163,7 @@ bool idle_game_state(uint32 time)
 
 		if (redraw)
 		{
-			static auto last_redraw = 0;
+			static uint64_t last_redraw = 0;
 			if (current_player && machine_tick_count() > last_redraw + MACHINE_TICKS_PER_SECOND / 30)
 			{
 				last_redraw = machine_tick_count();
@@ -1269,7 +1292,7 @@ void do_menu_item_command(
 						case _replay:
 							if (get_keyboard_controller_status())
 							{
-							  pause_game();
+								pause_game();
 							}
 							else
 							{	
@@ -1585,7 +1608,7 @@ bool enabled_item(
 		case iReplaySavedFilm:
 		case iCredits:
 		case iQuit:
-	        case iAbout:
+		case iAbout:
 		case iCenterButton:
 			break;
 			
@@ -1682,7 +1705,7 @@ static void display_epilogue(
 	Music::instance()->RestartIntroMusic();
 	
 	{
-		int32 ticks= machine_tick_count();
+		auto ticks= machine_tick_count();
 		
 		do
 		{
@@ -1707,7 +1730,7 @@ static void display_epilogue(
 		end_count = 2;
 	}
 	for (int i=0; i<end_count; i++)
-		try_and_display_chapter_screen(end_offset+i, true, true, true);
+		try_and_display_chapter_screen(end_offset+i, true, true);
 	show_cursor();
 }
 
@@ -1720,9 +1743,408 @@ public:
 	void item_selected(void) { }
 };
 
+#ifdef HAVE_STEAM
+
+static item_upload_data steam_workshop_prepare_upload(steam_workshop_uploader_ui_data& data)
+{
+	item_upload_data workshop_item;
+
+	if (steam_game_info.support_workshop_item_scenario && !data.is_scenarios_compatible)
+	{
+		const auto scenario_name = Scenario::instance()->GetName();
+
+		if (scenario_name.empty())
+		{
+			throw std::runtime_error("The scenario for this item couldn't be deduced");
+		}
+
+		workshop_item.required_scenario = scenario_name;
+	}
+
+	workshop_item.id = data.item_id;
+	workshop_item.item_type = static_cast<ItemType>(data.item_type);
+	workshop_item.content_type = static_cast<ContentType>(data.content_type);
+	workshop_item.directory_path = data.directory_path.GetPath();
+	workshop_item.thumbnail_path = data.thumbnail_path.GetPath();
+	return workshop_item;
+}
+
+static const STEAMSHIM_Event* steam_workshop_upload_result()
+{
+	const STEAMSHIM_Event* result = nullptr;
+	bool end_of_upload = false;
+	int progress_value = 0, upload_status = 0;
+
+	std::unordered_map<int, int> upload_messages =
+	{
+		{STEAM_EItemUpdateStatus::k_EItemUpdateStatusPreparingConfig, _uploading_steam_workshop_prepare},
+		{STEAM_EItemUpdateStatus::k_EItemUpdateStatusPreparingContent, _uploading_steam_workshop_prepare},
+		{STEAM_EItemUpdateStatus::k_EItemUpdateStatusUploadingContent, _uploading_steam_workshop_upload},
+		{STEAM_EItemUpdateStatus::k_EItemUpdateStatusUploadingPreviewFile, _uploading_steam_workshop_upload},
+		{STEAM_EItemUpdateStatus::k_EItemUpdateStatusCommittingChanges, _uploading_steam_workshop_upload}
+	};
+
+	open_progress_dialog(_uploading_steam_workshop_default, true);
+
+	while (STEAMSHIM_alive() && !end_of_upload)
+	{
+		progress_dialog_event();
+
+		result = STEAMSHIM_pump();
+
+		if (result)
+		{
+			switch (result->type)
+			{
+			case SHIMEVENT_WORKSHOP_UPLOAD_PROGRESS:
+				if (upload_status != result->okay)
+				{
+					upload_status = result->okay;
+					auto message_id = upload_messages.find(upload_status);
+					set_progress_dialog_message(message_id != upload_messages.end() ? message_id->second : _uploading_steam_workshop_default);
+				}
+				progress_value = result->ivalue;
+				break;
+			case SHIMEVENT_WORKSHOP_UPLOAD_RESULT:
+				progress_value = 100;
+				end_of_upload = true;
+				break;
+			default:
+				break;
+			}
+		}
+
+		draw_progress_bar(progress_value, 100);
+	}
+
+	close_progress_dialog();
+	return result;
+}
+
+static void steam_workshop_upload_item_callback(void* arg)
+{
+	auto params = reinterpret_cast<std::pair<steam_workshop_uploader_ui_data*, dialog*>*>(arg);
+	auto item = params->first;
+	auto dialog = params->second;
+
+	if (!item->item_id && (!item->directory_path.IsDir() || !item->directory_path.Exists()))
+	{
+		alert_user("The item directory is not valid.");
+		return;
+	}
+
+	item_upload_data steam_upload_data;
+
+	try
+	{
+		steam_upload_data = steam_workshop_prepare_upload(*item);
+	}
+	catch (std::exception& ex)
+	{
+		alert_user(ex.what());
+		return;
+	}
+
+	STEAMSHIM_uploadWorkshopItem(steam_upload_data);
+	auto result = steam_workshop_upload_result();
+
+	if (result && result->type == SHIMEVENT_WORKSHOP_UPLOAD_RESULT)
+	{
+		if (result->okay)
+		{
+			std::string message = "Your item was correctly uploaded on Steam.";
+			message += result->needs_to_accept_workshop_agreement ? " However, your item will remain hidden until you accept the Steam workshop legal agreement." : "";
+			alert_user(message.c_str(), infoNoError);
+			dialog->quit(0);
+		}
+		else
+		{
+			std::string error_code = std::to_string(result->ivalue);
+			std::string message = "Your item couldn't be uploaded on Steam. Steam error code was: " + error_code;
+			alert_user(message.c_str());
+		}
+	}
+	else
+		alert_user("Something went wrong while uploading to Steam. Restart the game and try again.");
+}
+
+static item_owned_query_result steam_get_owned_items(const std::string& scenario_name)
+{
+	open_progress_dialog(_loading);
+
+	STEAMSHIM_queryWorkshopItemOwned(scenario_name);
+
+	const STEAMSHIM_Event* result = nullptr;
+	while (STEAMSHIM_alive())
+	{
+		progress_dialog_event();
+
+		result = STEAMSHIM_pump();
+
+		if (result && result->type == SHIMEVENT_WORKSHOP_QUERY_ITEM_OWNED_RESULT)
+		{
+			break;
+		}
+	}
+
+	close_progress_dialog();
+	return result ? result->items_owned : item_owned_query_result { 0 };
+}
+
+static void display_steam_workshop_uploader_dialog(void* arg)
+{
+	force_system_colors(false);
+
+	const auto scenario_name = Scenario::instance()->GetName();
+
+	auto item_list = steam_get_owned_items(scenario_name);
+	std::vector<std::string> item_labels;
+
+	item_owned_query_result::item new_item;
+	new_item.id = 0;
+	new_item.title = "New Item";
+	new_item.item_type = ItemType::Plugin;
+	new_item.content_type = ContentType::Graphics;
+	new_item.is_scenarios_compatible = true;
+	item_list.items.insert(item_list.items.begin(), new_item);
+
+	if (item_list.result_code != 1)
+	{
+		std::string error_code = std::to_string(item_list.result_code);
+		std::string message = "Your workshop items couldn't be retrieved from Steam. Steam error code was: " + error_code;
+		alert_user(message.c_str());
+	}
+
+	for (const auto& item : item_list.items)
+	{
+		auto label = item.title.size() > 28 ? item.title.substr(0, 25) + "..." : item.title;
+		item_labels.push_back(label);
+	}
+
+	steam_workshop_uploader_ui_data ui_data;
+	ui_data.item_type = static_cast<int>(new_item.item_type);
+	ui_data.content_type = static_cast<int>(new_item.content_type);
+	ui_data.is_scenarios_compatible = new_item.is_scenarios_compatible;
+	ui_data.item_id = new_item.id;
+
+	dialog d;
+
+	auto placer = new vertical_placer;
+
+	placer->dual_add(new w_title("STEAM WORKSHOP UPLOADER"), d);
+	placer->add(new w_spacer, true);
+
+	auto table = new table_placer(2, get_theme_space(ITEM_WIDGET), true);
+	table->col_flags(0, placeable::kAlignRight);
+
+	auto items_popup = new w_select_popup();
+	items_popup->set_labels(item_labels);
+	items_popup->set_selection(0);
+	table->dual_add(items_popup->label("Upload For"), d);
+	table->dual_add(items_popup, d);
+
+	auto get_content_types_tags = [&](ItemType item_type) -> std::vector<std::string>
+	{
+		static const std::vector<std::string> content_types_tags[] = {
+			{ },
+			{ "Graphics", "HUD", "Music", "Script", "Theme" },
+			{ "Solo & Net", "Solo Only", "Net Only" }
+		};
+
+		switch (item_type)
+		{
+			case ItemType::Scenario:
+				return content_types_tags[0];
+			case ItemType::Plugin:
+				return content_types_tags[1];
+			default:
+				return content_types_tags[2];
+		}
+	};
+
+	std::vector<std::string> item_types = { "Plugin", "Map", "Physics", "Script", "Sounds", "Shapes" };
+
+	if (steam_game_info.support_workshop_item_scenario)
+	{
+		item_types.insert(item_types.begin(), "Scenario");
+	}
+
+	auto item_types_popup = new w_select_popup();
+	item_types_popup->set_labels(item_types);
+	item_types_popup->set_selection(steam_game_info.support_workshop_item_scenario ? static_cast<int>(new_item.item_type) : static_cast<int>(new_item.item_type) - 1);
+
+	table->dual_add(item_types_popup->label("Item Type"), d);
+	table->dual_add(item_types_popup, d);
+
+	auto content_types_popup = new w_select_popup();
+	content_types_popup->set_labels(get_content_types_tags(new_item.item_type));
+	content_types_popup->set_selection(0);
+
+	table->dual_add(content_types_popup->label("Content Type"), d);
+	table->dual_add(content_types_popup, d);
+
+	char label[64];
+	snprintf(label, 64, "%s Only", Scenario::instance()->GetName().c_str());
+	auto custom_scenarios_label = new w_label(label);
+	auto custom_scenarios = new w_toggle(false);
+	custom_scenarios->associate_label(custom_scenarios_label);
+	custom_scenarios->visible(steam_game_info.support_workshop_item_scenario);
+	custom_scenarios_label->visible(steam_game_info.support_workshop_item_scenario);
+
+	table->dual_add(custom_scenarios_label, d);
+	table->dual_add(custom_scenarios, d);
+
+	if (steam_game_info.support_workshop_item_scenario)
+	{
+		table->add_row(new w_spacer(), true);
+	}
+
+	auto thumbnail_path = new w_file_chooser("Choose Preview Image", _typecode_unknown);
+	table->dual_add(thumbnail_path->label("Preview Image"), d);
+	table->dual_add(thumbnail_path, d);
+
+	auto directory_path = new w_directory_chooser();
+	table->dual_add(directory_path->label("Item Directory"), d);
+	table->dual_add(directory_path, d);
+
+	placer->add(table, true);
+
+	placer->add(new w_spacer, true);
+
+	placer->dual_add(new w_hyperlink("https://steamcommunity.com/sharedfiles/workshoplegalagreement",
+		"By submitting this item, you agree to the workshop terms of service"), d);
+
+	placer->add(new w_spacer, true);
+
+	auto button_placer = new horizontal_placer;
+
+	auto callback_params = std::make_pair<steam_workshop_uploader_ui_data*, dialog*>(&ui_data, &d);
+	button_placer->dual_add(new w_button("UPLOAD", steam_workshop_upload_item_callback, &callback_params), d);
+	button_placer->dual_add(new w_button("RETURN", dialog_cancel, &d), d);
+
+	placer->add(button_placer, true);
+
+	d.set_widget_placer(placer);
+
+	auto can_update_content_type = [&]() -> bool
+	{
+		switch (static_cast<ItemType>(ui_data.item_type))
+		{
+			case ItemType::Plugin:
+				return !ui_data.item_id;
+			case ItemType::Map:
+			case ItemType::Script:
+				return true;
+			default:
+				return false;
+		}
+	};
+
+	auto update_content_type_value = [&]()
+	{
+		int start_enum_index;
+		switch (static_cast<ItemType>(ui_data.item_type))
+		{
+			case ItemType::Scenario:
+				start_enum_index = static_cast<int>(ContentType::START_SCENARIO);
+				break;
+			case ItemType::Plugin:
+				start_enum_index = static_cast<int>(ContentType::START_PLUGIN);
+				break;
+			default:
+				start_enum_index = static_cast<int>(ContentType::START_OTHER);
+				break;
+		}
+
+		ui_data.content_type = start_enum_index + std::max(content_types_popup->get_selection(), 0);
+	};
+
+	auto get_selection_for_content_type = [&]() -> int
+	{
+		switch (static_cast<ItemType>(ui_data.item_type))
+		{
+			case ItemType::Scenario:
+				return ui_data.content_type - static_cast<int>(ContentType::START_SCENARIO);
+			case ItemType::Plugin:
+				return ui_data.content_type - static_cast<int>(ContentType::START_PLUGIN);
+			default:
+				return ui_data.content_type - static_cast<int>(ContentType::START_OTHER);
+		}
+	};
+
+	auto update_common_widgets = [&]()
+	{
+		bool is_scenario = static_cast<ItemType>(ui_data.item_type) == ItemType::Scenario;
+		custom_scenarios->set_enabled(!is_scenario);
+		custom_scenarios->set_selection(!ui_data.is_scenarios_compatible);
+
+		content_types_popup->set_labels(get_content_types_tags(static_cast<ItemType>(ui_data.item_type)));
+		content_types_popup->set_enabled(can_update_content_type());
+	};
+
+	items_popup->set_popup_callback([&](void*)
+	{
+		auto item_index = items_popup->get_selection();
+		auto& item = item_list.items.at(item_index);
+
+		ui_data.item_id = item.id;
+		ui_data.item_type = static_cast<int>(item.item_type);
+		ui_data.content_type = static_cast<int>(item.content_type);
+		ui_data.directory_path = "";
+		ui_data.thumbnail_path = "";
+		ui_data.is_scenarios_compatible = item.is_scenarios_compatible;
+
+		item_types_popup->set_selection(steam_game_info.support_workshop_item_scenario ? ui_data.item_type : ui_data.item_type - 1);
+		item_types_popup->set_enabled(!ui_data.item_id);
+
+		directory_path->set_directory(ui_data.directory_path);
+		thumbnail_path->set_file(ui_data.thumbnail_path);
+
+		update_common_widgets();
+		content_types_popup->set_selection(get_selection_for_content_type());
+
+	}, nullptr);
+
+	item_types_popup->set_popup_callback([&](void*)
+	{
+		ui_data.item_type = steam_game_info.support_workshop_item_scenario ? item_types_popup->get_selection() : item_types_popup->get_selection() + 1;
+		update_common_widgets();
+		content_types_popup->set_selection(0);
+		update_content_type_value();
+
+	}, nullptr);
+
+	content_types_popup->set_popup_callback([&](void*)
+	{
+		update_content_type_value();
+
+	}, nullptr);
+
+	custom_scenarios->set_selection_changed_callback([&](void*)
+	{
+		ui_data.is_scenarios_compatible = !custom_scenarios->get_selection();
+	});
+
+	directory_path->set_callback([&]()
+	{
+		ui_data.directory_path = directory_path->get_directory().GetPath();
+	});
+
+	thumbnail_path->set_callback([&]()
+	{
+		ui_data.thumbnail_path = thumbnail_path->get_file().GetPath();
+	});
+
+	clear_screen();
+
+	d.run();
+}
+
+#endif
+
 static void display_about_dialog()
 {
-	force_system_colors();
+	force_system_colors(false);
 
 	dialog d;
 
@@ -1769,6 +2191,11 @@ static void display_about_dialog()
 	about_placer->add(new w_spacer, true);
 
 	about_placer->dual_add(new w_static_text(expand_app_variables("Scenario loaded: $scenarioName$ $scenarioVersion$").c_str()), d);
+
+#ifdef HAVE_STEAM
+	about_placer->add(new w_spacer, true);
+	about_placer->dual_add(new w_button("STEAM WORKSHOP UPLOADER", display_steam_workshop_uploader_dialog, &d), d);
+#endif
 
 	vertical_placer *authors_placer = new vertical_placer();
 	
@@ -1943,8 +2370,8 @@ static void transfer_to_new_level(
 			return;
 		}
 
-		if (!game_is_networked) try_and_display_chapter_screen(level_number, true, false, false);
-		success= goto_level(&entry, false, dynamic_world->player_count);
+		if (!game_is_networked) try_and_display_chapter_screen(level_number, true, false);
+		success= goto_level(&entry, dynamic_world->player_count, nullptr);
 		set_keyboard_controller_status(true);
 	}
 	
@@ -1984,10 +2411,12 @@ static void handle_replay( /* This is gross. */
 {
 	bool success;
 	
-	if(!last_replay) force_system_colors();
+	if(!last_replay) force_system_colors(true);
 	success= begin_game(_replay, !last_replay);
 	if(!success) display_main_menu();
 }
+
+extern bool is_saved_game_replay();
 
 // ZZZ: some modifications to use generalized game-startup
 static bool begin_game(
@@ -2138,6 +2567,9 @@ static bool begin_game(
 						load_film_profile(FILM_PROFILE_ALEPH_ONE_1_4);
 						break;
 					case RECORDING_VERSION_ALEPH_ONE_1_7:
+						load_film_profile(FILM_PROFILE_ALEPH_ONE_1_7);
+						break;
+					case RECORDING_VERSION_ALEPH_ONE_1_11:
 						load_film_profile(FILM_PROFILE_DEFAULT);
 						break;
 					default:
@@ -2163,10 +2595,10 @@ static bool begin_game(
 			} else {
 				entry.level_number= 0;
 			}
-	
+			
 			// iOS set custom entry level number
 			entry.level_number = helperGetEntryLevelNumber();
-			
+
 			// ZZZ: let the user use his behavior modifiers in single-player.
 			restore_custom_player_behavior_modifiers();
 			
@@ -2239,11 +2671,11 @@ static bool begin_game(
 		}
 
 		/* Try to display the first chapter screen.. */
-		if (user != _network_player && user != _demo)
+		if (user != _network_player && user != _demo && !is_saved_game_replay())
 		{
 			FindLevelMovie(entry.level_number);
 			show_movie(entry.level_number);
-			try_and_display_chapter_screen(entry.level_number, false, false, false);
+			try_and_display_chapter_screen(entry.level_number, false, false);
 		}
 
 		Plugins::instance()->set_mode(number_of_players > 1 ? Plugins::kMode_Net : Plugins::kMode_Solo);
@@ -2251,8 +2683,9 @@ static bool begin_game(
 		LoadHUDLua();
 		RunLuaHUDScript();
 		
-		/* Begin the game! */
-		success= new_game(number_of_players, is_networked, &game_information, starts, &entry);
+		success = is_saved_game_replay() ? make_restored_game_relevant(false, starts, number_of_players) :
+			new_game(number_of_players, is_networked, &game_information, starts, &entry);
+
 		if(success)
 		{
 			start_game(user, false);
@@ -2319,7 +2752,7 @@ static void start_game(
 	SoundManager::instance()->UpdateListener();
 	
 	//Bring up the iOS HUD
-	helperBringUpHUD();
+		helperBringUpHUD();
 }
 
 // LP: "static" removed
@@ -2333,7 +2766,7 @@ void handle_load_game(
 	FileSpecifier FileToLoad;
 	bool success= false;
 
-	force_system_colors();
+	force_system_colors(false);
 	show_cursor(); // JTP: Was hidden by force system colors
 	if(choose_saved_game_to_load(FileToLoad))
 	{
@@ -2404,8 +2837,8 @@ static void finish_game(
 	}
 
 	/* Fade out! (Pray) */ // should be interface_color_table for valkyrie, but doesn't work.
-	Music::instance()->ClearLevelMusic();
-	Music::instance()->Fade(0, MACHINE_TICKS_PER_SECOND / 2);
+	Music::instance()->ClearLevelPlaylist();
+	Music::instance()->Fade(0, MACHINE_TICKS_PER_SECOND / 2, Music::FadeType::Sinusoidal);
 	full_fade(_cinematic_fade_out, interface_color_table);
 	paint_window_black();
 	full_fade(_end_cinematic_fade_out, interface_color_table);
@@ -2428,7 +2861,7 @@ static void finish_game(
 		game_state.state= _displaying_network_game_dialogs;
 
 		change_screen_mode(_screentype_menu);
-		force_system_colors();
+		force_system_colors(false);
 		display_net_game_stats_helper(); //iOS needs to handle hiding the HUD before showing netstats.
 		exit_networking();
 	} 
@@ -2446,7 +2879,7 @@ static void finish_game(
 		{
 			game_state.state = _displaying_network_game_dialogs;
 
-			force_system_colors();
+			force_system_colors(false);
 			display_net_game_stats_helper(); //iOS needs to handle hiding the HUD before showing netstats.
 		}
 	}
@@ -2503,7 +2936,7 @@ static void handle_network_game(
 	bool successful_gather = false;
 	bool joined_resume_game = false;
 
-	force_system_colors();
+	force_system_colors(true);
 
 	/* Don't update the screen, etc.. */
 	game_state.state= _displaying_network_game_dialogs;
@@ -2542,7 +2975,7 @@ static void handle_network_game(
 static void handle_save_film(
 	void)
 {
-	force_system_colors();
+	force_system_colors(false);
 	show_cursor(); // JTP: Hidden by force_system_colors
 	move_replay();
 	hide_cursor(); // JTP: Will be shown by display_main_menu
@@ -2650,12 +3083,13 @@ static void display_loading_map_error(
 	set_game_error(systemError, errNone);
 }
 
+// LG: now specifies whether music should be cut or not
 static void force_system_colors(
-	void)
+	bool fade_music)
 {
 	if(can_interface_fade_out())
 	{
-		interface_fade_out(MAIN_MENU_BASE, true);
+		interface_fade_out(MAIN_MENU_BASE, fade_music);
 	}
 
 	if(interface_bit_depth==8)
@@ -2802,7 +3236,7 @@ static void handle_interface_menu_screen_click(
 				}
 				else
 				{
-					static auto last_redraw = 0;
+					static uint64_t last_redraw = 0;
 					if (machine_tick_count() > last_redraw + TICKS_PER_SECOND / 30)
 					{
 						draw_intro_screen();
@@ -2827,8 +3261,7 @@ static void handle_interface_menu_screen_click(
 static void try_and_display_chapter_screen(
 	short level,
 	bool interface_table_is_valid,
-	bool text_block,
-	bool epilogue_screen)
+	bool text_block)
 {
 	if (Movie::instance()->IsRecording() || !shell_options.replay_directory.empty())
 		return;
@@ -2840,7 +3273,8 @@ static void try_and_display_chapter_screen(
 		short existing_state= game_state.state;
 		game_state.state= _display_chapter_heading;
 
-		if (!epilogue_screen) SoundManager::instance()->StopAllSounds(); //don't stop the music if intro restarted for epilogue
+		Music::instance()->StopInGameMusic();
+		SoundManager::instance()->StopAllSounds();
 		
 		/* This will NOT work if the initial level entered has a chapter screen, which is why */
 		/*  we perform this check. (The interface_color_table is not valid...) */
@@ -2976,7 +3410,7 @@ void interface_fade_out(
 		hide_cursor();
 
 		if(fade_music) 
-			Music::instance()->Fade(0, MACHINE_TICKS_PER_SECOND/2);
+			Music::instance()->Fade(0, MACHINE_TICKS_PER_SECOND/2, Music::FadeType::Sinusoidal);
 
 		full_fade(_cinematic_fade_out, current_picture_clut);
 		
@@ -3015,7 +3449,7 @@ void do_preferences(void)
 {
 	struct screen_mode_data mode = graphics_preferences->screen_mode;
 
-	force_system_colors();
+	force_system_colors(false);
 	handle_preferences();
 
 	if (mode.bit_depth != graphics_preferences->screen_mode.bit_depth) {
@@ -3083,49 +3517,62 @@ void exit_networking(void)
  *  Show movie
  */
 
-#ifdef HAVE_FFMPEG
-#ifdef HAVE_OPENGL
-static OGL_Blitter show_movie_blitter;
-#endif
-static SDL_mutex *movie_audio_mutex = NULL;
-static const int AUDIO_BUF_SIZE = 10;
-static SDL_ffmpegAudioFrame *aframes[AUDIO_BUF_SIZE];
-static uint64_t movie_sync = 0;
-static SDL_AudioSpec specs;
-int movie_audio_callback(uint8* stream, int length)
+static void audio_samples_decoder_callback(plm_t* mpeg, plm_samples_t* samples, void* userdata)
 {
-	int returnLength = 0;
-	if (movie_audio_mutex && SDL_LockMutex(movie_audio_mutex) != -1)
+	auto& [mutex, audio_buffer] = *static_cast<std::tuple<SDL_mutex*, std::deque<float>*>*>(userdata);
+
+	if (SDL_LockMutex(mutex) == 0)
 	{
-		if (aframes[0]->size == length)
-		{
-			movie_sync = aframes[0]->pts;
-			memcpy(stream, aframes[0]->buffer, aframes[0]->size);
-			aframes[0]->size = 0;
+		audio_buffer->insert(audio_buffer->end(), samples->interleaved, samples->interleaved + samples->count * 2); //always work on stereo in interleaved mode
+		SDL_UnlockMutex(mutex);
+	}
+}
 
-			SDL_ffmpegAudioFrame* f = aframes[0];
-			for (int i = 1; i < AUDIO_BUF_SIZE; i++)
-				aframes[i - 1] = aframes[i];
-			aframes[AUDIO_BUF_SIZE - 1] = f;
-			returnLength = length;
-		}
+static int audio_player_callback(uint8_t* data, uint32_t length, void* userdata)
+{
+	auto& [mutex, audio_buffer] = *static_cast<std::tuple<SDL_mutex*, std::deque<float>*>*>(userdata);
 
-		SDL_UnlockMutex(movie_audio_mutex);
+	if (audio_buffer->size() && SDL_LockMutex(mutex) == 0)
+	{
+		const auto samples_length = std::min(audio_buffer->size(), (size_t)length / sizeof(float));
+		auto data_out = reinterpret_cast<float*>(data);
+
+		for (auto i = 0; i < samples_length; i++) 
+			data_out[i] = (*audio_buffer)[i];
+
+		audio_buffer->erase(audio_buffer->begin(), audio_buffer->begin() + samples_length);
+		SDL_UnlockMutex(mutex);
+		return samples_length * sizeof(float);
 	}
 
-	return returnLength;
+	return 0;
 }
+
+static void video_frame_decoder_callback(plm_t* mpeg, plm_frame_t* frame, void* userdata) 
+{
+	auto& [dimensions, surface, buffer, out_new_frame] = *static_cast<std::tuple<SDL_Rect, SDL_Surface*, std::vector<uint8>*, bool*>*>(userdata);
+
+#ifdef HAVE_LIBYUV
+	libyuv::I420Scale(frame->y.data, frame->y.width, frame->cb.data, frame->cb.width, frame->cr.data, frame->cr.width, frame->width, frame->height,
+		buffer[0].data(), dimensions.w, buffer[1].data(), dimensions.w / 2, buffer[2].data(), dimensions.w / 2, dimensions.w, dimensions.h, libyuv::FilterMode::kFilterNone);
+
+	if (PlatformIsLittleEndian())
+		libyuv::I420ToABGR(buffer[0].data(), dimensions.w, buffer[1].data(), dimensions.w / 2, buffer[2].data(), dimensions.w / 2, (uint8_t*)surface->pixels, surface->pitch, dimensions.w, dimensions.h);
+	else
+		libyuv::I420ToRGBA(buffer[0].data(), dimensions.w, buffer[1].data(), dimensions.w / 2, buffer[2].data(), dimensions.w / 2, (uint8_t*)surface->pixels, surface->pitch, dimensions.w, dimensions.h);
+#else
+	plm_frame_to_rgba(frame, (uint8_t*)surface->pixels, surface->pitch);
 #endif
 
-extern bool option_nosound;
+	(*out_new_frame) = true;
+}
 
 void show_movie(short index)
 {
 	if (Movie::instance()->IsRecording() || !shell_options.replay_directory.empty())
 		return;
 	
-#if defined(HAVE_FFMPEG)
-	float PlaybackSize = 2;
+	float PlaybackSize = 0;
 	
 	FileSpecifier IntroMovie;
 	FileSpecifier *File = GetLevelMovie(PlaybackSize);
@@ -3137,60 +3584,81 @@ void show_movie(short index)
 	}
 
 	if (!File) return;
-	if (!OpenALManager::Get()) return;
 
 	change_screen_mode(_screentype_chapter);
 
 	SoundManager::Pause pauseSoundManager;
-	SDL_Rect dst_rect = { 0, 0, 640, 480 };
 
-	SDL_ffmpegFile *sffile = SDL_ffmpegOpen(File->GetPath());
-	if (!sffile)
+	auto plm_context = plm_create_with_filename(File->GetPath());
+	if (!plm_context) return;
+
+#ifdef HAVE_LIBYUV
+	SDL_Rect dst_rect = { 0, 0, 640, 480 };
+#else
+	SDL_Rect dst_rect = { 0, 0, plm_context->video_decoder->width, plm_context->video_decoder->height };
+#endif
+
+	auto vframe = PlatformIsLittleEndian() ? 
+		SDL_CreateRGBSurface(SDL_SWSURFACE, dst_rect.w, dst_rect.h, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0) :
+		SDL_CreateRGBSurface(SDL_SWSURFACE, dst_rect.w, dst_rect.h, 32, 0xff000000, 0x00ff0000, 0x0000ff00, 0);
+
+	if (!vframe)
+	{
+		plm_destroy(plm_context);
 		return;
-		
-	SDL_ffmpegSelectVideoStream(sffile, 0);
-	SDL_ffmpegStream *vstream = SDL_ffmpegGetVideoStream(sffile, 0);
-		
-	SDL_ffmpegSelectAudioStream(sffile, 0);
-	SDL_ffmpegStream *astream = SDL_ffmpegGetAudioStream(sffile, 0);
-		
-	SDL_ffmpegVideoFrame *vframe = vstream ? SDL_ffmpegCreateVideoFrame() : NULL;
-		
-	if (vframe)
+	}
+
+	bool got_new_frame = false;
+	std::vector<uint8> frame_buffers[3];
+	frame_buffers[0].resize(dst_rect.w * dst_rect.h);
+	frame_buffers[1].resize(dst_rect.w * dst_rect.h / 2);
+	frame_buffers[2].resize(dst_rect.w * dst_rect.h / 2);
+
+	auto callback_video_userdata = std::make_tuple(dst_rect, vframe, frame_buffers, &got_new_frame);
+	plm_set_video_decode_callback(plm_context, video_frame_decoder_callback, &callback_video_userdata);
+
+	SDL_mutex* audio_mutex = nullptr;
+	std::deque<float> shared_audio_buffer;
+	std::tuple<SDL_mutex*, std::deque<float>*> callback_audio_userdata;
+	bool audio_playback = OpenALManager::Get();
+
+	if (audio_playback)
 	{
-		vframe->surface = SDL_CreateRGBSurface(SDL_SWSURFACE, dst_rect.w, dst_rect.h, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0x00000000);
-		if (!vframe->surface)
+		if (plm_get_num_audio_streams(plm_context) == 0)
 		{
-			SDL_ffmpegFreeVideoFrame(vframe);
-			vframe = NULL;
+			plm_probe(plm_context, 5000 * 1024); //on some video formats like VCDs, number of audio streams is not present in header
+			audio_playback = plm_get_num_audio_streams(plm_context) > 0;
+		}
+
+		if (audio_playback)
+		{
+			audio_mutex = SDL_CreateMutex();
+			callback_audio_userdata = std::make_tuple(audio_mutex, &shared_audio_buffer);
+			plm_set_audio_lead_time(plm_context, 0.1); // we don't set as (sample size / sample rate) as recommended but set a fixed value to give a little bit more time to be sure audio does not underrun
+			plm_set_audio_decode_callback(plm_context, audio_samples_decoder_callback, &callback_audio_userdata);
 		}
 	}
-		
-		
-	if (astream)
-	{
-		movie_audio_mutex = SDL_CreateMutex();
-		specs = SDL_ffmpegGetAudioSpec(sffile, 512, NULL);
-		int frameSize = specs.channels * specs.samples * 2;
-		for (int i = 0; i < AUDIO_BUF_SIZE; i++)
-		{
-			aframes[i] = SDL_ffmpegCreateAudioFrame(sffile, frameSize);
-			SDL_ffmpegGetAudioFrame(sffile, aframes[i]);
-		}
-	}
-				
+
+	plm_set_audio_enabled(plm_context, audio_playback);
+
 #ifdef HAVE_OPENGL
 	if (OGL_IsActive())
 		OGL_ClearScreen();
+
+	OGL_Blitter show_movie_blitter;
 #endif
-	OpenALManager::Get()->Start();
+
+	if (audio_playback) OpenALManager::Get()->Start();
+
 	bool done = false;
-	int64_t movie_waudio_sync = 0;
+	auto last_rendered_time = machine_tick_count();
 	std::shared_ptr<StreamPlayer> movie_audio_player;
+	const auto framerate = plm_get_framerate(plm_context);
+
 	while (!done)
 	{
 		SDL_Event event;
-		while (SDL_PollEvent(&event) )
+		while (SDL_PollEvent(&event))
 		{
 			switch (event.type) {
 			case SDL_KEYDOWN:
@@ -3202,87 +3670,55 @@ void show_movie(short index)
 				break;
 			}
 		}
+
+		auto current_time = machine_tick_count();
+		auto elapsed_time = current_time - last_rendered_time;
+		last_rendered_time = current_time;
+		plm_decode(plm_context, std::min(elapsed_time / 1000.0, 1.0 / framerate));
 			
-		if (astream)
+		if (audio_playback && (!movie_audio_player || !movie_audio_player->IsActive()))
 		{
-			SDL_LockMutex(movie_audio_mutex);
-			for (int i = 0; i < AUDIO_BUF_SIZE; i++)
-			{
-				if (!aframes[i]->size)
-				{
-					SDL_ffmpegGetAudioFrame(sffile, aframes[i]);
-				}
-			}
-			if (!aframes[AUDIO_BUF_SIZE - 1]->size && aframes[AUDIO_BUF_SIZE - 1]->last)
-				done = true;
-			SDL_UnlockMutex(movie_audio_mutex);
+			movie_audio_player = OpenALManager::Get()->PlayStream(audio_player_callback, plm_get_samplerate(plm_context), true, AudioFormat::_32_float, &callback_audio_userdata);
 		}
-			
-		if (!movie_audio_player || !movie_audio_player->IsActive()) {
-			movie_audio_player = OpenALManager::Get()->PlayStream(movie_audio_callback, specs.channels * specs.samples * 2, specs.freq, specs.channels == 2, AudioFormat::_32_float);
-		}
-		if (vframe)
+
+		if (got_new_frame)
 		{
-			if (!astream) 
-			{
-				movie_sync = machine_tick_count() - movie_waudio_sync;
-			}
-			if (!vframe->ready)
-			{
-				SDL_ffmpegGetVideoFrame(sffile, vframe);
-			}
-			else if (vframe->pts <= movie_sync)
-			{
 #ifdef HAVE_OPENGL
-				if (OGL_IsActive())
-				{
-					OGL_Blitter::BoundScreen();
-					show_movie_blitter.Load(*(vframe->surface));
-					show_movie_blitter.Draw(dst_rect);
-					show_movie_blitter.Unload();
-					MainScreenSwap();
-				}
-				else
-#endif
-				{
-					SDL_BlitSurface(vframe->surface, 0, MainScreenSurface(), &dst_rect);
-					MainScreenUpdateRects(1, &dst_rect);
-				}
-				vframe->ready = 0;
-				if (vframe->last)
-					done = true;
-
-				movie_waudio_sync = machine_tick_count() - vframe->pts;
-			}
-			else 
+			if (OGL_IsActive())
 			{
-				sleep_for_machine_ticks(MIN(30, vframe->pts - movie_sync));
+				OGL_Blitter::BoundScreen();
+				show_movie_blitter.Load(*(vframe));
+				show_movie_blitter.Draw(dst_rect);
+				show_movie_blitter.Unload();
+				MainScreenSwap();
 			}
+			else
+#endif
+			{
+				SDL_BlitSurface(vframe, 0, MainScreenSurface(), &dst_rect);
+				MainScreenUpdateRects(1, &dst_rect);
+			}
+
+			got_new_frame = false;
 		}
+		else if (plm_has_ended(plm_context))
+			done = true;
+		else
+			sleep_for_machine_ticks(1);
 	}
 
-	while (movie_audio_player->IsActive()) {
-		sleep_for_machine_ticks(MACHINE_TICKS_PER_SECOND / 100);
-	}
-
-	OpenALManager::Get()->Stop();
-	movie_audio_player.reset();
-
-	if (astream)
+	if (audio_playback)
 	{
-		for (int i = 0; i < AUDIO_BUF_SIZE; i++)
-		{
-			SDL_ffmpegFreeAudioFrame(aframes[i]);
+		while (movie_audio_player && movie_audio_player->IsActive()) {
+			sleep_for_machine_ticks(MACHINE_TICKS_PER_SECOND / 100);
 		}
-		SDL_DestroyMutex(movie_audio_mutex);
-		movie_audio_mutex = NULL;
-	}
-				
-	if (vframe)
-		SDL_ffmpegFreeVideoFrame(vframe);
-	SDL_ffmpegFree(sffile);
 
-#endif // HAVE_FFMPEG
+		OpenALManager::Get()->Stop();
+		SDL_DestroyMutex(audio_mutex);
+	}
+
+	SDL_FreeSurface(vframe);
+	plm_destroy(plm_context);
 }
 
 

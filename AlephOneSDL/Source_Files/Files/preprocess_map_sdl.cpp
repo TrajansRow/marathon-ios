@@ -37,7 +37,6 @@
 #include "game_wad.h"
 #include "game_errors.h"
 #include "QuickSave.h"
-
 #include "AlephOneHelper.h" //Needed for iOS port
 
 // From shell_sdl.cpp
@@ -135,7 +134,7 @@ bool save_game(void)
 	//On iOS, just save with current saved game by calling the helper
 	helperSaveGame();
 	return true;
-	
+
     bool success = create_quick_save();
     if (success)
         screen_printf("Game saved");

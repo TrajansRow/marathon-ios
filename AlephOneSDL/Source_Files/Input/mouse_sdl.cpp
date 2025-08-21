@@ -35,7 +35,6 @@
 #include "shell.h"
 #include "preferences.h"
 #include "screen.h"
-
 #include "AlephOneHelper.h" //Needed for iOS port
 
 // Global variables
@@ -54,7 +53,6 @@ void enter_mouse(short type)
 {
 	if (type != _keyboard_or_game_pad) {
 		MainScreenCenterMouse();
-		
 		//Clear mouse deltas to avoid a large initial jump on iOS.
 		float dx, dy;
 		slurpMouseDelta(&dx, &dy);
@@ -65,6 +63,7 @@ void enter_mouse(short type)
 		mouselook_delta = {0, 0};
 		snapshot_delta_scrollwheel = 0;
 		snapshot_delta_x = snapshot_delta_y = 0;
+		
 		button_mask = 0;	// Disable all buttons (so a shot won't be fired if we enter the game with a mouse button down from clicking a GUI widget)
 	}
 }
@@ -106,12 +105,6 @@ static inline float MIX(float start, float end, float factor)
 void mouse_idle(short type)
 {
 	if (mouse_active) {
-		static uint32 last_tick_count = 0;
-		uint32 tick_count = machine_tick_count();
-		int32 ticks_elapsed = tick_count - last_tick_count;
-
-		if (ticks_elapsed < 1)
-			return;
 
 		// Calculate axis deltas
 		float dx = snapshot_delta_x;

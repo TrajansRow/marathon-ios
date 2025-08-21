@@ -74,8 +74,6 @@
 
 #include <algorithm>
 
-#include "AlephOneHelper.h" //Needed for iOS port
-
 #if defined(__WIN32__) || (defined(__MACH__) && defined(__APPLE__))
 #define MUST_RELOAD_VIEW_CONTEXT
 #endif
@@ -118,9 +116,6 @@ bool using_default_gamma = true;
 
 static bool PrevFullscreen = false;
 static bool in_game = false;	// Flag: menu (fixed 640x480) or in-game (variable size) display
-
-static int desktop_width;
-static int desktop_height;
 
 static int failed_multisamples = 0;		// remember when GL multisample setting didn't succeed
 static bool passed_shader = false;      // remember when we passed Shader tests
@@ -299,7 +294,6 @@ void Screen::Initialize(screen_mode_data* mode)
 	screen_initialized = true;
 	
 	SDL_GL_SetSwapInterval(0); //Set default to no vsync like legacy OpenGL, unless player requests it (they really should).
-	//SDL_RenderSetVSync(main_render, 0); //ios test
 }
 
 int Screen::height()
@@ -604,8 +598,7 @@ static void reallocate_world_pixels(int width, int height)
 		SDL_FreeSurface(world_pixels_corrected);
 		world_pixels_corrected = NULL;
 	}
-	SDL_PixelFormat *f = main_surface->format;
-//	world_pixels = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, f->BitsPerPixel, f->Rmask, f->Gmask, f->Bmask, f->Amask);
+
 	switch (bit_depth)
 	{
 	case 8:
@@ -901,16 +894,13 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 		
 		setenv("ANGLE_DEFAULT_PLATFORM", "metal", 0); //If we don't specify this, ANGLE will probably try to use the OpenGL backend (which is super slow)
 		
-        
+        SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_EGL, 1);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-		
+				
 				// For iOS, force OpenGL ES 3.x. The default would otherwise be ES 2.
 				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-				SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
-				SDL_SetWindowFullscreen(main_screen, SDL_WINDOW_FULLSCREEN);
-
 		
         // Explicitly set channel depths, otherwise we might get some < 8
         SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
@@ -1191,6 +1181,18 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 			printf("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
 			printf("GL_VERSION: %s\n", glGetString(GL_VERSION));
             printf("GL_SHADING_LANGUAGE_VERSION: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+			
+			//Remove comment to print extensions for debugging OGL implementation
+			/*GLint numExtensions;
+			glGetIntegerv(GL_NUM_EXTENSIONS, &numExtensions);
+
+			for (GLint i = 0; i < numExtensions; i++) {
+				const char* extension = (const char*)glGetStringi(GL_EXTENSIONS, i);
+				if (extension) {
+					printf("%s\n", extension);
+				}
+			}*/
+			
 //		const char *gl_extensions = (const char *)glGetString(GL_EXTENSIONS);
 //		printf("GL_EXTENSIONS: %s\n", gl_extensions);
 			gl_info_printed = true;
@@ -1533,9 +1535,9 @@ void render_screen(short ticks_elapsed)
 		software_render_dest.clear();
 	else if (software_render_dest.empty() || ViewChangedSize)
 		software_render_dest = bitmap_definition_of_sdl_surface(world_pixels);
-
+    
 	clearSmartTrigger(); //Reset iOS smart trigger
-	
+
 	// Render world view
 	render_view(world_view, software_render_dest.get());
 
@@ -1544,7 +1546,7 @@ void render_screen(short ticks_elapsed)
     if (screen_mode.acceleration == _no_acceleration &&
 		(MapIsTranslucent || Screen::instance()->lua_hud()))
         clear_screen_margin();
-	
+    
 	if (game_is_networked && is_network_pregame)
 	{
 		clear_screen(false);
@@ -1682,7 +1684,7 @@ void render_screen(short ticks_elapsed)
 			darken_world_window();
 		}
 
-		OGL_SwapBuffers(); //return; //ios break test
+		OGL_SwapBuffers();
 	}
 #endif
 	
@@ -2383,6 +2385,10 @@ void MainScreenCenterMouse()
 SDL_Surface *MainScreenSurface()
 {
 	return main_surface;
+}
+SDL_Window* MainScreenWindow()
+{
+	return main_screen;
 }
 void MainScreenUpdateRect(int x, int y, int w, int h)
 {

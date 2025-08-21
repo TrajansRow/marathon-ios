@@ -103,7 +103,6 @@ May 22, 2003 (Woody Zenfell):
 #include "OpenALManager.h"
 #include "resource_manager.h"
 #include "XML_LevelScript.h"
-
 #include "AlephOneHelper.h" //Needed for iOS port
 
 #ifdef HAVE_UNISTD_H
@@ -1044,10 +1043,6 @@ static const char* term_scale_labels[] = {
 "Normal", "Double", "Largest", NULL
 };
 
-static const char* mouse_accel_labels[] = {
-	"Off", "Classic", NULL
-};
-
 static const char* max_saves_labels[] = {
 #ifdef HAVE_STEAM
 	"20", "100", "500", NULL
@@ -1562,7 +1557,11 @@ public:
 
 	void item_selected(void)
 	{
-		SoundManager::instance()->TestVolume((selection - 20) * 2, _snd_adjust_volume);
+		if (SoundManager::instance()->IsActive())
+		{
+			OpenALManager::Get()->SetMasterVolume(SoundManager::From_db((selection - 20) * 2));
+			SoundManager::instance()->PlaySound(_snd_adjust_volume, 0, NONE);
+		}
 	}
 };
 
@@ -1570,6 +1569,14 @@ class w_music_slider : public w_slider {
 public:
 	w_music_slider(int sel) : w_slider(41, sel) {
 		init_formatted_value();
+	}
+
+	void item_selected(void)
+	{
+		if (OpenALManager::Get())
+		{
+			OpenALManager::Get()->SetMusicVolume(SoundManager::From_db((selection - 20), true));
+		}
 	}
 
 	virtual std::string formatted_value() {
@@ -1601,14 +1608,27 @@ static void sound_dialog(void *arg)
 	table->dual_add(dynamic_w->label("Active Panning"), d);
 	table->dual_add(dynamic_w, d);
 
-	w_toggle *sounds3d_w = new w_toggle(sound_preferences->flags & _3d_sounds_flag);
+	bool is_3d_sounds_enabled = sound_preferences->flags & _3d_sounds_flag;
+	w_toggle *sounds3d_w = new w_toggle(is_3d_sounds_enabled);
 	table->dual_add(sounds3d_w->label("3D Sounds"), d);
 	table->dual_add(sounds3d_w, d);
 
-	w_toggle *hrtf_w = new w_toggle((OpenALManager::Get() && OpenALManager::Get()->Is_HRTF_Enabled()) || sound_preferences->flags & _hrtf_flag);
+	w_toggle *hrtf_w = new w_toggle((OpenALManager::Get() && OpenALManager::Get()->IsHrtfEnabled()) || sound_preferences->flags & _hrtf_flag);
 	table->dual_add(hrtf_w->label("HRTF (Headphones)"), d);
 	table->dual_add(hrtf_w, d);
-	hrtf_w->set_enabled(OpenALManager::Get() && OpenALManager::Get()->Support_HRTF_Toggling());
+	hrtf_w->set_enabled(OpenALManager::Get() && OpenALManager::Get()->GetHrtfSupport() != OpenALManager::HrtfSupport::Unsupported && is_3d_sounds_enabled && sound_preferences->channel_type == ChannelType::_stereo);
+
+	auto hrtf_enable_callback = [&](void*) {
+		bool can_enable_hrtf = sounds3d_w->get_selection() == 1
+			&& mapping_index_channel.at(channel_w->get_selection()) == ChannelType::_stereo
+			&& OpenALManager::Get() && OpenALManager::Get()->GetHrtfSupport() == OpenALManager::HrtfSupport::Supported;
+
+		hrtf_w->set_enabled(can_enable_hrtf);
+		hrtf_w->set_selection(!can_enable_hrtf && OpenALManager::Get() && OpenALManager::Get()->GetHrtfSupport() == OpenALManager::HrtfSupport::Required);
+	};
+
+	sounds3d_w->set_selection_changed_callback(hrtf_enable_callback);
+	channel_w->set_popup_callback(hrtf_enable_callback, nullptr);
 
 	table->add_row(new w_spacer(), true);
 
@@ -1711,10 +1731,17 @@ static void sound_dialog(void *arg)
 		}
 
 		if (changed) {
-//			set_sound_manager_parameters(sound_preferences);
+			auto slot = Music::instance()->GetSlot(Music::MusicSlot::Intro);
+			bool is_music_playing = slot && slot->Playing();
 			SoundManager::instance()->SetParameters(*sound_preferences);
 			write_preferences();
+			if (is_music_playing) Music::instance()->RestartIntroMusic();
 		}
+	}
+	else if (OpenALManager::Get())
+	{
+		OpenALManager::Get()->SetMasterVolume(SoundManager::From_db(sound_preferences->volume_db));
+		OpenALManager::Get()->SetMusicVolume(SoundManager::From_db(sound_preferences->music_db, true));
 	}
 }
 
@@ -2411,20 +2438,33 @@ static void controller_details_dialog(void *arg)
 	table_placer *table = new table_placer(2, get_theme_space(ITEM_WIDGET), true);
 	table->col_flags(0, placeable::kAlignRight);
 	
-	float joySensitivity = ((float) input_preferences->controller_sensitivity) / FIXED_ONE;
-	if (joySensitivity <= 0.0f) joySensitivity = 1.0f;
-	float joySensitivityLog = std::log(joySensitivity);
-	int joySliderPosition =
-	(int) ((joySensitivityLog - kMinSensitivityLog) * (1000.0f / kSensitivityLogRange) + 0.5f);
+	float joySensitivityX = ((float) input_preferences->controller_sensitivity_horizontal) / FIXED_ONE;
+	if (joySensitivityX <= 0.0f) joySensitivityX = 1.0f;
+	float joySensitivityLogX = std::log(joySensitivityX);
+	int joySliderPositionX = (int) ((joySensitivityLogX - kMinSensitivityLog) * (1000.0f / kSensitivityLogRange) + 0.5f);
 
-	w_sens_slider* sens_joy_w = new w_sens_slider(1000, joySliderPosition);
-	table->dual_add(sens_joy_w->label("Aiming Sensitivity"), d);
-	table->dual_add(sens_joy_w, d);
+	w_sens_slider* sens_joy_w_x = new w_sens_slider(1000, joySliderPositionX);
+	table->dual_add(sens_joy_w_x->label("Aiming Horizontal Sensitivity"), d);
+	table->dual_add(sens_joy_w_x, d);
 	
-	int joyDeadzone = (int)((input_preferences->controller_deadzone / 655.36f) + 0.5f);
-	w_deadzone_slider* dead_joy_w = new w_deadzone_slider(11, joyDeadzone);
-	table->dual_add(dead_joy_w->label("Analog Dead Zone"), d);
-	table->dual_add(dead_joy_w, d);
+	int joyDeadzoneX = (int)((input_preferences->controller_deadzone_horizontal / 655.36f) + 0.5f);
+	w_deadzone_slider* dead_joy_w_x = new w_deadzone_slider(11, joyDeadzoneX);
+	table->dual_add(dead_joy_w_x->label("Analog Horizontal Dead Zone"), d);
+	table->dual_add(dead_joy_w_x, d);
+
+	float joySensitivityY = ((float)input_preferences->controller_sensitivity_vertical) / FIXED_ONE;
+	if (joySensitivityY <= 0.0f) joySensitivityY = 1.0f;
+	float joySensitivityLogY = std::log(joySensitivityY);
+	int joySliderPositionY = (int)((joySensitivityLogY - kMinSensitivityLog) * (1000.0f / kSensitivityLogRange) + 0.5f);
+
+	w_sens_slider* sens_joy_w_y = new w_sens_slider(1000, joySliderPositionY);
+	table->dual_add(sens_joy_w_y->label("Aiming Vertical Sensitivity"), d);
+	table->dual_add(sens_joy_w_y, d);
+
+	int joyDeadzoneY = (int)((input_preferences->controller_deadzone_vertical / 655.36f) + 0.5f);
+	w_deadzone_slider* dead_joy_w_y = new w_deadzone_slider(11, joyDeadzoneY);
+	table->dual_add(dead_joy_w_y->label("Analog Vertical Dead Zone"), d);
+	table->dual_add(dead_joy_w_y, d);
 
 	w_toggle* controller_inverted = new w_toggle(input_preferences->controller_aim_inverted);
 	table->dual_add(controller_inverted->label("Invert Vertical Aim"), d);
@@ -2444,18 +2484,33 @@ static void controller_details_dialog(void *arg)
 	if (d.run() == 0) {	// Accepted
 		bool changed = false;
 
-		int sensPos = sens_joy_w->get_selection();
-		float sensLog = kMinSensitivityLog + ((float) sensPos) * (kSensitivityLogRange / 1000.0f);
-		_fixed sensNorm = _fixed(std::exp(sensLog) * FIXED_ONE);
-		if (sensNorm != input_preferences->controller_sensitivity) {
-			input_preferences->controller_sensitivity = sensNorm;
+		int sensPosX = sens_joy_w_x->get_selection();
+		float sensLogX = kMinSensitivityLog + ((float)sensPosX) * (kSensitivityLogRange / 1000.0f);
+		_fixed sensNormX = _fixed(std::exp(sensLogX) * FIXED_ONE);
+		if (sensNormX != input_preferences->controller_sensitivity_horizontal) {
+			input_preferences->controller_sensitivity_horizontal = sensNormX;
 			changed = true;
 		}
 		
-		int deadPos = dead_joy_w->get_selection();
-		int deadNorm = deadPos * 655.36f;
-		if (deadNorm != input_preferences->controller_deadzone) {
-			input_preferences->controller_deadzone = deadNorm;
+		int deadPosX = dead_joy_w_x->get_selection();
+		int deadNormX = deadPosX * 655.36f;
+		if (deadNormX != input_preferences->controller_deadzone_horizontal) {
+			input_preferences->controller_deadzone_horizontal = deadNormX;
+			changed = true;
+		}
+
+		int sensPosY = sens_joy_w_y->get_selection();
+		float sensLogY = kMinSensitivityLog + ((float)sensPosY) * (kSensitivityLogRange / 1000.0f);
+		_fixed sensNormY = _fixed(std::exp(sensLogY) * FIXED_ONE);
+		if (sensNormY != input_preferences->controller_sensitivity_vertical) {
+			input_preferences->controller_sensitivity_vertical = sensNormY;
+			changed = true;
+		}
+
+		int deadPosY = dead_joy_w_y->get_selection();
+		int deadNormY = deadPosY * 655.36f;
+		if (deadNormY != input_preferences->controller_deadzone_vertical) {
+			input_preferences->controller_deadzone_vertical = deadNormY;
 			changed = true;
 		}
 
@@ -3072,7 +3127,6 @@ static void plugins_dialog(void* arg)
 	d.set_widget_placer(placer);
 	d.activate_widget(plugins_w);
 
-	bool theme_changed = false;
 	FileSpecifier old_theme;
 	const Plugin* theme_plugin = Plugins::instance()->find_theme();
 	if (theme_plugin)
@@ -3213,7 +3267,7 @@ static void environment_dialog(void *arg)
 	table->dual_add(use_native_file_dialogs_w, d);
 #endif
 
-	w_select *max_saves_w = new w_select(0, max_saves_labels);
+	w_select *max_saves_w = new w_select(2, max_saves_labels);
 	for (int i = 0; max_saves_labels[i] != NULL; ++i) {
 		if (max_saves_values[i] == environment_preferences->maximum_quick_saves)
 			max_saves_w->set_selection(i);
@@ -3590,6 +3644,7 @@ InfoTree graphics_preferences_tree()
 	root.put_attr("wait_for_vsync", graphics_preferences->OGL_Configure.WaitForVSync);
 	root.put_attr("gamma_corrected_blending", graphics_preferences->OGL_Configure.Use_sRGB);
 	root.put_attr("use_npot", graphics_preferences->OGL_Configure.Use_NPOT);
+	root.put_attr("billboard_xy", graphics_preferences->OGL_Configure.BillboardXY);
 	root.put_attr("movie_export_video_quality", graphics_preferences->movie_export_video_quality);
 	root.put_attr("movie_export_video_bitrate", graphics_preferences->movie_export_video_bitrate);
 	root.put_attr("movie_export_audio_quality", graphics_preferences->movie_export_audio_quality);
@@ -3627,10 +3682,10 @@ InfoTree graphics_preferences_tree()
 			Config.NearFilter=2;
 		}
 #endif
-		
+
 		//Override gamma levels for iOS
 		graphics_preferences->screen_mode.gamma_level = helperGamma();
-		
+
 		//For iOS, use 3D perspective
 		graphics_preferences->OGL_Configure.Flags &= ~OGL_Flag_MimicSW;
 		
@@ -3646,12 +3701,12 @@ InfoTree graphics_preferences_tree()
 		
 		//for iOS, set FPS target higher
 		graphics_preferences->fps_target = iOSFPSTarget();
-		graphics_preferences->OGL_Configure.WaitForVSync = 0;
+		graphics_preferences->OGL_Configure.WaitForVSync = 1;
 		
 		//Show iOS FPS if desired.
 		extern bool displaying_fps;
 		displaying_fps = showiOSFPS();
-		
+
 		//Temporary workaround for Remote Hub to work on iOS. Future engine versions will probably not need this
 		//Badly breaks M1 game state, so we don't use it for that (nor does it seem needed)
 		#if SCENARIO != 1
@@ -3911,8 +3966,10 @@ InfoTree input_preferences_tree()
 	
 	root.put_attr("controller_analog", input_preferences->controller_analog);
 	root.put_attr("controller_aim_inverted", input_preferences->controller_aim_inverted);
-	root.put_attr("controller_sensitivity", input_preferences->controller_sensitivity);
-	root.put_attr("controller_deadzone", input_preferences->controller_deadzone);
+	root.put_attr("controller_sensitivity_horizontal", input_preferences->controller_sensitivity_horizontal);
+	root.put_attr("controller_deadzone_horizontal", input_preferences->controller_deadzone_horizontal);
+	root.put_attr("controller_sensitivity_vertical", input_preferences->controller_sensitivity_vertical);
+	root.put_attr("controller_deadzone_vertical", input_preferences->controller_deadzone_vertical);
 	
 	for (int i = 0; i < (NUMBER_OF_KEYS + NUMBER_OF_SHELL_KEYS); ++i)
 	{
@@ -3967,13 +4024,13 @@ InfoTree sound_preferences_tree()
 	root.put_attr("samples", sound_preferences->samples);
 	root.put_attr("video_export_volume_db", sound_preferences->video_export_volume_db);
 	root.put_attr("channel", static_cast<int>(sound_preferences->channel_type));
-
-		//On iOS, always enable 3D audio and HRTF
+	
+	//On iOS, always enable 3D audio and HRTF
 	sound_preferences->flags |= _3d_sounds_flag;
 	sound_preferences->flags |= _hrtf_flag;
-	sound_preferences->flags |= _dynamic_tracking_flag;
 	setVolumeAndRefreshSound();
-	
+
+
 	return root;
 }
 
@@ -4250,8 +4307,10 @@ static void default_input_preferences(input_preferences_data *preferences)
 
 	preferences->controller_aim_inverted = false;
 	preferences->controller_analog = true;
-	preferences->controller_sensitivity = FIXED_ONE;
-	preferences->controller_deadzone = 3276;
+	preferences->controller_sensitivity_horizontal = FIXED_ONE;
+	preferences->controller_deadzone_horizontal = 3276;
+	preferences->controller_sensitivity_vertical = FIXED_ONE;
+	preferences->controller_deadzone_vertical = 3276;
 }
 
 static void default_environment_preferences(environment_preferences_data *preferences)
@@ -4408,7 +4467,7 @@ static bool validate_player_preferences(player_preferences_data *preferences)
 {
 	// Fix bool options
 	preferences->background_music_on = !!preferences->background_music_on;
-	
+
 	return false;
 }
 
@@ -4632,6 +4691,7 @@ void parse_graphics_preferences(InfoTree root, std::string version)
 	root.read_attr("wait_for_vsync", graphics_preferences->OGL_Configure.WaitForVSync);
 	root.read_attr("gamma_corrected_blending", graphics_preferences->OGL_Configure.Use_sRGB);
 	root.read_attr("use_npot", graphics_preferences->OGL_Configure.Use_NPOT);
+	root.read_attr("billboard_xy", graphics_preferences->OGL_Configure.BillboardXY);
 	root.read_attr_bounded<int16>("movie_export_video_quality", graphics_preferences->movie_export_video_quality, 0, 100);
 	root.read_attr_bounded<int16>("movie_export_audio_quality", graphics_preferences->movie_export_audio_quality, 0, 100);
 	root.read_attr("movie_export_video_bitrate", graphics_preferences->movie_export_video_bitrate);
@@ -4849,12 +4909,29 @@ void parse_input_preferences(InfoTree root, std::string version)
 	root.read_attr("extra_mouse_precision", input_preferences->extra_mouse_precision);
 	root.read_attr("controller_analog", input_preferences->controller_analog);
 	root.read_attr("controller_aim_inverted", input_preferences->controller_aim_inverted);
-	root.read_attr("controller_sensitivity", input_preferences->controller_sensitivity);
-	root.read_attr("controller_deadzone", input_preferences->controller_deadzone);
+
+	_fixed old_controller_sensitivity_pref;
+	if (root.read_attr("controller_sensitivity", old_controller_sensitivity_pref))
+	{
+		input_preferences->controller_sensitivity_vertical =
+			input_preferences->controller_sensitivity_horizontal = old_controller_sensitivity_pref;
+	}
 
 	//On iOS, always use extra mouse precision
 	input_preferences->extra_mouse_precision = true;
-	
+
+	short old_controller_deadzone_pref;
+	if (root.read_attr("controller_deadzone", old_controller_deadzone_pref))
+	{
+		input_preferences->controller_deadzone_vertical =
+			input_preferences->controller_deadzone_horizontal = old_controller_deadzone_pref;
+	}
+
+	root.read_attr("controller_sensitivity_horizontal", input_preferences->controller_sensitivity_horizontal);
+	root.read_attr("controller_deadzone_horizontal", input_preferences->controller_deadzone_horizontal);
+	root.read_attr("controller_sensitivity_vertical", input_preferences->controller_sensitivity_vertical);
+	root.read_attr("controller_deadzone_vertical", input_preferences->controller_deadzone_vertical);
+
 	// remove default key bindings the first time we see one from these prefs
 	std::set<std::pair<BindingType, int>> seen_key;
 	
@@ -5088,6 +5165,7 @@ void parse_environment_preferences(InfoTree root, std::string version)
 	root.read_attr("auto_play_demos", environment_preferences->auto_play_demos);
 	
 	orphan_disabled_plugins.clear();
+	//Force enable Enhanced HUD for iOS
 	/*for (const InfoTree &plugin : root.children_named("disable_plugin"))
 	{
 		char tempstr[256];

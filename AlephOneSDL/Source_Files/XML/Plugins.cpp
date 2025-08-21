@@ -33,9 +33,11 @@
 #include "InfoTree.h"
 #include "XML_ParseTreeRoot.h"
 #include "Scenario.h"
+#ifdef HAVE_STEAM
+#include "steamshim_child.h"
+#endif
 
 #include "AlephOneHelper.h" //Needed for iOS port
-
 #include <boost/algorithm/string/predicate.hpp>
 
 namespace algo = boost::algorithm;
@@ -76,7 +78,7 @@ bool Plugin::allowed() const {
 bool Plugin::valid() const {
 	if (!enabled)
 		return false;
-
+	
 	//Plugin filters for iOS
 	if(useClassicVisuals()) {
 		if(
@@ -100,12 +102,11 @@ bool Plugin::valid() const {
 				strncmp(name.c_str(), "4096", 4) == 0 ||
 			 
 				//Any Gorans
-				strncmp(name.c_str(), "Gorans", 6) == 0 
+				strncmp(name.c_str(), "Gorans", 6) == 0
 				) {
 			return false;
 		}
 	}
-
 	
 	if (!environment_preferences->use_solo_lua &&
 		Plugins::instance()->mode() == Plugins::kMode_Solo)
@@ -515,10 +516,25 @@ bool PluginLoader::ParseDirectory(FileSpecifier& dir)
 
 extern std::vector<DirectorySpecifier> data_search_path;
 
+#ifdef HAVE_STEAM
+extern std::vector<item_subscribed_query_result::item> subscribed_workshop_items;
+#endif
+
 void Plugins::enumerate() {
 
 	logContext("parsing plugins");
 	PluginLoader loader;
+
+#ifdef HAVE_STEAM
+	for (const auto& item : subscribed_workshop_items)
+	{
+		if (item.item_type == ItemType::Plugin)
+		{
+			FileSpecifier dir(item.install_folder_path);
+			loader.ParseDirectory(dir);
+		}
+	}
+#endif
 	
 	for (std::vector<DirectorySpecifier>::const_iterator it = data_search_path.begin(); it != data_search_path.end(); ++it) {
 		DirectorySpecifier path = *it + "Plugins";

@@ -103,6 +103,12 @@ May 3, 2003 (Br'fin (Jeremy Parsons))
 #include "OGL_Textures.h"
 #include "screen.h"
 
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#include <GL/GLU.h>
+#endif
+
 using std::min;
 using std::max;
 
@@ -1334,10 +1340,10 @@ void TextureManager::PlaceTexture(const ImageDescriptor *Image, bool normal_map)
 				}
 				mipmapsLoaded = true;
 			} else {
+#if defined GL_SGIS_generate_mipmap
 #ifdef TARGET_OS_IOS
 				bool useSGISMipmaps=0;
 #endif
-#if defined GL_SGIS_generate_mipmap
 				if (useSGISMipmaps) {
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_TRUE);
 					mipmapsLoaded = true;
@@ -1610,7 +1616,6 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 	int TxtrWidth = Image.get()->GetWidth();
 	int TxtrHeight = Image.get()->GetHeight();
 
-	bool IsInfravision = IsInfravisionTable(CLUT);
 	bool IsSilhouette = IsSilhouetteTable(CLUT);
 	
 	if (IsSilhouette)
@@ -1655,10 +1660,10 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 		case GL_LINEAR_MIPMAP_LINEAR:
 			if (Image.get()->GetMipMapCount() > 1) 
 			{
+#ifdef GL_SGIS_generate_mipmap
 #ifdef TARGET_OS_IOS
 				bool useSGISMipmaps=0;
 #endif
-#ifdef GL_SGIS_generate_mipmap
 				if (useSGISMipmaps) {
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_FALSE);
 				}
@@ -1672,10 +1677,10 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 			}
 			else
 			{
+#ifdef GL_SGIS_generate_mipmap
 #ifdef TARGET_OS_IOS
 				bool useSGISMipmaps=0;
 #endif
-#ifdef GL_SGIS_generate_mipmap
 				if (useSGISMipmaps)
 				{
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_TRUE);
@@ -1739,10 +1744,10 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 		case GL_LINEAR_MIPMAP_LINEAR:
 			if (Image.get()->GetMipMapCount() > 1)
 			{
+#ifdef GL_SGIS_generate_mipmap
 #ifdef TARGET_OS_IOS
 				bool useSGISMipmaps=0;
 #endif
-#ifdef GL_SGIS_generate_mipmap
 				if (useSGISMipmaps)
 				{
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_FALSE);
@@ -1757,11 +1762,11 @@ void LoadModelSkin(ImageDescriptor& SkinImage, short Collection, short CLUT)
 			}
 			else
 			{
+#ifdef GL_SGIS_generate_mipmap
 #ifdef TARGET_OS_IOS
 				bool useSGISMipmaps=0;
 #endif
-#ifdef GL_SGIS_generate_mipmap
-				if (useSGISMipmaps) 
+				if (useSGISMipmaps)
 				{
 					glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_TRUE);
 					mipmapsLoaded = true;

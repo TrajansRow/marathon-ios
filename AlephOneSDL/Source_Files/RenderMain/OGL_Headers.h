@@ -50,6 +50,7 @@ typedef double GLclampd; //Added for iOS by SDL_opengl_glext.h
 #include "SDL2/SDL_opengles.h"
 #endif
 
+
 #ifndef __APPLE__
 #include <SDL2/SDL_opengles2.h>
 #endif

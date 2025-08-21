@@ -316,7 +316,7 @@ void Shader::init() {
 	//If the location is later requested but not found in the shader, the value will become -1.
 	std::fill_n(_uniform_locations, static_cast<int>(NUMBER_OF_UNIFORM_LOCATIONS), -2);
 	
-  std::fill_n(_cached_floats, static_cast<int>(NUMBER_OF_UNIFORM_LOCATIONS), 0.0);
+    std::fill_n(_cached_floats, static_cast<int>(NUMBER_OF_UNIFORM_LOCATIONS), 0.0);
 
     _loaded = true;
 

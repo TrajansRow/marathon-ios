@@ -42,7 +42,6 @@ Dec 17, 2000 (Loren Petrich:
 #include "ViewControl.h"
 #include "InfoTree.h"
 #include "preferences.h"
-
 #include "AlephOneHelper.h" //Needed for iOS port
 
 struct view_settings_definition {
@@ -169,7 +168,7 @@ FontSpecifier& GetOnScreenFont()
 // Move field-of-view value closer to some target value:
 bool View_AdjustFOV(float& FOV, float FOV_Target)
 {
-	FOV_Target += extraFieldOfView();
+	FOV_Target += extraFieldOfView(); //iOS adds extra FOV option
 	
 	bool Changed = false;
 	if (FOV_ChangeRate < 0) FOV_ChangeRate *= -1;

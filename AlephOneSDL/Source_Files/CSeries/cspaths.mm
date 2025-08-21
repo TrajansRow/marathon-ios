@@ -27,7 +27,6 @@
 			#import <Cocoa/Cocoa.h>
 		#endif
 #endif
-
 #include "cstypes.h"
 #include "cspaths.h"
 #include "alephversion.h"
@@ -161,7 +160,8 @@ std::string get_application_name()
 {
 #ifdef TARGET_OS_IOS
 	return A1_DISPLAY_NAME;
-#else
+#endif
+	
 	static std::string name = "";
 	if (name.empty())
 	{
@@ -170,7 +170,6 @@ std::string get_application_name()
 		name = [appName UTF8String];
 	}
 	return name;
-#endif
 }
 
 std::string get_application_identifier()

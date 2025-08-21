@@ -43,7 +43,7 @@ From the new source tree, sort all of the subfolders by name. Then Remove Refere
 
 We need a copy of the main event loop to run without the enclosing infinite while loop. Look in shell.cpp->void main_event_loop(void), and grab the inner contents of the "while ((game_state = get_game_state()) != _quit_game)" loop, and paste it into the void AlephOneMainLoop() function in AlephOneShell.cpp
 
-Remove these lines, and make sure they are OUTSIDE of the AlephOneMainLoop() definition:
+Grab these lines from the start of main_event_loop(void), and make sure they are OUTSIDE of the AlephOneMainLoop() definition:
 	uint32 last_event_poll = 0;
 	short game_state;
 
@@ -61,8 +61,11 @@ If you don't do the above, stereo sounds will not update panning and the console
 
 
 
-***See notes on commenting out SDL_WaitEventTimeout below!!!
-
+***See notes on commenting out SDL_WaitEventTimeout below!!! Comment out the following from AlephOneMainLoop():
+/*if (SDL_WaitEventTimeout(&event, 30))
+{
+	process_event(event);
+}*/
 
 
 ***Update OpenGL Headers for ES
@@ -118,8 +121,6 @@ In cspaths, csalerts or anywhere that includes Cocoa.h, replace the #import with
 In cspaths.mm, return a static name for now:std::string get_application_name() like this:
 #ifdef TARGET_OS_IOS
 	return A1_DISPLAY_NAME;
-#else
-	***Leave existing code here!
 #endif
 
 Also, add #include "alephversion.h" to the top of that file.
@@ -129,12 +130,6 @@ Also, add #include "alephversion.h" to the top of that file.
 
 Add this to the top of shell.cpp:
 #include "alephversion.h"
-
-
-***Fix #include in Pinger
-
-Change the AStream.h include to quotes, like this:
-#include "AStream.h"
 
 
 ***Add definition for useSGISMipmaps
@@ -152,8 +147,8 @@ In QuickSave.h, add these before the final #endif:
 std::string build_save_metadata(QuickSave& save);
 bool build_map_preview(std::ostringstream& ostream);
 
-In QuickSaver.cpp, change this to non-static:
-bool build_map_preview(std::ostringstream& ostream)
+In QuickSave.cpp, change this to non-static:
+bool build_map_preview(std::ostringstream& ostream) //Changed to non-static for iOS port
 
 
 ***Fix other missing static symbols
@@ -166,7 +161,13 @@ In devices.cpp, change BOTH line_is_within_range to non-static:
 //Changed to non-static for iOS port
 bool line_is_within_range(
 
+***Fix progress.h include
 
+In interface.cpp, change the include for progress.h to use quotes instead of angled brackets:
+#include "progress.h"
+
+
+***** At this point the project should build. Great job so far, but you can't stop here! *****
 
 ~~~~~ Code changes to enable iOS interface hooks and capabilities ~~~~~
 
@@ -177,7 +178,7 @@ Many of the following changes need the AlephOneHelper.h header for various hooks
 
 ***Change default Data Directory
 
-In shell.cpp, add the Helper header and then right before "const string data_env = a1_getenv("ALEPHONE_DATA");", change default_data_dir using (also include the healer header file): 
+In shell.cpp, add the Helper header and then right before "const string data_env = a1_getenv("ALEPHONE_DATA");", change default_data_dir using: 
 #if TARGET_OS_IPHONE
 	//iOS directory override
 	default_data_dir = getDataDir();
@@ -187,7 +188,7 @@ In shell.cpp, add the Helper header and then right before "const string data_env
 
 ***Enable console and stats keys
 
-In shell.cpp-> handle game key, change:
+In shell.cpp-> handle_game_key(const SDL_Event &event), change:
 
 		else if (input_preferences->shell_key_bindings[_key_show_scores].count(sc) || key == SDLK_1) //iOS needs check for || key == SDLK_1
 
@@ -225,6 +226,9 @@ case mInterface:
 						begin_game(_single_player, cheat);
 					}
 
+					ForceRepaintMenuDisplay();
+					break;
+
 Also, in begin_game(), right before "// ZZZ: let the user use his behavior modifiers in single-player." Add this:
 			// iOS set custom entry level number
 			entry.level_number = helperGetEntryLevelNumber();
@@ -232,7 +236,7 @@ Also, in begin_game(), right before "// ZZZ: let the user use his behavior modif
 
 ***Disable SDL controller init
 
-In joystick_sdl.cpp, at the top of joystick_added() add:
+In joystick_sdl.cpp, at the top of joystick_added(int device_index)  add:
 	//On iOS, we handle the joystick elsewhere - double input is not ideal and may cause jitter. Just return.
 	return;
 
@@ -254,7 +258,7 @@ int Screen::window_width()
 }
 
 
-***If games are only rendering a black screen by now, fix issue with default framebuffer. Maybe the main GLES branch should do this, too?
+***If games are only rendering a black screen (or just stuck on the loading message) by now, fix an issue with default framebuffer. Maybe the main GLES branch should do this, too?
 
 In OGL_FBO.cpp->FBO::deactivate(), change the final glBindFramebuffer to:
 		//Binding to framebuffer 0 doesn't switch to the on-screen buffer on iOS.
@@ -292,14 +296,14 @@ And add this to mouse_idle() right after "snapshot_delta_y = 0;":
 
 ***Enable virtual keymap overlay
 
-In vbl.cpp->parse_keymap(), add the Helper header and replace the innermost condition I "// Parse the keymap" with:
+In vbl.cpp->parse_keymap(), add the Helper header and replace the deepest condition "// Parse the keymap" with:
 				if (key_map[code] || fake_key_map[code]) //iOS virtual input uses fake_key_map
 
 Also, right after "if (player_in_terminal_mode(local_player_index))", change the flag assignment to:
 flags = build_terminal_action_flags((char *)/*key_map*/fake_key_map); //iOS changed to fake_key_map
 
 
-In preprocess_map_sdl.cpp, att the #include "AlephOneHelper.h" header and override save_game with:
+In preprocess_map_sdl.cpp, at the #include "AlephOneHelper.h" header and override save_game with:
 bool save_game(void)
 {
 	//On iOS, just save with current saved game by calling the helper
@@ -309,7 +313,7 @@ bool save_game(void)
 
 ***Enable custom load and restore functionality
 
-In interface, add the Helper header and then override handle_load_game with:
+In interface.cpp, add the Helper header and then override handle_load_game with:
 void handle_load_game(
 	void)
 {
@@ -317,7 +321,7 @@ void handle_load_game(
   helperHandleLoadGame();
   return;
 
-In should_restore_network_game_networked() right before "if(d.run() == 0)" near the end of the function, return early with:
+In should_restore_game_networked() right before "if(d.run() == 0)" near the end of the function, return early with:
 	//iOS TODO: Test enable multiplayer restore. Currently, the dialog may not be shown.
 	if(dynamic_world->player_count != 0) {
 		switchToSDLMenu();
@@ -403,7 +407,7 @@ In Plugins.cpp->Plugin::valid() add the Helper header, and then add the iOS plug
 ***Allow the visual style to override map appearance
 
 In screen.cpp->map_is_translucent(void), add the Helper header and change the function to:
-	return ( (screen_mode.translucent_map || true) && NetAllowOverlayMap()); //iOS should always use translucent map, bnecause the opaque version sometimes is very slow to refresh for some reason.
+	return ( (screen_mode.translucent_map || true) && NetAllowOverlayMap()); //iOS should always use translucent map, because the opaque version sometimes is very slow to refresh for some reason.
 
 ***Override preferences with custom options
 
@@ -463,7 +467,7 @@ In preferences.cpp->graphics_preferences_tree(), add the Helper header. Right be
 		set_physics_file(physFile);
 		#endif
 
-Also in parse_input_preferences, add this right after "root.read_attr("controller_deadzone", input_preferences->controller_deadzone);"
+Also in parse_input_preferences, add this right before "short old_controller_deadzone_pref;"
 
 	//On iOS, always use extra mouse precision
 	input_preferences->extra_mouse_precision = true;
@@ -478,6 +482,7 @@ Also in sound_preferences_tree(), add this to the end:
 
 
 Also in parse_environment_preferences(), comment out the disable_plugin environment check in order to force-enable the Enhanced HUD for M1:
+	//Force enable Enhanced HUD for iOS
 	/*for (const InfoTree &plugin : root.children_named("disable_plugin"))
 	{
 		char tempstr[256];
@@ -523,7 +528,7 @@ bool isLivingMonster; //iOS smart trigger hint
 In RenderPlaceObjs.cpp , add this near the top:
 #include "monsters.h" //Needed for iOS smart trigger
 
-Then also add this in build_render_object(), right after "render_object= &RenderObjects[Length];":
+Then also add this in build_render_object(), right before "render_object->clipping_windows = nullptr;":
 				//Set iOS smart trigger hint
 				render_object->rectangle.isLivingMonster= 0;
 				if (GET_OBJECT_OWNER(object) == _object_is_monster)
@@ -584,27 +589,31 @@ Add the include:
 At the top of receive_thread_function(void*), add:
 pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0); //Set interactive QoS for iOS
 
-In NetDDPOpenSocket(), right before "// Set up socket set" add this:
-
-				//Set an appropriate network socket service type for iOS. First connection listening when hosting.
-				int	theSocketFD = ((int*)sSocket)[1];
-				int st = NET_SERVICE_TYPE_VO;
-				setsockopt(theSocketFD, SOL_SOCKET, SO_NET_SERVICE_TYPE, (void *)&st, sizeof(st));
+//The following is different in Asia. Maybe we don't need it anymore?
+//Skipping this as of August 21 2025
+//In NetDDPOpenSocket(), right before "// Set up socket set" add this:
+//
+//				//Set an appropriate network socket service type for iOS. First connection listening when hosting.
+//				int	theSocketFD = ((int*)sSocket)[1];
+//				int st = NET_SERVICE_TYPE_VO;
+//				setsockopt(theSocketFD, SOL_SOCKET, SO_NET_SERVICE_TYPE, (void *)&st, sizeof(st));
 
 
 In ViewControl.cpp->View_AdjustFOV(), add the Helper header then this line at the top:
-	FOV_Target += extraFieldOfView();
+	FOV_Target += extraFieldOfView(); //iOS adds extra FOV option
 
 
 ***Disable miniupnpc
 
 In config.h, undefine these (actually, maybe not needed...):
+//Skipping this as of August 21 2025
 
 /* ${desc_miniupnpc} enabled */
 #define HAVE_MINIUPNPC 0
 
 /* Define to 1 if you have the <miniupnpc/miniupnpc.h> header file. */
 #define HAVE_MINIUPNPC_MINIUPNPC_H 0
+
 
 
 ***Enable hiding of HUD and controls for cinematic recording

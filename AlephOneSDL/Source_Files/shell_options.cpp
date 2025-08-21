@@ -11,7 +11,6 @@
 #ifdef __WIN32__
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#undef CreateDirectory
 #endif
 
 static void print_usage();
@@ -96,7 +95,8 @@ static const std::vector<ShellOptionsFlag> shell_options_flags {
 	{"j", "nojoystick", "Do not initialize joysticks", shell_options.nojoystick},
 	{"i", "insecure_lua", "", shell_options.insecure_lua},
 	{"Q", "skip-intro", "Skip intro screens", shell_options.skip_intro},
-	{"e", "editor", "Use editor prefs; jump directly to map", shell_options.editor}
+	{"e", "editor", "Use editor prefs; jump directly to map", shell_options.editor},
+	{"", "no-chooser", "Disable the scenario chooser", shell_options.no_chooser}
 };
 
 static const std::vector<ShellOptionsString> shell_options_strings {

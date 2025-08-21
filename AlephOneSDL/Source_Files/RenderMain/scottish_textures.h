@@ -172,9 +172,8 @@ struct rectangle_definition
 	int LightDepth;				// For finding the amount of "miner's light"
 	GLfloat LightDirection[3];		// To the "light point"
 	short WorldLeft, WorldBottom, WorldRight, WorldTop;
-
 	bool isLivingMonster; //iOS smart trigger hint
-	
+
 	// Constructor required defaults
 	rectangle_definition() :
 		LowLevelShape(0) {}

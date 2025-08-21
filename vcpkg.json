@@ -32,6 +32,10 @@
             "libjpeg-turbo"
          ]
       },
+	  {
+		 "name":"asio",
+		 "platform": "!linux"
+	  },
       {
          "name":"sdl2-net"
       },
