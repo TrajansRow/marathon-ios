@@ -106,8 +106,7 @@
 #include "Console.h"
 
 extern void process_event(const SDL_Event &event);
-extern void execute_timer_tasks(uint32 time);
-
+extern void execute_timer_tasks(uint64_t time);
 
 void initialize_application(void);
 void AlephOneInitialize() {
@@ -121,27 +120,17 @@ static uint32 lastTimeThroughLoop = 0;
 //const uint32 TICKS_BETWEEN_EVENT_POLL = 167; // 6 Hz
 const uint32 TICKS_BETWEEN_EVENT_POLL = 16; // 60 Hz
 
-//last_event_poll and game_state need to be outside this scope, otherwise 3D sounds and console keys won't work.
-uint32 last_event_poll = 0;
-short game_state = 0;
 
 time_t start_time = time(NULL);
 time_t current_time;
 float frames = 0;
 
+//last_event_poll and game_state need to be outside of AlephOneMainLoop(), otherwise 3D sounds and console keys won't work.
+uint32 last_event_poll = 0;
+short game_state = 0;
 void AlephOneMainLoop()
 {
-	game_state = get_game_state();
-	frames++;
-	current_time = time(NULL);
-	if (difftime(current_time, start_time) >= 1.0) {
-		//printf("AlephOneMainLoop per second: %f GameState: %d\n", frames, game_state);
-		start_time = current_time; // Reset the start time
-		frames = 0;
-
-	}
-	
-	uint32 cur_time = machine_tick_count();
+	uint64_t cur_time = machine_tick_count();
 	bool yield_time = false;
 	bool poll_event = false;
 
@@ -177,7 +166,6 @@ void AlephOneMainLoop()
 			break;
 	}
 
-
 	if (poll_event) {
 		global_idle_proc();
 
@@ -186,10 +174,11 @@ void AlephOneMainLoop()
 		{
 			// The game is not in a "hot" state, yield time to other
 			// processes but only try for a maximum of 30ms
-	/*		if (SDL_WaitEventTimeout(&event, 30))
+			/*if (SDL_WaitEventTimeout(&event, 30))
 			{
 				process_event(event);
-			} This SDL_WaitEventTimeout() is causing slow framerates on Release builds on iOS. Not sure why yet. */
+			}*/
+			//This SDL_WaitEventTimeout() is causing slow framerates on RELEASE builds on iOS. Not sure why yet. */
 			//TODO: Figure this out!
 		}
 
@@ -201,7 +190,7 @@ void AlephOneMainLoop()
 #ifdef HAVE_STEAM
 		while (auto steam_event = STEAMSHIM_pump()) {
 			switch (steam_event->type) {
-				case SHIMEVENT_ISOVERLAYACTIVATED:
+				case SHIMEVENT_IS_OVERLAY_ACTIVATED:
 					if (steam_event->okay && get_game_state() == _game_in_progress && !game_is_networked)
 					{
 						pause_game();
@@ -236,7 +225,7 @@ void AlephOneMainLoop()
 	}
 	else if (game_state != _game_in_progress)
 	{
-		static auto last_redraw = 0;
+		static uint64_t last_redraw = 0U;
 		if (machine_tick_count() > last_redraw + TICKS_PER_SECOND / 30)
 		{
 			update_game_window();
