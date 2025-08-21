@@ -946,6 +946,7 @@ short localFindActionTarget(
   self.menuView.hidden = NO;
   mode = MenuMode;
   [self closeEvent];
+	resume_game(); // Need to unpause or else the music system gets stuck in a pause state and subsequent games won't start
   set_game_state(_close_game);
 }
 
