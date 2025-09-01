@@ -86,8 +86,8 @@ int64_t UDPsocket::broadcast_send(const UDPpacket& packet)
     asio::ip::udp::endpoint broadcast_endpoint(asio::ip::address_v4::broadcast(), packet.address.port());
 		
 		//iOS can only broadcast to the local subnet, so change broadcast_endpoint to local subnet if possible.
-		struct ifaddrs favoriteInterface = getFavoriteInterface();
-		if(favoriteInterface.ifa_addr != NULL) {
+		ifaddrs favoriteInterface = getFavoriteInterface();
+		if(favoriteInterface.ifa_addr) {
 			asio::ip::address_v4 ip_address = asio::ip::address_v4::from_string(inet_ntoa(((struct sockaddr_in *)favoriteInterface.ifa_addr)->sin_addr));
 			asio::ip::address_v4 netmask = asio::ip::address_v4::from_string(inet_ntoa(((struct sockaddr_in *)favoriteInterface.ifa_netmask)->sin_addr));
 			broadcast_endpoint = asio::ip::udp::endpoint(asio::ip::address_v4::broadcast(ip_address, netmask), packet.address.port());
