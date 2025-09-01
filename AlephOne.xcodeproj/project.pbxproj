@@ -6827,7 +6827,7 @@
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/lib";
-				MARKETING_VERSION = 6.5;
+				MARKETING_VERSION = 6.6;
 				OTHER_CFLAGS = "";
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
@@ -6926,7 +6926,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.5;
+				MARKETING_VERSION = 6.6;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",
@@ -7044,7 +7044,7 @@
 					"\"$(SRCROOT)/Frameworks/libGLESv2.framework\"",
 				);
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/lib";
-				MARKETING_VERSION = 6.5;
+				MARKETING_VERSION = 6.6;
 				OTHER_CFLAGS = "";
 				OTHER_LDFLAGS = (
 					"-lSDL2",
@@ -7146,7 +7146,7 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.5;
+				MARKETING_VERSION = 6.6;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7247,7 +7247,7 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.5;
+				MARKETING_VERSION = 6.6;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7344,7 +7344,7 @@
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/lib";
-				MARKETING_VERSION = 6.5;
+				MARKETING_VERSION = 6.6;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CFLAGS = "";
 				OTHER_LDFLAGS = (
@@ -7436,7 +7436,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.5;
+				MARKETING_VERSION = 6.6;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7529,7 +7529,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.5;
+				MARKETING_VERSION = 6.6;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7726,7 +7726,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.5;
+				MARKETING_VERSION = 6.6;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",
@@ -7833,7 +7833,7 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.5;
+				MARKETING_VERSION = 6.6;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7926,7 +7926,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.5;
+				MARKETING_VERSION = 6.6;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -8123,7 +8123,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.5;
+				MARKETING_VERSION = 6.6;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",

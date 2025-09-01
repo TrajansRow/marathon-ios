@@ -110,7 +110,7 @@ bool Music::Playing()
 }
 
 void Music::Idle()
-{ printf("Paused::: %d \n",OpenALManager::Get()->IsPaused());
+{
 	if (!SoundManager::instance()->IsInitialized() || !SoundManager::instance()->IsActive() || OpenALManager::Get()->IsPaused()) {
 		auto state1 = SoundManager::instance()->IsInitialized();
 		auto state2 = SoundManager::instance()->IsActive();

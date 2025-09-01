@@ -7,6 +7,8 @@
 //
 
 #include "SDL2/SDL.h"
+#include <ifaddrs.h>
+
 
 #ifdef __IPAD__
 // #define iWidth 1024
@@ -32,7 +34,8 @@ extern char* getLocalPrefsDir(); //DCW
 extern char* getLocalTmpDir(); //DCW
 extern char* getPhysicsFilePath();
 extern char* LANIP( char *prefix, char *suffix);
-extern void  overrideSomeA1Prefs();//DCW 
+extern ifaddrs getFavoriteInterface();
+extern void  overrideSomeA1Prefs();//DCW
 extern void helperBringUpHUD();
 
 extern int helperNewGame();

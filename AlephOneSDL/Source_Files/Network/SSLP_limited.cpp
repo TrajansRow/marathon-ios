@@ -441,10 +441,10 @@ SSLPint_Enter() {
 
     sSocketDescriptor = NetGetNetworkInterface()->udp_open_socket(SSLP_PORT);
     if (!sSocketDescriptor) return false;
-
+		
     if (!sSocketDescriptor->broadcast(true))
         return false;
-    
+
     // (note: if EnableBroadcast failed, it's not the end of the world... but it will be harder to locate services)
     assert(sBehaviorsDesired == SSLPINT_NONE);
     

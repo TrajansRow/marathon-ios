@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>BuildNumber</key>
-	<string>4568</string>
+	<string>4575</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -30,12 +30,14 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Supports Bluetooth controllers</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Uses the local network to discover multiplayer games.</string>
 	<key>NSMainNibFile</key>
 	<string>MainWindow</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Uses the microphone to communicate with other players.</string>
 	<key>SHA1</key>
-	<string>b72c12b4bf65229ff50023f20027927803e6cd34</string>
+	<string>c0ec67e95169ef18eea40bdde6f3279fe961eaab</string>
 	<key>UIInterfaceOrientation</key>
 	<string>UIInterfaceOrientationLandscapeRight</string>
 	<key>UILaunchStoryboardName</key>
