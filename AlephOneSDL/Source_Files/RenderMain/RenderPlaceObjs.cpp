@@ -306,14 +306,13 @@ render_object_data *RenderPlaceObjsClass::build_render_object(
 				}
 				
 				//Set iOS smart trigger hint
-				render_object->rectangle.isLivingMonster= 0;
+				bool isLivingMonster = FALSE;
 				if (GET_OBJECT_OWNER(object) == _object_is_monster)
 				{
 					struct monster_data *monster= get_monster_data(object->permutation);
-					if (monster && !MONSTER_IS_DYING(monster)) {
-						render_object->rectangle.isLivingMonster=1;
-					}
+					isLivingMonster =  monster && !MONSTER_IS_DYING(monster);
 				}
+				render_object->rectangle.isLivingMonster = isLivingMonster;
 
 				render_object->clipping_windows = nullptr;
 				render_object->rectangle.flags= 0;
@@ -453,6 +452,9 @@ render_object_data *RenderPlaceObjsClass::build_render_object(
 							parasitic_render_object->next_object= render_object;
 							render_object= parasitic_render_object;
 						}
+						
+						//Set iOS smart trigger hint
+						render_object->rectangle.isLivingMonster = isLivingMonster;
 					}
 				}
 			}
