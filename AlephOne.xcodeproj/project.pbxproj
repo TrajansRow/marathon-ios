@@ -188,13 +188,10 @@
 		5157760B261FAB150062A73F /* Monaco.dfont in Resources */ = {isa = PBXBuildFile; fileRef = 51577608261FAB140062A73F /* Monaco.dfont */; };
 		515BC3682DB6A3280040FA3E /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 515BC3652DB6A3280040FA3E /* Metal.framework */; };
 		515BC3692DB6A3280040FA3E /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 515BC3672DB6A3280040FA3E /* MetalKit.framework */; };
-		515BC36A2DB6A3280040FA3E /* MetalFX.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 515BC3662DB6A3280040FA3E /* MetalFX.framework */; };
 		515BC36B2DB6A3280040FA3E /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 515BC3652DB6A3280040FA3E /* Metal.framework */; };
 		515BC36C2DB6A3280040FA3E /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 515BC3672DB6A3280040FA3E /* MetalKit.framework */; };
-		515BC36D2DB6A3280040FA3E /* MetalFX.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 515BC3662DB6A3280040FA3E /* MetalFX.framework */; };
 		515BC36E2DB6A3280040FA3E /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 515BC3652DB6A3280040FA3E /* Metal.framework */; };
 		515BC36F2DB6A3280040FA3E /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 515BC3672DB6A3280040FA3E /* MetalKit.framework */; };
-		515BC3702DB6A3280040FA3E /* MetalFX.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 515BC3662DB6A3280040FA3E /* MetalFX.framework */; };
 		515BC3722DB6A7450040FA3E /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 515BC3712DB6A7450040FA3E /* OpenGLES.framework */; };
 		515BC3732DB6A7450040FA3E /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 515BC3712DB6A7450040FA3E /* OpenGLES.framework */; };
 		515BC3742DB6A7450040FA3E /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 515BC3712DB6A7450040FA3E /* OpenGLES.framework */; };
@@ -1950,7 +1947,6 @@
 		515303171DAD716200B0F62A /* CoreMotion.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMotion.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/CoreMotion.framework; sourceTree = DEVELOPER_DIR; };
 		51577608261FAB140062A73F /* Monaco.dfont */ = {isa = PBXFileReference; lastKnownFileType = file; name = Monaco.dfont; path = Resources/Monaco.dfont; sourceTree = "<group>"; };
 		515BC3652DB6A3280040FA3E /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/Metal.framework; sourceTree = DEVELOPER_DIR; };
-		515BC3662DB6A3280040FA3E /* MetalFX.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalFX.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/MetalFX.framework; sourceTree = DEVELOPER_DIR; };
 		515BC3672DB6A3280040FA3E /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/MetalKit.framework; sourceTree = DEVELOPER_DIR; };
 		515BC3712DB6A7450040FA3E /* OpenGLES.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGLES.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/OpenGLES.framework; sourceTree = DEVELOPER_DIR; };
 		516ECE8C1F46195800D38BB2 /* GenericLoadingBackground.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = GenericLoadingBackground.png; sourceTree = "<group>"; };
@@ -3003,7 +2999,6 @@
 			files = (
 				515BC3682DB6A3280040FA3E /* Metal.framework in Frameworks */,
 				515BC3692DB6A3280040FA3E /* MetalKit.framework in Frameworks */,
-				515BC36A2DB6A3280040FA3E /* MetalFX.framework in Frameworks */,
 				512E0C041E70C85D000B0C98 /* ImageIO.framework in Frameworks */,
 				A8CB80ED13A28662004D6DBD /* AudioToolbox.framework in Frameworks */,
 				A8AD43511222125200A09383 /* CoreData.framework in Frameworks */,
@@ -3040,7 +3035,6 @@
 			files = (
 				515BC36B2DB6A3280040FA3E /* Metal.framework in Frameworks */,
 				515BC36C2DB6A3280040FA3E /* MetalKit.framework in Frameworks */,
-				515BC36D2DB6A3280040FA3E /* MetalFX.framework in Frameworks */,
 				513436EA2266CAE700435C9D /* GameController.framework in Frameworks */,
 				51C730451E59027900558D7D /* CoreAudio.framework in Frameworks */,
 				A88121E412C7816300A1A08E /* AVFoundation.framework in Frameworks */,
@@ -3077,7 +3071,6 @@
 			files = (
 				515BC36E2DB6A3280040FA3E /* Metal.framework in Frameworks */,
 				515BC36F2DB6A3280040FA3E /* MetalKit.framework in Frameworks */,
-				515BC3702DB6A3280040FA3E /* MetalFX.framework in Frameworks */,
 				A88123E512C7826300A1A08E /* MobileCoreServices.framework in Frameworks */,
 				512E0C061E70C85D000B0C98 /* ImageIO.framework in Frameworks */,
 				51C730461E59027900558D7D /* CoreAudio.framework in Frameworks */,
@@ -3215,7 +3208,6 @@
 				A8C4B6FD12EFCD6900D5D23F /* Foundation.framework */,
 				A8C4B6FF12EFCD6900D5D23F /* MobileCoreServices.framework */,
 				515BC3652DB6A3280040FA3E /* Metal.framework */,
-				515BC3662DB6A3280040FA3E /* MetalFX.framework */,
 				515BC3672DB6A3280040FA3E /* MetalKit.framework */,
 				A8C4B70112EFCD6900D5D23F /* Security.framework */,
 				A8C4B70512EFCD6900D5D23F /* SystemConfiguration.framework */,
@@ -6827,7 +6819,7 @@
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/lib";
-				MARKETING_VERSION = 6.6;
+				MARKETING_VERSION = 6.7;
 				OTHER_CFLAGS = "";
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
@@ -6926,7 +6918,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.6;
+				MARKETING_VERSION = 6.7;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",
@@ -7044,7 +7036,7 @@
 					"\"$(SRCROOT)/Frameworks/libGLESv2.framework\"",
 				);
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/vcpkg/installed-arm64-ios-simulator/arm64-ios-simulator/lib";
-				MARKETING_VERSION = 6.6;
+				MARKETING_VERSION = 6.7;
 				OTHER_CFLAGS = "";
 				OTHER_LDFLAGS = (
 					"-lSDL2",
@@ -7146,7 +7138,7 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.6;
+				MARKETING_VERSION = 6.7;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7247,7 +7239,7 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.6;
+				MARKETING_VERSION = 6.7;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -7726,7 +7718,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.6;
+				MARKETING_VERSION = 6.7;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",
@@ -7833,7 +7825,7 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.6;
+				MARKETING_VERSION = 6.7;
 				OTHER_LDFLAGS = (
 					"-lSDL2",
 					"-liconv",
@@ -8123,7 +8115,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/vcpkg/installed-arm64-ios/arm64-ios/lib";
-				MARKETING_VERSION = 6.6;
+				MARKETING_VERSION = 6.7;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-Wnoc++11-narrowing",

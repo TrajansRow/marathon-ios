@@ -61,6 +61,10 @@ void NonblockingConnect::connect()
 
 int NonblockingConnect::connect_thread(void *p)
 {
+		//Set interactive QoS for iOS
+	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
+	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
+	
 	NonblockingConnect *nbc = static_cast<NonblockingConnect *>(p);
 	return nbc->Thread();
 }

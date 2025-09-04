@@ -530,14 +530,19 @@ In RenderPlaceObjs.cpp , add this near the top:
 
 Then also add this in build_render_object(), right before "render_object->clipping_windows = nullptr;":
 				//Set iOS smart trigger hint
-				render_object->rectangle.isLivingMonster= 0;
+				bool isLivingMonster = FALSE;
 				if (GET_OBJECT_OWNER(object) == _object_is_monster)
 				{
 					struct monster_data *monster= get_monster_data(object->permutation);
-					if (monster && !MONSTER_IS_DYING(monster)) {
-						render_object->rectangle.isLivingMonster=1;
-					}
+					isLivingMonster =  monster && !MONSTER_IS_DYING(monster);
 				}
+				render_object->rectangle.isLivingMonster = isLivingMonster;
+
+In the same function, to get auto trigger on player torsos, add this to the END of the "if (parasitic_render_object)" block:
+
+						//Set iOS smart trigger hint
+						render_object->rectangle.isLivingMonster = isLivingMonster;
+
 
 
 In RenderRasterizeShader->_render_node_object_helper() add the Helper header, and then add this before the FIRST "DC()->addTriangleFan(4, vertex_array, texcoord_array, NULL);" call:
@@ -580,16 +585,24 @@ In network_dialogs.cpp, in SdlGatherDialog(), replace the line "autogather_place
 
 ***Set recommended QoS settings
 
-In network_udp.cpp
+
+In network_udp.cpp:
 
 Add the include:
 #include <sys/socket.h> //Needed for setting QOS on iOS
 
+There are *FOUR* places in the code where we place this. Right at the top of the following functions (thread_loop(void* inData), StatsManager::Run(void *pv), NonblockingConnect::connect_thread(void *p), receive_thread_function(void*)) Add this:
 
-At the top of receive_thread_function(void*), add:
-pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0); //Set interactive QoS for iOS
+		//Set interactive QoS for iOS
+	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
+	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
 
-//The following is different in Asia. Maybe we don't need it anymore?
+
+
+In thread_priority_sdl_macosx.cpp:::::::::::::::::::::
+
+
+//The following is different in asio. Maybe we don't need it anymore?
 //Skipping this as of August 21 2025
 //In NetDDPOpenSocket(), right before "// Set up socket set" add this:
 //
@@ -598,8 +611,25 @@ pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0); //Set interactive Q
 //				int st = NET_SERVICE_TYPE_VO;
 //				setsockopt(theSocketFD, SOL_SOCKET, SO_NET_SERVICE_TYPE, (void *)&st, sizeof(st));
 
+In NetworkINterface.h, comment out this in class UDPSocket and make it public:
+private:
+		//asio::ip::udp::socket _socket;
+public:
+		asio::ip::udp::socket _socket; //Make public for iOS
 
-***Enable local subnet broadcast for 
+In network_udp.cpp, in NetDDPOpenSocket() just after "if (!sSocket) return false;" add:
+
+	//set service type for iOS
+	asio::detail::socket_type native_socket = sSocket->_socket.native_handle();
+	int service_type = NET_SERVICE_TYPE_VO;
+	if (setsockopt(native_socket, SOL_SOCKET, SO_NET_SERVICE_TYPE,
+								 &service_type, sizeof(service_type)) == -1) {
+		fdprintf("warning: Failed to set socket service type. Network performance may suffer\n");
+	}
+
+
+
+***Enable local subnet broadcast for netgame discovery
 ***MAY NOT BE NEEDED IF ALEPH ONE DOES THIS ITSELF IN THE FUTURE
 In NetworkINterface.cpp->UDPsocket::broadcast_send, add the following directly after "asio::ip::udp::endpoint broadcast_endpoint(asio::ip::address_v4::broadcast(), packet.address.port());"
 

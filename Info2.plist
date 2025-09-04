@@ -28,6 +28,8 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>GCSupportsGameMode</key>
+	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Supports Bluetooth controllers</string>
 	<key>NSLocalNetworkUsageDescription</key>

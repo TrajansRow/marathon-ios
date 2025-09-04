@@ -1888,6 +1888,9 @@ short items[]=
 }
 
 - (void)runMainLoopOnce:(id)sender {
+	
+		pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0); //Set interactive QoS for iOS for the main loop, also
+	
       //Capture touch movement deltas immediately!
     grabMovementDeltasForCurrentFrameAtInterval( (NSTimeInterval)[(CADisplayLink*)displayLink timestamp] ); //This will probably crash if displayLink is not supported.
   

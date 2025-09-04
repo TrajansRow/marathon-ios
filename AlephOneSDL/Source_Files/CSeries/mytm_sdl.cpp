@@ -126,6 +126,10 @@ release_mytm_mutex() {
 // Tries to be drift-free.
 static int
 thread_loop(void* inData) {
+		//Set interactive QoS for iOS
+	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
+	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
+
     myTMTask*	theTMTask	= (myTMTask*) inData;
     
 	uint64_t theLastRunTime	= machine_tick_count();

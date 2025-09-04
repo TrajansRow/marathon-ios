@@ -49,7 +49,10 @@ static SDL_Thread* sReceivingThread = NULL;
 // packet handler when it gets something.
 static int
 receive_thread_function(void*) {
-	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0); //Set interactive QoS for iOS
+	
+		//Set interactive QoS for iOS
+	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
+	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
 
 	UDPpacket packet;
 	sSocket->register_receive_async(packet);
@@ -90,6 +93,14 @@ bool NetDDPOpenSocket(uint16_t ioPortNumber, PacketHandlerProcPtr packetHandler)
 	sPacketHandler = packetHandler;
 	sSocket = NetGetNetworkInterface()->udp_open_socket(ioPortNumber);
 	if (!sSocket) return false;
+
+	//Set service type for iOS
+	asio::detail::socket_type native_socket = sSocket->_socket.native_handle();
+	int service_type = NET_SERVICE_TYPE_VO;
+	if (setsockopt(native_socket, SOL_SOCKET, SO_NET_SERVICE_TYPE,
+								 &service_type, sizeof(service_type)) == -1) {
+		fdprintf("warning: Failed to set socket service type. Network performance may suffer\n");
+	}
 
 	// Set up receiver
 	sKeepListening = true;
