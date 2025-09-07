@@ -149,6 +149,11 @@ extern int helperLongScreenDimension(); //DCW
 extern int helperShortScreenDimension(); //DCW
 extern float helperScreenScale();
 
+	//Thread priority boost
+void boost_ios_thread_priority();
+
+	//Thread debugging
+extern void print_qos_class();
 
 // C linkage
 #if defined(__cplusplus)

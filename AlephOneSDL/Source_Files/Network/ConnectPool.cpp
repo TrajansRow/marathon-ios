@@ -24,6 +24,7 @@
 #include "ConnectPool.h"
 #include "network.h"
 #include <utility>
+#include "AlephOneHelper.h" //Needed for iOS port
 
 
 NonblockingConnect::NonblockingConnect(const std::string& address, uint16 port)
@@ -62,9 +63,8 @@ void NonblockingConnect::connect()
 int NonblockingConnect::connect_thread(void *p)
 {
 		//Set interactive QoS for iOS
-	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
-	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
-	
+	boost_ios_thread_priority();
+
 	NonblockingConnect *nbc = static_cast<NonblockingConnect *>(p);
 	return nbc->Thread();
 }

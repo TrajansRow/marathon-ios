@@ -29,6 +29,8 @@
 #include <functional>
 #include <sstream>
 
+#include "AlephOneHelper.h" //Needed for iOS port
+
 class ScopedMutex
 {
 public:
@@ -111,8 +113,7 @@ static uint32 checksum_string(const std::string& s)
 int StatsManager::Run(void *pv)
 {
 		//Set interactive QoS for iOS
-	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
-	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
+	boost_ios_thread_priority();
 
 	
 	StatsManager* sm = reinterpret_cast<StatsManager*>(pv);

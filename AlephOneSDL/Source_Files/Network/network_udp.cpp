@@ -36,6 +36,7 @@
 #include "network_private.h"
 #include "mytm.h" // mytm_mutex stuff
 #include <sys/socket.h> //Needed for setting QOS on iOS
+#include "AlephOneHelper.h" //Needed for iOS port
 
 // Keep track of our one sending/receiving socket
 static std::unique_ptr<UDPsocket> sSocket;
@@ -51,8 +52,7 @@ static int
 receive_thread_function(void*) {
 	
 		//Set interactive QoS for iOS
-	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
-	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
+	boost_ios_thread_priority();
 
 	UDPpacket packet;
 	sSocket->register_receive_async(packet);

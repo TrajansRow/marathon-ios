@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>BuildNumber</key>
-	<string>2871</string>
+	<string>2873</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -41,7 +41,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Uses the microphone to communicate with other players.</string>
 	<key>SHA1</key>
-	<string>c0ec67e95169ef18eea40bdde6f3279fe961eaab</string>
+	<string>07467a47c20f0df97bfa2bd8b4e81058a953dfcd</string>
 	<key>UIInterfaceOrientation</key>
 	<string>UIInterfaceOrientationLandscapeRight</string>
 	<key>UILaunchStoryboardName</key>

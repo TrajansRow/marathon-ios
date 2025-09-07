@@ -19,6 +19,9 @@
 #include "computer_interface.h" //Used for player in terminal check
 #include "SDL2/SDL_syswm.h"
 
+//#include <mach/mach.h>
+#include <mach/thread_info.h>
+
 #include <sys/sysctl.h>
 
 #include "player.h"
@@ -880,3 +883,32 @@ float helperScreenScale(){
   return screenScale;
 }
 
+void boost_ios_thread_priority() {
+	//Set interactive QoS for iOS
+	//SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL); //This seems incompatible with pthread_set_qos_class_self_np; the class changes to QOS_CLASS_UNSPECIFIED
+	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
+}
+
+void print_qos_class() {
+		pthread_t thread = pthread_self();
+		qos_class_t qos;
+		int relprio;
+
+		if (pthread_get_qos_class_np(thread, &qos, &relprio) == 0) {
+				const char* qos_name = "UNKNOWN";
+				switch (qos) {
+						case QOS_CLASS_USER_INTERACTIVE: qos_name = "USER_INTERACTIVE"; break;
+						case QOS_CLASS_USER_INITIATED:   qos_name = "USER_INITIATED";   break;
+						case QOS_CLASS_DEFAULT:          qos_name = "DEFAULT";          break;
+						case QOS_CLASS_UTILITY:          qos_name = "UTILITY";          break;
+						case QOS_CLASS_BACKGROUND:       qos_name = "BACKGROUND";       break;
+						case QOS_CLASS_UNSPECIFIED:      qos_name = "UNSPECIFIED";      break;
+				}
+				// Retrieve the name
+				char name[64];
+				if (pthread_getname_np(pthread_self(), name, sizeof(name)) == 0)
+				printf("***%s ***   QoS Class: %s, Relative Priority: %d\n", name, qos_name, relprio);
+		} else {
+				perror("pthread_get_qos_class_np");
+		}
+}

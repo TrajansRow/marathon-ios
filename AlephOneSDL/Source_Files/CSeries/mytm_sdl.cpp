@@ -52,6 +52,8 @@
 
 #include "Logging.h"
 
+#include "AlephOneHelper.h" //Needed for iOS port
+
 #ifndef NO_STD_NAMESPACE
 using std::vector;
 #endif
@@ -127,8 +129,7 @@ release_mytm_mutex() {
 static int
 thread_loop(void* inData) {
 		//Set interactive QoS for iOS
-	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
-	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
+	boost_ios_thread_priority();
 
     myTMTask*	theTMTask	= (myTMTask*) inData;
     

@@ -594,12 +594,9 @@ Add the include:
 There are *FOUR* places in the code where we place this. Right at the top of the following functions (thread_loop(void* inData), StatsManager::Run(void *pv), NonblockingConnect::connect_thread(void *p), receive_thread_function(void*)) Add this:
 
 		//Set interactive QoS for iOS
-	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
-	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
+	boost_ios_thread_priority();
 
 
-
-In thread_priority_sdl_macosx.cpp:::::::::::::::::::::
 
 
 //The following is different in asio. Maybe we don't need it anymore?
