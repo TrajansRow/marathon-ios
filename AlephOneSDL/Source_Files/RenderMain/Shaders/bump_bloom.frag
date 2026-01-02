@@ -44,10 +44,19 @@ void main (void) {
     texCoords += vec3(normXY.y * -pulsate, normXY.x * pulsate, 0.0);
     texCoords += vec3(normXY.y * -wobble * texCoords.y, wobble * texCoords.y, 0.0);
     vec3 viewv = normalize(viewDir);
-    // iterative parallax mapping
-    float scale = 0.010;
-    float bias = -0.005;
-    for(int i = 0; i < 4; ++i) {
+    // iterative parallax mapping with distance-based tapering
+    float viewDistance = length(viewDir);
+    const float PARALLAX_NEAR = 2048.0;   // distance where full effect begins
+    const float PARALLAX_FAR  = 4096.0;  // beyond this, skip parallax
+    float parallaxT = clamp((PARALLAX_FAR - viewDistance) / (PARALLAX_FAR - PARALLAX_NEAR), 0.0, 1.0);
+
+    // Compute max steps [0..4] and attenuate effect with distance
+    int maxSteps = int(floor(parallaxT * 4.0 + 0.5));
+    float scale = 0.010 * parallaxT;
+    float bias  = -0.005 * parallaxT;
+
+    for (int i = 0; i < 4; ++i) {
+        if (i >= maxSteps) { break; }
         vec4 normal = texture2D(texture1, texCoords.xy);
         float h = normal.a * scale + bias;
         texCoords.x += h * viewv.x;

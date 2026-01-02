@@ -128,38 +128,47 @@ vec4 spotLighting(vec4 baseColor, vec3 norm) {
 }
 
 void main (void) {
-   if( dot( vPosition_eyespace, clipPlane0) < 0.0 ) {discard;}
-   if( dot( vPosition_eyespace, clipPlane1) < 0.0 ) {discard;}
-   if( dot( vPosition_eyespace, clipPlane5) < 0.0 ) {discard;}
-   vec3 texCoords = vec3(textureUV.xy, 0.0);
-    vec3 normXY = normalize(viewXY);
-    texCoords += vec3(normXY.y * -pulsate, normXY.x * pulsate, 0.0);
-    texCoords += vec3(normXY.y * -wobble * texCoords.y, wobble * texCoords.y, 0.0);
-    float mlFactor = clamp(selfLuminosity + flare - (length(viewDir)/8192.0), 0.0, 1.0);
-    vec3 intensity;
-    if (vertexColor.r > mlFactor) {
-        intensity = vertexColor.rgb + (mlFactor * 0.5); }
-    else {
-        intensity = (vertexColor.rgb * 0.5) + mlFactor; }
-    vec3 viewv = normalize(viewDir);
-    // iterative parallax mapping
-    float scale = 0.010;
-    float bias = -0.005;
-    for(int i = 0; i < 4; ++i) {
-        vec4 normal = texture2D(texture1, texCoords.xy);
-        float h = normal.a * scale + bias;
-        texCoords.x += h * viewv.x;
-        texCoords.y -= h * viewv.y;
-    }
-    vec3 norm = (texture2D(texture1, texCoords.xy).rgb - 0.5) * 2.0;
-    float diffuse = 0.5 + abs(dot(norm, viewv))*0.5;
-   if (glow > 0.001) {
-       diffuse = 1.0;
-   }
-    vec4 color = texture2D(texture0, texCoords.xy);
-    intensity = clamp(intensity * diffuse, glow, 1.0);
+	 if( dot( vPosition_eyespace, clipPlane0) < 0.0 ) {discard;}
+	 if( dot( vPosition_eyespace, clipPlane1) < 0.0 ) {discard;}
+	 if( dot( vPosition_eyespace, clipPlane5) < 0.0 ) {discard;}
+	 vec3 texCoords = vec3(textureUV.xy, 0.0);
+		vec3 normXY = normalize(viewXY);
+		texCoords += vec3(normXY.y * -pulsate, normXY.x * pulsate, 0.0);
+		texCoords += vec3(normXY.y * -wobble * texCoords.y, wobble * texCoords.y, 0.0);
+		float mlFactor = clamp(selfLuminosity + flare - (length(viewDir)/8192.0), 0.0, 1.0);
+		vec3 intensity;
+		if (vertexColor.r > mlFactor) {
+				intensity = vertexColor.rgb + (mlFactor * 0.5); }
+		else {
+				intensity = (vertexColor.rgb * 0.5) + mlFactor; }
+		vec3 viewv = normalize(viewDir);
+		// iterative parallax mapping with distance-based tapering
+		float viewDistance = length(viewDir);
+		const float PARALLAX_NEAR = 2048.0;   // distance where full effect begins
+		const float PARALLAX_FAR  = 4096.0;  // beyond this, skip parallax
+		float parallaxT = clamp((PARALLAX_FAR - viewDistance) / (PARALLAX_FAR - PARALLAX_NEAR), 0.0, 1.0);
+
+		// Compute max steps [0..4] and attenuate effect with distance
+		int maxSteps = int(floor(parallaxT * 4.0 + 0.5));
+		float scale = 0.010 * parallaxT;
+		float bias  = -0.005 * parallaxT;
+
+		for (int i = 0; i < 4; ++i) {
+				if (i >= maxSteps) { break; }
+				vec4 normal = texture2D(texture1, texCoords.xy);
+				float h = normal.a * scale + bias;
+				texCoords.x += h * viewv.x;
+				texCoords.y -= h * viewv.y;
+		}
+		vec3 norm = (texture2D(texture1, texCoords.xy).rgb - 0.5) * 2.0;
+		float diffuse = 0.5 + abs(dot(norm, viewv))*0.5;
+	 if (glow > 0.001) {
+			 diffuse = 1.0;
+	 }
+		vec4 color = texture2D(texture0, texCoords.xy);
+		intensity = clamp(intensity * diffuse, glow, 1.0);
 #ifdef GAMMA_CORRECTED_BLENDING
-    intensity = intensity * intensity; // approximation of pow(intensity, 2.2)
+		intensity = intensity * intensity; // approximation of pow(intensity, 2.2)
 #endif
 	float fogFactor = getFogFactor(length(viewDir));
 	
@@ -167,7 +176,8 @@ void main (void) {
 	lightAddition += spotLighting(color, norm);
 	//lightAddition += areaLighting(color, norm);
 
-    gl_FragColor = vec4(mix(fogColor.rgb, lightAddition.rgb + color.rgb * intensity, fogFactor), vertexColor.a * color.a);
+		gl_FragColor = vec4(mix(fogColor.rgb, lightAddition.rgb + color.rgb * intensity, fogFactor), vertexColor.a * color.a);
+
 }
 
 )"
